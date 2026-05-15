@@ -4,6 +4,7 @@ import com.strands.agents.core.internal.ChatMessageConverter;
 import com.strands.agents.core.model.agent.*;
 import com.strands.agents.core.model.event.*;
 import com.strands.agents.core.model.message.Message;
+import com.strands.agents.core.model.session.Session;
 import com.strands.agents.core.model.tool.ToolCall;
 import com.strands.agents.core.model.tool.ToolExecutionResult;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
@@ -30,18 +31,33 @@ public class StrandsAgent implements Agent {
     private final ToolRegistry toolRegistry;
     private final ToolExecutor toolExecutor;
     private final String sessionId;
+    private final ConversationManager conversationManager;
+    private final SessionManager sessionManager;
     private AgentEventListener eventListener;
 
     public StrandsAgent(ChatModel model) {
-        this(model, new ToolRegistry(), new ToolExecutor());
+        this(model, new ToolRegistry(), new ToolExecutor(), null, null);
     }
 
     public StrandsAgent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor) {
+        this(model, toolRegistry, toolExecutor, null, null);
+    }
+
+    public StrandsAgent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
+                        ConversationManager conversationManager) {
+        this(model, toolRegistry, toolExecutor, conversationManager, null);
+    }
+
+    public StrandsAgent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
+                        ConversationManager conversationManager, SessionManager sessionManager) {
         this.model = model;
         this.toolRegistry = toolRegistry;
         this.toolExecutor = toolExecutor;
+        this.conversationManager = conversationManager;
+        this.sessionManager = sessionManager;
         this.chatMemory = MessageWindowChatMemory.builder()
-            .maxMessages(20)
+            .maxMessages(conversationManager instanceof SlidingWindowConversationManager sw
+                ? sw.windowSize() : 20)
             .build();
         this.sessionId = UUID.randomUUID().toString();
     }
@@ -55,20 +71,75 @@ public class StrandsAgent implements Agent {
         return execute(prompt, Map.of());
     }
 
+    public AgentResult execute(String sessionId, String prompt) {
+        return execute(sessionId, prompt, Map.of());
+    }
+
     public AgentResult execute(String prompt, Map<String, Object> contextVariables) {
+        return executeWithSession(sessionId, prompt, contextVariables, false);
+    }
+
+    public AgentResult execute(String sessionId, String prompt, Map<String, Object> contextVariables) {
+        return executeWithSession(sessionId, prompt, contextVariables, true);
+    }
+
+    private AgentResult executeWithSession(String sid, String prompt, Map<String, Object> contextVariables,
+                                           boolean useSessionManager) {
+        if (useSessionManager && sessionManager != null) {
+            var session = sessionManager.loadSession(sid)
+                .orElseGet(() -> sessionManager.createSession("default", Map.of()));
+            if (chatMemory instanceof MessageWindowChatMemory mwcm) {
+                mwcm.clear();
+                ChatMessageConverter.toLangChain4jMessages(session.messages())
+                    .forEach(mwcm::add);
+            }
+        }
+
+        var result = executeLoop(sid, prompt, contextVariables);
+
+        if (useSessionManager && sessionManager != null) {
+            var messages = ChatMessageConverter.toDomainMessages(chatMemory.messages());
+            var loaded = sessionManager.loadSession(sid);
+            loaded.ifPresent(session -> {
+                var status = result.stopReason() == StopReason.ERROR
+                    ? AgentStatus.FAILED : AgentStatus.COMPLETED;
+                var newState = new AgentState(sid, messages, contextVariables, status);
+                var updated = new Session(sid, session.agentName(), messages, newState,
+                    session.metadata(), session.createdAt(), Instant.now());
+                sessionManager.saveSession(updated);
+            });
+        }
+
+        return result;
+    }
+
+    private AgentResult executeLoop(String sid, String prompt, Map<String, Object> contextVariables) {
         var start = System.nanoTime();
         int totalInputTokens = 0;
         int totalOutputTokens = 0;
         int toolCallCount = 0;
 
-        fire(new AgentStartedEvent(sessionId, Instant.now(), prompt));
+        fire(new AgentStartedEvent(sid, Instant.now(), prompt));
 
         chatMemory.add(UserMessage.from(prompt));
 
         for (int iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
             var currentMessages = chatMemory.messages();
             var domainMessages = ChatMessageConverter.toDomainMessages(currentMessages);
-            fire(new ModelRequestedEvent(sessionId, Instant.now(), domainMessages));
+
+            if (conversationManager != null) {
+                domainMessages = conversationManager.prune(domainMessages);
+                var prunedLangChain = ChatMessageConverter.toLangChain4jMessages(domainMessages);
+                if (chatMemory instanceof MessageWindowChatMemory mwcm) {
+                    mwcm.clear();
+                    for (var msg : prunedLangChain) {
+                        mwcm.add(msg);
+                    }
+                }
+                currentMessages = prunedLangChain;
+            }
+
+            fire(new ModelRequestedEvent(sid, Instant.now(), domainMessages));
 
             var requestBuilder = ChatRequest.builder()
                 .messages(currentMessages);
@@ -93,20 +164,20 @@ public class StrandsAgent implements Agent {
                 var generatedMessages = ChatMessageConverter.toDomainMessages(chatMemory.messages());
 
                 var result = new AgentResult(
-                    sessionId,
+                    sid,
                     aiMessage.text(),
                     generatedMessages,
                     new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
                     StopReason.COMPLETED
                 );
-                fire(new AgentFinishedEvent(sessionId, Instant.now(), result.finalAnswer()));
+                fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
                 return result;
             }
 
             toolCallCount += aiMessage.toolExecutionRequests().size();
 
             for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
-                fire(new ToolExecutionStartedEvent(sessionId, Instant.now(),
+                fire(new ToolExecutionStartedEvent(sid, Instant.now(),
                     new ToolCall(req.id(), req.name(), req.arguments())));
             }
 
@@ -122,31 +193,31 @@ public class StrandsAgent implements Agent {
                     if (request != null) {
                         chatMemory.add(ToolExecutionResultMessage.from(request, r.result()));
                     }
-                    fire(new ToolExecutionFinishedEvent(sessionId, Instant.now(), r));
+                    fire(new ToolExecutionFinishedEvent(sid, Instant.now(), r));
                 }
             } catch (Exception e) {
                 var durationMs = (System.nanoTime() - start) / 1_000_000;
                 var result = new AgentResult(
-                    sessionId,
+                    sid,
                     "Tool-Fehler: " + e.getMessage(),
                     ChatMessageConverter.toDomainMessages(chatMemory.messages()),
                     new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
                     StopReason.ERROR
                 );
-                fire(new AgentFinishedEvent(sessionId, Instant.now(), result.finalAnswer()));
+                fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
                 return result;
             }
         }
 
         var durationMs = (System.nanoTime() - start) / 1_000_000;
         var result = new AgentResult(
-            sessionId,
+            sid,
             "Maximale Iterationen erreicht",
             ChatMessageConverter.toDomainMessages(chatMemory.messages()),
             new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
             StopReason.MAX_ITERATIONS
         );
-        fire(new AgentFinishedEvent(sessionId, Instant.now(), result.finalAnswer()));
+        fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
         return result;
     }
 

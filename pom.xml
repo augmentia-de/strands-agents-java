@@ -13,6 +13,7 @@
 
     <modules>
         <module>strands-agents-core</module>
+        <module>strands-agents-mcp</module>
         <module>strands-agents-sessions</module>
         <module>strands-agents-examples</module>
     </modules>

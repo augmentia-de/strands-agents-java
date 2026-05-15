@@ -8,5 +8,6 @@ public record ToolMessage(
     Instant timestamp,
     String content,
     Map<String, Object> metadata,
-    String toolCallId
+    String toolCallId,
+    String toolName
 ) implements Message {}

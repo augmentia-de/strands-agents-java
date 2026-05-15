@@ -16,6 +16,8 @@ class AgentConfigTest {
         assertThat(config.maxIterations()).isEqualTo(10);
         assertThat(config.toolClassNames()).isEmpty();
         assertThat(config.routes()).isEmpty();
+        assertThat(config.conversationManager()).isNull();
+        assertThat(config.sessionManager()).isNull();
     }
 
     @Test
@@ -33,5 +35,19 @@ class AgentConfigTest {
         assertThat(config.toolClassNames()).contains("com.strands.agents.core.tools.CalculatorTool");
         assertThat(config.maxIterations()).isEqualTo(15);
         assertThat(config.routes()).containsEntry("wetter", "weather-agent");
+        assertThat(config.conversationManager()).isNull();
+        assertThat(config.sessionManager()).isNull();
+    }
+
+    @Test
+    void shouldBuildWithConversationManager() {
+        var slidingWindow = new SlidingWindowConversationManager(5);
+        var config = AgentConfig.builder()
+            .name("agent-mit-gedaechtnis")
+            .conversationManager(slidingWindow)
+            .build();
+
+        assertThat(config.conversationManager()).isSameAs(slidingWindow);
+        assertThat(config.conversationManager()).isInstanceOf(SlidingWindowConversationManager.class);
     }
 }

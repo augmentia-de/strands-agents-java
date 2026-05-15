@@ -1,10 +1,13 @@
 # Strands Agents SDK – Java 21 Portierung
 
-Portierung des Python **Strands Agents SDK** nach **Java 21** mit **LangChain4j**.
+Portierung des **Strands Agents SDK (TypeScript)** nach **Java 21** mit **LangChain4j**.
+
+> **Leitprinzip:** Umfassende Funktionalität ist wichtiger als das jeweils neueste LLM oder Drittsystem-Integrationen.  
+> Daher wird zuerst das vollständige SDK-Kern-Feature-Set abgebildet (Phasen 1–5), bevor optionale Enterprise-Erweiterungen folgen (Phase 6).
 
 ## Voraussetzungen
 
-- Java 21 (JDK)
+- Java 21 (JDK) mit `--enable-preview`
 - Maven 3.9+
 - Optional: OpenAI API-Key (`OPENAI_API_KEY`) für echte LLM-Aufrufe
 
@@ -55,14 +58,19 @@ strands-agents-java
  └── docs/                     Phasenplan, Architektur, Entscheidungen
 ```
 
+Zukünftige Module (geplant):
+- `strands-agents-mcp` – MCP Client für dynamische Tools (Step 9)
+- `strands-agents-telemetry` – OpenTelemetry + Micrometer (Step 13)
+
 ## Phasenübersicht
 
 | Phase | Thema | Status |
 |---|---|---|
-| 1 | Datenmodell, Maven-Setup | ✅ |
-| 2 | Core Agent Loop | ✅ |
-| 3 | Tool-Infrastruktur, Session-Stores | ✅ |
-| 4 | Event-System, Observability | ✅ |
-| 5 | Multi-Agent, MCP, A2A | 📅 |
+| **1** Foundation – Setup, Agent Loop, Tools, Events, A2A | ✅ **Komplett** |
+| **2** Robustheit & Konversation – Conversation Manager, Session Persistierung | 🔲 Geplant |
+| **3** Modell- & Tool-Diversifikation – Multi-Provider, MCP Client | 🔲 Geplant |
+| **4** Event-Loop Optimierung – Token Recovery, Retries, Streaming | 🔲 Geplant |
+| **5** Orchestrierung & Ökosystem – Enhanced A2A, LLM Routing, Telemetry | 🔲 Geplant |
+| **6** Enterprise (optional) – Vault, DB, Kafka, K8s, Spring Boot | 📅 Optional |
 
 Details in [`docs/`](docs/).
