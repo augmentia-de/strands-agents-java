@@ -60,6 +60,7 @@ public class ChatCLI {
                 case ToolExecutionStartedEvent e -> System.out.println("  🔧 Tool: " + e.toolCall().toolName());
                 case ToolExecutionFinishedEvent e ->
                     System.out.println("  ✅ " + e.result().toolName() + " → " + truncate(e.result().result(), 80));
+                case TokenEvent e -> {}
                 case AgentFinishedEvent e -> {}
             }
         });

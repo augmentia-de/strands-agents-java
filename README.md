@@ -52,25 +52,43 @@ var result = agent.execute("Hallo Welt");
 ## Projektstruktur
 
 ```
-strands-agents-java
- ├── strands-agents-core       Agent Loop, ToolRegistry, Event-System, Datenmodelle
- ├── strands-agents-sessions   ChatMemoryStores (InMemory, File)
- └── docs/                     Phasenplan, Architektur, Entscheidungen
+strands-agents-java (Parent)
+ ├── strands-agents-core        Agent Loop, ToolRegistry, Event-System, Datenmodelle,
+ │                              Resilience (Retry/CircuitBreaker/TokenRecovery),
+ │                              Streaming, Enhanced Multi-Agent (A2A Executor, LlmRouter)
+ ├── strands-agents-mcp         MCP Client: StdIO/SSE Transport, JSON-RPC, Tool-Discovery
+ ├── strands-agents-sessions    ChatMemoryStores + SessionManager (File, JDBC)
+ ├── strands-agents-telemetry   OpenTelemetry-Tracing, Micrometer-Metrics, Hook-System
+ ├── strands-agents-examples    Demo: MainMock (Mock) + Main (OpenAI) + ChatCLI
+ └── docs/                      Phasenplan, Architektur, Entscheidungen
 ```
-
-Zukünftige Module (geplant):
-- `strands-agents-mcp` – MCP Client für dynamische Tools (Step 9)
-- `strands-agents-telemetry` – OpenTelemetry + Micrometer (Step 13)
 
 ## Phasenübersicht
 
 | Phase | Thema | Status |
 |---|---|---|
 | **1** Foundation – Setup, Agent Loop, Tools, Events, A2A | ✅ **Komplett** |
-| **2** Robustheit & Konversation – Conversation Manager, Session Persistierung | 🔲 Geplant |
-| **3** Modell- & Tool-Diversifikation – Multi-Provider, MCP Client | 🔲 Geplant |
-| **4** Event-Loop Optimierung – Token Recovery, Retries, Streaming | 🔲 Geplant |
-| **5** Orchestrierung & Ökosystem – Enhanced A2A, LLM Routing, Telemetry | 🔲 Geplant |
+| **2** Robustheit & Konversation – Conversation Manager, Session Persistierung | ✅ **Komplett** |
+| **3** Modell- & Tool-Diversifikation – Multi-Provider, MCP Client | ⏸️ **Teilweise** (MCP ✅, Multi-Provider 🔲) |
+| **4** Event-Loop Optimierung – Token Recovery, Retries, Streaming | ✅ **Komplett** |
+| **5** Orchestrierung & Ökosystem – Enhanced A2A, LLM Routing, Telemetry | ✅ **Komplett** |
 | **6** Enterprise (optional) – Vault, DB, Kafka, K8s, Spring Boot | 📅 Optional |
 
-Details in [`docs/`](docs/).
+## Vergleich: Steps 14–22 mit aktuellem Implementationstand
+
+Die Enterprise-Steps (Phase 6) sind optional und größtenteils nicht implementiert.
+Einige Module enthalten jedoch bereits **Grundlagen**, die in diese Richtung weisen:
+
+| Step | Thema | Status | Überschneidung mit aktueller Implementierung |
+|------|-------|--------|----------------------------------------------|
+| 14 | **HashiCorp Vault** – Secrets Management | 📅 Nicht impl. | Keine. API-Keys kommen weiterhin aus Umgebungsvariablen (`LlmConfig`). |
+| 15 | **PostgreSQL** – Session-DB | 📅 Nicht impl. | **Teilweise:** `JdbcSessionManager` (in `strands-agents-sessions`) bietet bereits JDBC-basierte Session-Persistenz mit DataSource, auto-creates `sessions`-Tabelle und `MERGE INTO`-Syntax (H2-kompatibel). Für PostgreSQL muss lediglich ein `PGSimpleDataSource` übergeben werden. Ein `PostgresChatMemoryStore` fehlt jedoch. |
+| 16 | **Redis** – Caching & Pub/Sub | 📅 Nicht impl. | Keine. Keine Redis-Abhängigkeit im Projekt. |
+| 17 | **Vektordb (pgvector/Qdrant)** – RAG | 📅 Nicht impl. | Keine. Keine Embedding-Pipeline oder Vector-Store vorhanden. |
+| 18 | **Apache Kafka** – Event Streaming | 📅 Nicht impl. | Keine. Keine Kafka-Abhängigkeit im Projekt. |
+| 19 | **Elasticsearch / OpenSearch** – Logging | 📅 Nicht impl. | Keine. Aber: `LoggingHook` in `strands-agents-telemetry` bietet strukturiertes SLF4J-Logging aller Events (kann via Logback nach ES geleitet werden). |
+| 20 | **Docker & Kubernetes** – Deployment | 📅 Nicht impl. | Kein Dockerfile, keine Helm-Charts, keine K8s-Manifeste im Java-Projekt. |
+| 21 | **gRPC** – Inter-Agent-Kommunikation | 📅 Nicht impl. | Keine. Keine Protobuf-Definitionen oder gRPC-Server/Client. |
+| 22 | **Spring Boot / Quarkus** – DI-Framework | 📅 Nicht impl. | Keine Spring-Boot- oder Quarkus-Abhängigkeit. Agent wird über `main()` + Builder gestartet. |
+
+Details in [`docs/`](docs/) und [`docs/options.md`](docs/options.md).

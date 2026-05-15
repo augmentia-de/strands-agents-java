@@ -11,15 +11,25 @@ public class AgentTool {
     private final Agent subAgent;
     private final String toolName;
     private final String description;
+    private final A2AExecutor executor;
 
     public AgentTool(Agent subAgent, String toolName, String description) {
+        this(subAgent, toolName, description, new A2AExecutor());
+    }
+
+    public AgentTool(Agent subAgent, String toolName, String description, A2AExecutor executor) {
         this.subAgent = subAgent;
         this.toolName = toolName;
         this.description = description;
+        this.executor = executor;
     }
 
     public AgentTool(Agent subAgent, String toolName) {
-        this(subAgent, toolName, "Führt einen Sub-Agenten aus: " + toolName);
+        this(subAgent, toolName, "Führt einen spezialisierten Sub-Agenten aus: " + toolName);
+    }
+
+    public AgentTool(Agent subAgent, String toolName, A2AExecutor executor) {
+        this(subAgent, toolName, "Führt einen spezialisierten Sub-Agenten aus: " + toolName, executor);
     }
 
     @Tool("Führt einen spezialisierten Sub-Agenten aus")
@@ -29,9 +39,9 @@ public class AgentTool {
             return "Fehler: Maximale Rekursionstiefe von " + MAX_RECURSION_DEPTH + " erreicht.";
         }
         try {
-            AgentResult result = ScopedValue.where(RECURSION_DEPTH, currentDepth + 1)
-                .call(() -> subAgent.execute(prompt));
-            return result.finalAnswer();
+            A2AResult a2aResult = ScopedValue.where(RECURSION_DEPTH, currentDepth + 1)
+                .call(() -> executor.call(subAgent, prompt, toolName));
+            return a2aResult.result();
         } catch (Exception e) {
             return "Fehler im Sub-Agenten: " + e.getMessage();
         }

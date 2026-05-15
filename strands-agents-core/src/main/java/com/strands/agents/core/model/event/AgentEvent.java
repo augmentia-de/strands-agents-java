@@ -5,7 +5,7 @@ import java.time.Instant;
 public sealed interface AgentEvent
     permits AgentStartedEvent, ModelRequestedEvent,
             ToolExecutionStartedEvent, ToolExecutionFinishedEvent,
-            AgentFinishedEvent {
+            AgentFinishedEvent, TokenEvent {
 
     String sessionId();
 
