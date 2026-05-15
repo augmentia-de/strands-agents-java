@@ -2,7 +2,6 @@ package com.strands.agents.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.strands.agents.core.model.agent.AgentResult;
 import com.strands.agents.core.model.agent.StopReason;
 import dev.langchain4j.data.message.UserMessage;
 import org.junit.jupiter.api.Test;
@@ -22,7 +21,7 @@ class StrandsAgentTest {
 
     @Test
     void shouldMaintainConversationHistory() {
-        var agent = new StrandsAgent(new MockChatModel("Antwort: %s"), 10);
+        var agent = new StrandsAgent(new MockChatModel("Antwort: %s"));
 
         agent.execute("Erste Frage");
         agent.execute("Zweite Frage");
@@ -30,17 +29,5 @@ class StrandsAgentTest {
         var memory = agent.getChatMemory();
         assertThat(memory.messages()).hasSize(4);
         assertThat(((UserMessage) memory.messages().get(0)).singleText()).isEqualTo("Erste Frage");
-    }
-
-    @Test
-    void shouldTruncateHistoryWhenExceedingMaxMessages() {
-        var agent = new StrandsAgent(new MockChatModel(), 2);
-
-        agent.execute("Frage 1");
-        agent.execute("Frage 2");
-        agent.execute("Frage 3");
-
-        var memory = agent.getChatMemory();
-        assertThat(memory.messages().size()).isLessThanOrEqualTo(4);
     }
 }

@@ -3,7 +3,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Automatisch set_keys.sh laden, falls vorhanden
 if [ -f "$SCRIPT_DIR/set_keys.sh" ]; then
     source "$SCRIPT_DIR/set_keys.sh"
 fi
@@ -17,10 +16,9 @@ Usage: ./dev.sh <command>
 
 Commands:
   build         Vollständigen Build ausführen (compile + test)
-  test          Unit-Tests ausführen (ohne Integrationstests)
-  test-all      Alle Tests inkl. Integrationstests (benötigt OPENAI_API_KEY)
+  test          Unit-Tests ausführen
   run           Beispiel mit OpenAI starten (benötigt OPENAI_API_KEY)
-  run-mock      Beispiel mit SimpleMockModel starten (kein API-Key nötig)
+  run-mock      Beispiel mit MockChatModel starten (kein API-Key nötig)
   clean         Build-Artefakte entfernen
   help          Diese Hilfe anzeigen
 
@@ -48,13 +46,6 @@ cmd_test() {
     echo ">>> Tests erfolgreich"
 }
 
-cmd_test_all() {
-    echo ">>> $PROJECT: Alle Tests (inkl. Integration)"
-    check_java
-    mvn verify
-    echo ">>> Alle Tests erfolgreich"
-}
-
 cmd_run() {
     echo ">>> $PROJECT: Starte mit OpenAI"
     check_java
@@ -64,18 +55,20 @@ cmd_run() {
         exit 1
     fi
     mvn -q install -DskipTests
-    (cd strands-agents-examples && \
-     mvn -q exec:java \
-        -Dexec.mainClass="com.strands.agents.examples.Main")
+    mvn -q -pl strands-agents-examples \
+        exec:exec \
+        -Dexec.executable="java" \
+        -Dexec.args="--enable-preview -cp %classpath com.strands.agents.examples.Main"
 }
 
 cmd_run_mock() {
     echo ">>> $PROJECT: Starte mit MockChatModel (Demo – kein API-Key nötig)"
     check_java
     mvn -q install -DskipTests
-    (cd strands-agents-examples && \
-     mvn -q exec:java \
-        -Dexec.mainClass="com.strands.agents.examples.MainMock")
+    mvn -q -pl strands-agents-examples \
+        exec:exec \
+        -Dexec.executable="java" \
+        -Dexec.args="--enable-preview -cp %classpath com.strands.agents.examples.MainMock"
 }
 
 cmd_clean() {
@@ -87,7 +80,6 @@ cmd_clean() {
 case "${1:-help}" in
     build)      cmd_build ;;
     test)       cmd_test ;;
-    test-all)   cmd_test_all ;;
     run)        cmd_run ;;
     run-mock)   cmd_run_mock ;;
     clean)      cmd_clean ;;

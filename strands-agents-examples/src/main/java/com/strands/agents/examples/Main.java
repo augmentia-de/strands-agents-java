@@ -1,8 +1,11 @@
 package com.strands.agents.examples;
 
-import com.strands.agents.core.ModelFactory;
-import com.strands.agents.core.StrandsAgent;
+import com.strands.agents.core.*;
 import com.strands.agents.core.model.agent.AgentResult;
+import com.strands.agents.core.model.event.*;
+import com.strands.agents.core.tools.CalculatorTool;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.UserMessage;
 
 public class Main {
 
@@ -16,35 +19,59 @@ public class Main {
         }
 
         var model = ModelFactory.createOpenAiFromEnv();
-        var agent = new StrandsAgent(model);
-        var sessionId = agent.getSessionId();
+
+        var registry = new ToolRegistry();
+        registry.register(new CalculatorTool());
+        System.out.println("Registrierte Tools: " + registry.getToolNames());
+
+        var agent = new StrandsAgent(model, registry, new ToolExecutor());
+
+        agent.setEventListener(event -> {
+            switch (event) {
+                case AgentStartedEvent e ->
+                    System.out.println("[EVENT] Gestartet – \"" + e.initialPrompt() + "\"");
+                case ModelRequestedEvent e ->
+                    System.out.println("[EVENT] LLM-Call (" + e.promptHistory().size() + " Nachrichten)");
+                case ToolExecutionStartedEvent e ->
+                    System.out.println("[EVENT] Tool: " + e.toolCall().toolName());
+                case ToolExecutionFinishedEvent e ->
+                    System.out.println("[EVENT] Tool-Result: " + e.result().toolName()
+                        + " → " + e.result().result());
+                case AgentFinishedEvent e ->
+                    System.out.println("[EVENT] Beendet");
+            }
+        });
 
         var baseUrl = System.getenv("OPENAI_BASE_URL");
         var modelName = System.getenv("LLM_CHAT_MODEL");
 
         System.out.println("=== Strands Agent (OpenAI-kompatibel) ===");
-        System.out.println("Session: " + sessionId);
+        System.out.println("Session: " + agent.getSessionId());
         if (baseUrl != null && !baseUrl.isBlank()) {
             System.out.println("Base URL: " + baseUrl);
         }
         if (modelName != null && !modelName.isBlank()) {
             System.out.println("Model: " + modelName);
         }
+        System.out.println("Tools: " + registry.getToolNames());
         System.out.println();
 
         interact(agent, "Hallo, wer bist du?");
         interact(agent, "Was kannst du?");
         interact(agent, "Erinnere dich: mein Name ist Torsten.");
-        interact(agent, "Wie heißt ich?");
+        interact(agent, "Wie heiße ich?");
     }
 
     static void interact(StrandsAgent agent, String prompt) {
+        System.out.println("---");
         System.out.println("Du:    " + prompt);
         AgentResult result = agent.execute(prompt);
         System.out.println("Agent: " + result.finalAnswer());
-        System.out.println("       (Tokens: " + result.metrics().inputTokens()
+        System.out.println("       StopReason: " + result.stopReason());
+        System.out.println("       Tokens: " + result.metrics().inputTokens()
             + " in / " + result.metrics().outputTokens() + " out, "
-            + result.metrics().durationMs() + " ms)");
+            + result.metrics().durationMs() + " ms"
+            + ", Tool-Calls: " + result.metrics().toolCallsCount());
         System.out.println();
     }
 }

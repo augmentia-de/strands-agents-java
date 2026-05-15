@@ -11,4 +11,25 @@
     </parent>
 
     <artifactId>strands-agents-sessions</artifactId>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.strands.agents</groupId>
+            <artifactId>strands-agents-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 </project>

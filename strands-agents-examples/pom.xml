@@ -19,8 +19,17 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.strands.agents</groupId>
+            <artifactId>strands-agents-sessions</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-open-ai</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
         </dependency>
     </dependencies>
 
