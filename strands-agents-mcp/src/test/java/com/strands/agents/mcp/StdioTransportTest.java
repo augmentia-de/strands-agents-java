@@ -24,8 +24,8 @@ class StdioTransportTest {
             "while read line; do echo \"$line\"; done");
 
         transport.connect();
-        assertThat(transport.sendAndReceive("msg1")).isEqualTo("msg1");
-        assertThat(transport.sendAndReceive("msg2")).isEqualTo("msg2");
+        assertThat(transport.sendAndReceive("{\"msg\": \"msg1\"}")).isEqualTo("{\"msg\": \"msg1\"}");
+        assertThat(transport.sendAndReceive("{\"msg\": \"msg2\"}")).isEqualTo("{\"msg\": \"msg2\"}");
         transport.close();
     }
 

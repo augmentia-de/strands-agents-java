@@ -10,21 +10,21 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>strands-agents-tools</artifactId>
+    <artifactId>strands-agents-skills</artifactId>
 
     <dependencies>
         <dependency>
             <groupId>com.strands.agents</groupId>
             <artifactId>strands-agents-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+            <version>${jackson.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.assertj</groupId>
-            <artifactId>assertj-core</artifactId>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
         </dependency>
     </dependencies>
 </project>

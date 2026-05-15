@@ -2,8 +2,11 @@ package com.strands.agents.mcp;
 
 import java.io.*;
 import java.util.concurrent.*;
+import org.slf4j.*;
 
 public class StdioTransport implements McpTransport {
+
+    private static final Logger log = LoggerFactory.getLogger(StdioTransport.class);
 
     private final ProcessBuilder processBuilder;
     private Process process;
@@ -34,14 +37,25 @@ public class StdioTransport implements McpTransport {
 
         var future = CompletableFuture.supplyAsync(() -> {
             try {
-                return reader.readLine();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    var trimmed = line.strip();
+                    if (trimmed.startsWith("{")) {
+                        return trimmed;
+                    }
+                }
+                return null;
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
         });
 
         try {
-            return future.get(30, TimeUnit.SECONDS);
+            var result = future.get(30, TimeUnit.SECONDS);
+            if (result == null) {
+                throw new RuntimeException("MCP server closed connection");
+            }
+            return result;
         } catch (TimeoutException e) {
             future.cancel(true);
             throw new RuntimeException("MCP transport timeout", e);

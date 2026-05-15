@@ -12,6 +12,7 @@ import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.memory.ChatMemory;
@@ -20,9 +21,11 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 import java.util.concurrent.Flow;
 import java.util.concurrent.SubmissionPublisher;
 import java.util.UUID;
@@ -44,6 +47,8 @@ public class StrandsAgent implements Agent {
     private final CircuitBreaker circuitBreaker;
     private final SubmissionPublisher<AgentEvent> eventPublisher;
     private AgentEventListener eventListener;
+    private String systemPrompt = "";
+    private final List<Consumer<StringBuilder>> pluginHooks = new ArrayList<>();
 
     public StrandsAgent(ChatModel model) {
         this(model, new ToolRegistry(), new ToolExecutor(), null, null);
@@ -84,8 +89,31 @@ public class StrandsAgent implements Agent {
         this.eventPublisher = new SubmissionPublisher<>();
     }
 
+    public StrandsAgent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
+                        ConversationManager conversationManager, SessionManager sessionManager,
+                        ResilienceConfig resilienceConfig, List<Plugin> plugins) {
+        this(model, toolRegistry, toolExecutor, conversationManager, sessionManager, resilienceConfig);
+        if (plugins != null && !plugins.isEmpty()) {
+            var registry = new PluginRegistry(plugins);
+            registry.initialize(this);
+            setEventListener(registry);
+        }
+    }
+
     public void setEventListener(AgentEventListener eventListener) {
         this.eventListener = eventListener;
+    }
+
+    public String getSystemPrompt() {
+        return systemPrompt;
+    }
+
+    public void setSystemPrompt(String systemPrompt) {
+        this.systemPrompt = systemPrompt;
+    }
+
+    public void setPluginHook(Consumer<StringBuilder> hook) {
+        pluginHooks.add(hook);
     }
 
     @Override
@@ -178,6 +206,14 @@ public class StrandsAgent implements Agent {
                 }
                 currentMessages = prunedLangChain;
             }
+
+            var sb = new StringBuilder(systemPrompt != null ? systemPrompt : "");
+            var bie = new BeforeInvocationEvent(sid, Instant.now(), sb);
+            fire(bie);
+            for (var hook : pluginHooks) {
+                hook.accept(sb);
+            }
+            systemPrompt = sb.toString();
 
             fire(new ModelRequestedEvent(sid, Instant.now(), domainMessages));
 
@@ -306,8 +342,15 @@ public class StrandsAgent implements Agent {
     }
 
     private ChatRequest buildRequest(List<ChatMessage> messages, List<ToolSpecification> toolSpecs) {
-        var builder = ChatRequest.builder()
-            .messages(messages);
+        var builder = ChatRequest.builder();
+        if (systemPrompt != null && !systemPrompt.isBlank()) {
+            var allMessages = new ArrayList<ChatMessage>();
+            allMessages.add(SystemMessage.from(systemPrompt));
+            allMessages.addAll(messages);
+            builder.messages(allMessages);
+        } else {
+            builder.messages(messages);
+        }
         if (toolSpecs != null && !toolSpecs.isEmpty()) {
             builder.toolSpecifications(toolSpecs);
         }

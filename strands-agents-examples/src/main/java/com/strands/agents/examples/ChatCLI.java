@@ -5,12 +5,16 @@ import com.strands.agents.core.model.agent.AgentResult;
 import com.strands.agents.core.model.event.*;
 import com.strands.agents.core.model.message.*;
 import com.strands.agents.core.tools.CalculatorTool;
+import com.strands.agents.mcp.*;
 import com.strands.agents.sessions.FileSessionManager;
 import dev.langchain4j.model.chat.ChatModel;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.*;
 
 public class ChatCLI {
+
+    private static McpClient mcpClient;
 
     public static void main(String[] args) {
         var useMock = false;
@@ -46,6 +50,15 @@ public class ChatCLI {
 
         var registry = new ToolRegistry();
         registry.register(new CalculatorTool());
+
+        var mcpCommand = System.getenv("MCP_SERVER_COMMAND");
+        var mcpUrl = System.getenv("MCP_SERVER_URL");
+        if (mcpCommand != null && !mcpCommand.isBlank()) {
+            connectMcpStdio(registry, mcpCommand);
+        } else if (mcpUrl != null && !mcpUrl.isBlank()) {
+            connectMcpSse(registry, mcpUrl);
+        }
+
         var conversationManager = new SlidingWindowConversationManager(20);
         var sessionManager = new FileSessionManager(sessionDir);
         var agent = new StrandsAgent(model, registry, new ToolExecutor(), conversationManager, sessionManager);
@@ -84,7 +97,7 @@ public class ChatCLI {
                     continue;
                 }
 
-                long start = System.nanoTime();
+                    long start = System.nanoTime();
                 AgentResult result;
                 try {
                     result = agent.execute(actualSessionId, input, Map.of());
@@ -101,6 +114,7 @@ public class ChatCLI {
                     + result.metrics().toolCallsCount() + " Tool-Calls");
             }
         }
+        closeMcp();
     }
 
     static boolean handleCommand(String input, StrandsAgent agent, ToolRegistry registry, String sessionId) {
@@ -129,17 +143,81 @@ public class ChatCLI {
                     System.out.println("    [" + role + "] " + truncate(text, 100));
                 }
             }
+            case "/mcp" -> {
+                if (mcpClient == null) {
+                    System.out.println("  Kein MCP-Server verbunden.");
+                    System.out.println("  Setze MCP_SERVER_COMMAND oder MCP_SERVER_URL.");
+                } else {
+                    System.out.println("  MCP-Server: ✅ verbunden");
+                    try {
+                        var tools = mcpClient.listTools();
+                        System.out.println("  Tools (" + tools.size() + "):");
+                        for (var t : tools) {
+                            System.out.println("    - " + t.name() + ": " + (t.description() != null ? t.description() : ""));
+                        }
+                    } catch (Exception e) {
+                        System.out.println("  ⚠️ Fehler: " + e.getMessage());
+                    }
+                }
+            }
             case "/help" -> {
                 System.out.println("  Commands:");
                 System.out.println("    /exit            Beenden");
                 System.out.println("    /tools           Registrierte Tools anzeigen");
                 System.out.println("    /session         Aktuelle Session & Verlauf");
+                System.out.println("    /mcp             MCP-Server-Status & Tools");
                 System.out.println("    /help            Diese Hilfe");
                 System.out.println("  Alles andere wird als Prompt an den Agenten gesendet.");
             }
             default -> System.out.println("  Unbekanntes Command: " + parts[0] + " (/help für Hilfe)");
         }
         return true;
+    }
+
+    static void connectMcpStdio(ToolRegistry registry, String command) {
+        try {
+            var parts = command.split("\\s+");
+            var transport = new StdioTransport(parts);
+            mcpClient = new McpClient(transport);
+            mcpClient.connect();
+            var tools = mcpClient.listTools();
+            System.out.println("  MCP (Stdio): " + String.join(" ", parts) + " → " + tools.size() + " Tools");
+            for (var mcpTool : tools) {
+                var spec = mcpClient.toToolSpecification(mcpTool);
+                registry.register(spec.name(), spec, new McpToolMethod(mcpClient, mcpTool.name(), spec));
+                System.out.println("    - " + mcpTool.name() + ": " + mcpTool.description());
+            }
+        } catch (Exception e) {
+            System.out.println("  ⚠️ MCP-Fehler: " + e.getMessage());
+            if (mcpClient != null) try { mcpClient.close(); } catch (Exception ignored) {}
+            mcpClient = null;
+        }
+    }
+
+    static void connectMcpSse(ToolRegistry registry, String url) {
+        try {
+            var transport = new SseTransport(new URI(url));
+            mcpClient = new McpClient(transport);
+            mcpClient.connect();
+            var tools = mcpClient.listTools();
+            System.out.println("  MCP (SSE): " + url + " → " + tools.size() + " Tools");
+            for (var mcpTool : tools) {
+                var spec = mcpClient.toToolSpecification(mcpTool);
+                registry.register(spec.name(), spec, new McpToolMethod(mcpClient, mcpTool.name(), spec));
+                System.out.println("    - " + mcpTool.name() + ": " + mcpTool.description());
+            }
+        } catch (Exception e) {
+            System.out.println("  ⚠️ MCP-Fehler: " + e.getMessage());
+            if (mcpClient != null) try { mcpClient.close(); } catch (Exception ignored) {}
+            mcpClient = null;
+        }
+    }
+
+    static void closeMcp() {
+        if (mcpClient != null) {
+            try { mcpClient.close(); } catch (Exception ignored) {}
+            mcpClient = null;
+        }
     }
 
     static void printHelp() {
@@ -150,6 +228,10 @@ public class ChatCLI {
               --session <id>      Bestehende Session fortsetzen
               --session-dir <pfad> Verzeichnis für Session-Persistierung
               --help              Diese Hilfe
+
+            Umgebungsvariablen (optional):
+              MCP_SERVER_COMMAND  MCP-Server via Stdio (z.B. "npx -y ...")
+              MCP_SERVER_URL      MCP-Server via HTTP/SSE (z.B. "http://...")
             """);
     }
 

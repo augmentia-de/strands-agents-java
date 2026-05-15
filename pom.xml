@@ -15,6 +15,7 @@
         <module>strands-agents-core</module>
         <module>strands-agents-mcp</module>
         <module>strands-agents-sessions</module>
+        <module>strands-agents-skills</module>
         <module>strands-agents-telemetry</module>
         <module>strands-agents-examples</module>
     </modules>

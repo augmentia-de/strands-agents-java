@@ -1,5 +1,6 @@
 package com.strands.agents.mcp;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.agent.tool.ToolSpecification;
@@ -132,6 +133,7 @@ public class McpClient {
         toolCache.values().removeIf(CachedTool::isExpired);
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record McpTool(String name, String description, Map<String, Object> inputSchema) {}
 
     private record CachedTool(McpTool tool, long expiresAt) {
