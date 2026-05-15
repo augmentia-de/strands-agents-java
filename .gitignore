@@ -1,0 +1,15 @@
+target/
+*.class
+*.log
+set_keys.sh
+.idea/
+*.iml
+.settings/
+.project
+.classpath
+.vscode/
+*.swp
+*.swo
+~*
+/others/
+/docs/
