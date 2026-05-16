@@ -18,6 +18,17 @@ public record LlmConfig(
         );
     }
 
+    public static LlmConfig fromEnv(String modelName) {
+        var env = fromEnv();
+        return new LlmConfig(
+            env.apiKey(),
+            env.baseUrl(),
+            modelName != null && !modelName.isBlank() ? modelName : env.modelName(),
+            env.temperature(),
+            env.maxRetries()
+        );
+    }
+
     public static LlmConfig fromVault(SecretProvider vault, String path) {
         var secrets = vault.getSecrets(path);
         return new LlmConfig(

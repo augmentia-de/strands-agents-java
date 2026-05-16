@@ -45,7 +45,7 @@ class ToolRegistryTest {
         registry.register(new CalculatorTool());
         assertThatThrownBy(() -> registry.get("unknown"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Unbekanntes Tool");
+            .hasMessageContaining("Unknown tool");
     }
 
     @Test

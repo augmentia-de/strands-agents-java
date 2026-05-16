@@ -4,7 +4,6 @@ import com.strands.agents.core.*;
 import com.strands.agents.core.model.agent.AgentResult;
 import com.strands.agents.core.model.event.*;
 import com.strands.agents.core.model.message.*;
-import com.strands.agents.core.tools.CalculatorTool;
 import com.strands.agents.mcp.*;
 import com.strands.agents.sessions.FileSessionManager;
 import com.strands.agents.skills.*;
@@ -56,8 +55,10 @@ public class ChatCLI {
         Runtime.getRuntime().addShutdownHook(new Thread(llmLogger::close));
         System.out.println("  LLM-Log: " + llmLogPath.toAbsolutePath());
 
-        var registry = new ToolRegistry();
-        registry.register(new CalculatorTool());
+        var registry = ToolRegistry.builder()
+            .standard()
+            .with("com.strands.agents.core.tools.CalculatorTool")
+            .build();
 
         var mcpCommand = System.getenv("MCP_SERVER_COMMAND");
         var mcpUrl = System.getenv("MCP_SERVER_URL");
@@ -80,7 +81,7 @@ public class ChatCLI {
                     System.out.println("  Skills: " + skills.stream().map(Skill::name).toList());
                 }
             } catch (Exception e) {
-                System.out.println("  ⚠️ Skills-Fehler: " + e.getMessage());
+                System.out.println("  Skills-Fehler: " + e.getMessage());
             }
         }
 
@@ -91,14 +92,14 @@ public class ChatCLI {
 
         agent.setEventListener(event -> {
             switch (event) {
-                case AgentStartedEvent e -> System.out.println("\n  ⏳ Agent gestartet");
-                case ModelRequestedEvent e -> System.out.println("  🧠 LLM-Call (" + e.promptHistory().size() + " Nachrichten)");
-                case ToolExecutionStartedEvent e -> System.out.println("  🔧 Tool: " + e.toolCall().toolName());
+                case AgentStartedEvent e -> System.out.println("\n  Agent gestartet");
+                case ModelRequestedEvent e -> System.out.println("  LLM-Call (" + e.promptHistory().size() + " Nachrichten)");
+                case ToolExecutionStartedEvent e -> System.out.println("  Tool: " + e.toolCall().toolName());
                 case ToolExecutionFinishedEvent e ->
-                    System.out.println("  ✅ " + e.result().toolName() + " → " + truncate(e.result().result(), 80));
+                    System.out.println("  " + e.result().toolName() + " → " + truncate(e.result().result(), 80));
                 case BeforeInvocationEvent e -> {}
                 case AfterInvocationEvent e -> {}
-                case AgentStateChangedEvent e -> System.out.println("  🔄 " + e.previousPhase() + " → " + e.currentPhase());
+                case AgentStateChangedEvent e -> System.out.println("  " + e.previousPhase() + " → " + e.currentPhase());
                 case TokenEvent e -> {}
                 case AgentFinishedEvent e -> {}
             }
@@ -109,7 +110,7 @@ public class ChatCLI {
         System.out.println("  Session-Dir: " + sessionDir.toAbsolutePath());
         System.out.println();
         System.out.println("Commands: /exit, /tools, /session, /help");
-        System.out.println("─".repeat(50));
+        System.out.println("-".repeat(50));
 
         try (var scanner = new Scanner(System.in)) {
             while (true) {
@@ -128,13 +129,13 @@ public class ChatCLI {
                 try {
                     result = agent.execute(actualSessionId, input, Map.of());
                 } catch (Exception e) {
-                    System.out.println("  ⚠️ Fehler: " + e.getMessage());
+                    System.out.println("  Fehler: " + e.getMessage());
                     continue;
                 }
                 var durationMs = (System.nanoTime() - start) / 1_000_000;
 
                 System.out.println("  Agent: " + result.finalAnswer());
-                System.out.println("  ─ " + result.metrics().inputTokens() + " in / "
+                System.out.println("  - " + result.metrics().inputTokens() + " in / "
                     + result.metrics().outputTokens() + " out, "
                     + durationMs + " ms, "
                     + result.metrics().toolCallsCount() + " Tool-Calls");
@@ -147,7 +148,7 @@ public class ChatCLI {
         var parts = input.split("\\s+", 2);
         switch (parts[0].toLowerCase()) {
             case "/exit", "/quit" -> {
-                System.out.println("  👋 Tschüss!");
+                System.out.println("  Tschuss!");
                 return false;
             }
             case "/tools" -> {
@@ -174,7 +175,7 @@ public class ChatCLI {
                     System.out.println("  Kein MCP-Server verbunden.");
                     System.out.println("  Setze MCP_SERVER_COMMAND oder MCP_SERVER_URL.");
                 } else {
-                    System.out.println("  MCP-Server: ✅ verbunden");
+                    System.out.println("  MCP-Server: verbunden");
                     try {
                         var tools = mcpClient.listTools();
                         System.out.println("  Tools (" + tools.size() + "):");
@@ -182,7 +183,7 @@ public class ChatCLI {
                             System.out.println("    - " + t.name() + ": " + (t.description() != null ? t.description() : ""));
                         }
                     } catch (Exception e) {
-                        System.out.println("  ⚠️ Fehler: " + e.getMessage());
+                        System.out.println("  Fehler: " + e.getMessage());
                     }
                 }
             }
@@ -195,7 +196,7 @@ public class ChatCLI {
                 System.out.println("    /help            Diese Hilfe");
                 System.out.println("  Alles andere wird als Prompt an den Agenten gesendet.");
             }
-            default -> System.out.println("  Unbekanntes Command: " + parts[0] + " (/help für Hilfe)");
+            default -> System.out.println("  Unbekanntes Command: " + parts[0] + " (/help fur Hilfe)");
         }
         return true;
     }
@@ -207,14 +208,14 @@ public class ChatCLI {
             mcpClient = new McpClient(transport);
             mcpClient.connect();
             var tools = mcpClient.listTools();
-            System.out.println("  MCP (Stdio): " + String.join(" ", parts) + " → " + tools.size() + " Tools");
+            System.out.println("  MCP (Stdio): " + String.join(" ", parts) + " -> " + tools.size() + " Tools");
             for (var mcpTool : tools) {
                 var spec = mcpClient.toToolSpecification(mcpTool);
                 registry.register(spec.name(), spec, new McpToolMethod(mcpClient, mcpTool.name(), spec));
                 System.out.println("    - " + mcpTool.name() + ": " + mcpTool.description());
             }
         } catch (Exception e) {
-            System.out.println("  ⚠️ MCP-Fehler: " + e.getMessage());
+            System.out.println("  MCP-Fehler: " + e.getMessage());
             if (mcpClient != null) try { mcpClient.close(); } catch (Exception ignored) {}
             mcpClient = null;
         }
@@ -226,14 +227,14 @@ public class ChatCLI {
             mcpClient = new McpClient(transport);
             mcpClient.connect();
             var tools = mcpClient.listTools();
-            System.out.println("  MCP (SSE): " + url + " → " + tools.size() + " Tools");
+            System.out.println("  MCP (SSE): " + url + " -> " + tools.size() + " Tools");
             for (var mcpTool : tools) {
                 var spec = mcpClient.toToolSpecification(mcpTool);
                 registry.register(spec.name(), spec, new McpToolMethod(mcpClient, mcpTool.name(), spec));
                 System.out.println("    - " + mcpTool.name() + ": " + mcpTool.description());
             }
         } catch (Exception e) {
-            System.out.println("  ⚠️ MCP-Fehler: " + e.getMessage());
+            System.out.println("  MCP-Fehler: " + e.getMessage());
             if (mcpClient != null) try { mcpClient.close(); } catch (Exception ignored) {}
             mcpClient = null;
         }
@@ -252,7 +253,7 @@ public class ChatCLI {
             Optionen:
               --mock              Ohne API-Key im Mock-Modus starten
               --session <id>      Bestehende Session fortsetzen
-              --session-dir <pfad> Verzeichnis für Session-Persistierung
+              --session-dir <pfad> Verzeichnis fur Session-Persistierung
               --help              Diese Hilfe
 
             Umgebungsvariablen (optional):
@@ -279,9 +280,9 @@ public class ChatCLI {
                     ? um.singleText() : last.toString();
                 return dev.langchain4j.model.chat.response.ChatResponse.builder()
                     .aiMessage(dev.langchain4j.data.message.AiMessage.from(
-                        "🧠 Mock-Agent:\n\nDu sagtest: \"" + text + "\"\n\n"
+                        "Mock-Agent:\n\nDu sagtest: \"" + text + "\"\n\n"
                         + "Das ist eine simulierte Antwort. Im echten Modus (ohne --mock) "
-                        + "würde hier die OpenAI-API antworten."))
+                        + "wurde hier die OpenAI-API antworten."))
                     .tokenUsage(new dev.langchain4j.model.output.TokenUsage(10, text.length()))
                     .finishReason(dev.langchain4j.model.output.FinishReason.STOP)
                     .build();

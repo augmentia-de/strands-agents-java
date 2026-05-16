@@ -3,7 +3,6 @@ package com.strands.agents.examples;
 import com.strands.agents.core.*;
 import com.strands.agents.core.model.agent.AgentResult;
 import com.strands.agents.core.model.event.*;
-import com.strands.agents.core.tools.CalculatorTool;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
@@ -17,7 +16,7 @@ import java.util.Map;
 public class MainMock {
 
     public static void main(String[] args) {
-        System.out.println("=== Strands Agent (Mock) — Step 5: Multi-Agent Demo ===");
+        System.out.println("=== Strands Agent (Mock) — Demo ===");
         System.out.println();
 
         demoBasics();
@@ -29,8 +28,9 @@ public class MainMock {
     static void demoBasics() {
         System.out.println("─── 1. Basis: Events + Tools + Sessions ───");
 
-        var registry = new ToolRegistry();
-        registry.register(new CalculatorTool());
+        var registry = ToolRegistry.builder()
+            .with("com.strands.agents.core.tools.CalculatorTool")
+            .build();
         var model = new DemoMockModel();
         var agent = new StrandsAgent(model, registry, new ToolExecutor());
         agent.setEventListener(event -> {
@@ -69,8 +69,9 @@ public class MainMock {
         System.out.println("  @Tool-Methode: execute(String prompt)");
         System.out.println("  Rekursionstiefe: max " + AgentTool.MAX_RECURSION_DEPTH);
 
-        var registry = new ToolRegistry();
-        registry.register(agentTool);
+        var registry = ToolRegistry.builder()
+            .with(agentTool)
+            .build();
         System.out.println("  Registrierte Tools: " + registry.getToolNames());
 
         var parentModel = new DemoMockModel();
@@ -109,21 +110,30 @@ public class MainMock {
     }
 
     static void demoAgentConfig() {
-        System.out.println("─── 4. Config: AgentConfig-Builder ───");
+        System.out.println("─── 4. Config: AgentConfig + ToolRegistry.Builder ───");
 
         var config = AgentConfig.builder()
             .name("recherche-agent")
             .modelName("openai/gpt-4o")
-            .toolClassNames(List.of("com.strands.agents.core.tools.CalculatorTool"))
+            .systemPrompt("Du bist ein Recherche-Agent.")
+            .toolRegistry(ToolRegistry.builder()
+                .standard()
+                .include("bash", "read", "ls")
+                .build())
             .maxIterations(15)
-            .routes(Map.of("wetter", "weather-agent"))
             .build();
 
         System.out.println("  Name: " + config.name());
         System.out.println("  Model: " + config.modelName());
-        System.out.println("  Tools: " + config.toolClassNames());
+        System.out.println("  SystemPrompt: " + config.systemPrompt());
+        System.out.println("  Tools: " + config.toolRegistry().getToolNames());
         System.out.println("  MaxIterations: " + config.maxIterations());
-        System.out.println("  Routes: " + config.routes());
+
+        var agent = config.createAgent(new DemoMockModel());
+        System.out.println("  Agent erstellt via config.createAgent(model)");
+
+        var result = agent.execute("Hallo");
+        System.out.println("  Agent: " + result.finalAnswer());
         System.out.println();
     }
 

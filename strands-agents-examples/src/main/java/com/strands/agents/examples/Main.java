@@ -3,9 +3,6 @@ package com.strands.agents.examples;
 import com.strands.agents.core.*;
 import com.strands.agents.core.model.agent.AgentResult;
 import com.strands.agents.core.model.event.*;
-import com.strands.agents.core.tools.CalculatorTool;
-import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.UserMessage;
 
 public class Main {
 
@@ -18,13 +15,11 @@ public class Main {
             System.exit(1);
         }
 
-        var model = ModelFactory.createOpenAiFromEnv();
-
-        var registry = new ToolRegistry();
-        registry.register(new CalculatorTool());
-        System.out.println("Registrierte Tools: " + registry.getToolNames());
-
-        var agent = new StrandsAgent(model, registry, new ToolExecutor());
+        var agent = AgentConfig.builder()
+            .name("demo")
+            .toolRegistry(ToolRegistry.builder().standard().build())
+            .build()
+            .createAgent();
 
         agent.setEventListener(event -> {
             switch (event) {
@@ -57,7 +52,7 @@ public class Main {
         if (modelName != null && !modelName.isBlank()) {
             System.out.println("Model: " + modelName);
         }
-        System.out.println("Tools: " + registry.getToolNames());
+        System.out.println("Tools: " + agent.getToolRegistry().getToolNames());
         System.out.println();
 
         interact(agent, "Hallo, wer bist du?");

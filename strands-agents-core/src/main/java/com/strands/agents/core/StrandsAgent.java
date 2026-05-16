@@ -111,6 +111,21 @@ public class StrandsAgent implements Agent {
         }
     }
 
+    public StrandsAgent(AgentConfig config) {
+        this(config.modelName() != null
+            ? ModelFactory.createOpenAi(LlmConfig.fromEnv(config.modelName()))
+            : ModelFactory.createOpenAiFromEnv(),
+            config.toolRegistry() != null ? config.toolRegistry() : new ToolRegistry(),
+            new ToolExecutor(),
+            config.conversationManager(),
+            config.sessionManager(),
+            config.resilienceConfig() != null ? config.resilienceConfig() : ResilienceConfig.DEFAULT,
+            config.plugins());
+        if (config.systemPrompt() != null && !config.systemPrompt().isBlank()) {
+            setSystemPrompt(config.systemPrompt());
+        }
+    }
+
     public void setEventListener(AgentEventListener eventListener) {
         this.eventListener = eventListener;
     }
