@@ -1,16 +1,19 @@
 package com.strands.agents.quarkus.resources;
 
+import com.strands.agents.quarkus.dto.AgentInitRequest;
 import com.strands.agents.quarkus.dto.ChatRequest;
 import com.strands.agents.quarkus.dto.ChatResponse;
+import com.strands.agents.quarkus.dto.ToolInfo;
 import com.strands.agents.quarkus.service.AgentService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-@Path("/api/chat")
+@Path("/api")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class ChatResource {
@@ -19,6 +22,7 @@ public class ChatResource {
     AgentService agentService;
 
     @POST
+    @Path("/chat")
     public ChatResponse chat(ChatRequest req) {
         if (req.prompt == null || req.prompt.isBlank()) {
             var err = new ChatResponse();
@@ -29,7 +33,7 @@ public class ChatResource {
     }
 
     @POST
-    @Path("/stream")
+    @Path("/chat/stream")
     @Produces(MediaType.SERVER_SENT_EVENTS)
     public Response chatStream(ChatRequest req) {
         if (req.prompt == null || req.prompt.isBlank()) {
@@ -76,6 +80,34 @@ public class ChatResource {
                 }
             }
         }, MediaType.SERVER_SENT_EVENTS).build();
+    }
+
+    @POST
+    @Path("/agent/init")
+    public ChatResponse initAgent(AgentInitRequest req) {
+        if (req.tools == null) req.tools = List.of();
+        if (req.skills == null) req.skills = List.of();
+        return agentService.initAgent(req);
+    }
+
+    @POST
+    @Path("/mcp/discover")
+    public List<ToolInfo> discoverMcpTools(Map<String, String> body) {
+        var url = body != null ? body.get("url") : null;
+        if (url == null || url.isBlank()) {
+            return List.of();
+        }
+        return agentService.discoverMcpTools(url);
+    }
+
+    @POST
+    @Path("/agent/release")
+    public Response releaseSession(Map<String, String> body) {
+        var sessionId = body != null ? body.get("sessionId") : null;
+        if (sessionId != null) {
+            agentService.releaseSession(sessionId);
+        }
+        return Response.ok(Map.of("released", sessionId)).build();
     }
 
     private String toJson(String key, String value) {

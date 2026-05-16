@@ -1,16 +1,107 @@
 {#include base}
 {#body}
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #e0e0e0; height: 100vh; }
+#app { display: flex; height: 100vh; }
+
+#sidebar { width: 320px; min-width: 320px; background: #16213e; padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; border-right: 1px solid #0f3460; }
+#sidebar h2 { font-size: 18px; color: #e94560; margin-bottom: 8px; }
+#sidebar h3 { font-size: 14px; color: #a0a0c0; cursor: pointer; padding: 6px 0; user-select: none; }
+#sidebar h3:hover { color: #e0e0ff; }
+#sidebar section { border-bottom: 1px solid #0f3460; padding-bottom: 8px; }
+.chip-select { display: inline-flex; align-items: center; margin: 3px; }
+.chip-select input { display: none; }
+.chip-select span { display: inline-block; padding: 4px 10px; border-radius: 12px; background: #0f3460; font-size: 12px; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-select input:checked + span { background: #e94560; color: #fff; border-color: #ff6b81; }
+.chip-select input:disabled + span { opacity: 0.5; cursor: not-allowed; }
+.chip-select span:hover { border-color: #e94560; }
+.tool-list { display: flex; flex-wrap: wrap; gap: 2px; padding: 4px 0; }
+.empty { font-size: 12px; color: #666; padding: 8px 0; }
+
+.mcp-config { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.mcp-config label { font-size: 12px; color: #a0a0c0; }
+.mcp-url-row { display: flex; gap: 6px; }
+.mcp-url-row input { flex: 1; background: #0f3460; border: 1px solid #1a4a7a; color: #e0e0e0; padding: 6px 10px; border-radius: 6px; font-size: 13px; font-family: monospace; }
+.mcp-url-row input:focus { outline: none; border-color: #e94560; }
+.mcp-url-row button { background: #0f3460; color: #a0a0c0; padding: 6px 12px; font-size: 12px; white-space: nowrap; }
+.mcp-url-row button:hover { background: #1a4a7a; color: #e0e0e0; }
+#mcp-status { font-size: 11px; margin: 2px 0; }
+.status-pending { color: #ffa500; }
+.status-ready { color: #4caf50; }
+.status-error { color: #e94560; }
+#mcp-count { font-size: 11px; color: #888; margin: 2px 0; }
+
+.chip-mcp span { background: #1a3a5c; border-color: #2a5a8c; }
+.chip-mcp input:checked + span { background: #2a7a3c; border-color: #4caf50; }
+.chip-mode span { background: #1a3a2c; border-color: #2a5a3c; }
+.chip-mode input:checked + span { background: #2a6a4c; border-color: #4caf50; }
+.mode-config { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.mode-config label { font-size: 12px; color: #a0a0c0; }
+.mode-config input[type="text"] { background: #0f3460; border: 1px solid #1a4a7a; color: #e0e0e0; padding: 6px 10px; border-radius: 6px; font-size: 13px; font-family: monospace; }
+.mode-config input[type="text"]:focus { outline: none; border-color: #e94560; }
+.mode-hint { font-size: 11px; color: #666; margin: 2px 0; }
+
+#info-section { margin-top: auto; padding-top: 12px; }
+#session-info { font-size: 12px; color: #888; margin-bottom: 8px; }
+#session-id { font-family: monospace; color: #e0e0e0; }
+#init-status { font-size: 12px; margin: 4px 0; }
+
+button { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.15s; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+#init-btn { background: #e94560; color: #fff; width: 100%; }
+#init-btn:hover:not(:disabled) { background: #ff6b81; }
+#new-session-btn { background: #0f3460; color: #a0a0c0; width: 100%; font-size: 12px; margin-top: 4px; }
+#new-session-btn:hover { background: #1a4a7a; color: #e0e0e0; }
+
+#chat-area { flex: 1; display: flex; flex-direction: column; background: #1a1a2e; }
+#messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.message { max-width: 80%; padding: 10px 14px; border-radius: 10px; line-height: 1.5; font-size: 14px; }
+.message.user { align-self: flex-end; background: #e94560; color: #fff; border-bottom-right-radius: 2px; }
+.message.agent { align-self: flex-start; background: #16213e; color: #e0e0e0; border-bottom-left-radius: 2px; }
+.message.system { align-self: center; background: transparent; color: #888; font-size: 12px; font-style: italic; }
+.msg-meta { font-size: 11px; color: #666; margin-top: 4px; text-align: right; }
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #666; border-top-color: #e94560; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#input-area { display: flex; gap: 10px; padding: 16px 20px; background: #16213e; border-top: 1px solid #0f3460; }
+#prompt-input { flex: 1; background: #0f3460; border: 1px solid #1a4a7a; color: #e0e0e0; padding: 10px 14px; border-radius: 8px; font-size: 14px; font-family: inherit; resize: none; }
+#prompt-input:focus { outline: none; border-color: #e94560; }
+#prompt-input:disabled { opacity: 0.4; }
+#send-btn { background: #e94560; color: #fff; padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; align-self: flex-end; }
+#send-btn:hover:not(:disabled) { background: #ff6b81; }
+</style>
+
 <div id="app">
   <aside id="sidebar">
     <h2>Strands Agent</h2>
+
+    <section id="mcp-section">
+      <h3 data-toggle="mcp">MCP Server &#9662;</h3>
+      <div id="mcp-list">
+        <div class="mcp-config">
+          <label for="mcp-url">Server URL</label>
+          <div class="mcp-url-row">
+            <input type="text" id="mcp-url" value="http://localhost:8888/mcp" placeholder="http://localhost:8888/mcp">
+            <button id="mcp-refresh-btn">Entdecken</button>
+          </div>
+          <p id="mcp-status" class="status-pending">&#x23f3; Wird ermittelt...</p>
+          <p id="mcp-count"></p>
+        </div>
+        <div id="mcp-tools-list" class="tool-list">
+          <p class="empty">MCP Tools werden geladen...</p>
+        </div>
+      </div>
+    </section>
+
     <section id="tools-section">
       <h3 data-toggle="tools">Tools &#9662;</h3>
-      <div id="tools-list">
+      <div id="tools-list" class="tool-list">
         {#if hasTools}
           {#for tool in tools}
             <label class="chip-select">
               <input type="checkbox" name="tool" value="{tool.name}" checked>
-              <span>{tool.name}</span>
+              <span title="{tool.description}">{tool.name}</span>
             </label>
           {/for}
         {#else}
@@ -18,14 +109,15 @@
         {/if}
       </div>
     </section>
+
     <section id="skills-section">
       <h3 data-toggle="skills">Skills &#9662;</h3>
-      <div id="skills-list">
+      <div id="skills-list" class="tool-list">
         {#if hasSkills}
           {#for skill in skills}
             <label class="chip-select">
               <input type="checkbox" name="skill" value="{skill.name}" checked>
-              <span>{skill.name}</span>
+              <span title="{skill.description}">{skill.name}</span>
             </label>
           {/for}
         {#else}
@@ -33,8 +125,47 @@
         {/if}
       </div>
     </section>
+
+    <section id="mode2-section">
+      <h3 data-toggle="mode2">Dynamic Discovery (Modus 2) &#9656;</h3>
+      <div id="mode2-list" style="display:none">
+        <div class="mode-config">
+          <label>Skill Search (Agent durchsucht Skills dynamisch)</label>
+          <label class="chip-select chip-mode">
+            <input type="checkbox" id="skill-search-enabled" checked>
+            <span>Skill Search aktivieren</span>
+          </label>
+        </div>
+        <div class="mode-config">
+          <label>MCP Ingest (Agent kann MCP Server zur Laufzeit verbinden)</label>
+          <label class="chip-select chip-mode">
+            <input type="checkbox" id="mcp-ingest-enabled">
+            <span>MCP Ingest aktivieren</span>
+          </label>
+        </div>
+        <p class="mode-hint">Erlaubt dem Agenten, Skills und MCP-Tools dynamisch zu entdecken</p>
+      </div>
+    </section>
+
+    <section id="mode3-section">
+      <h3 data-toggle="mode3">Capability Search (Modus 3) &#9656;</h3>
+      <div id="mode3-list" style="display:none">
+        <div class="mode-config">
+          <label for="cap-dirs">Skill-Verzeichnisse (komma-getrennt)</label>
+          <input type="text" id="cap-dirs" placeholder="z.B. skills,extra-skills">
+        </div>
+        <div class="mode-config">
+          <label for="cap-mcp">MCP-Server Definitionen (name:url, komma-getrennt)</label>
+          <input type="text" id="cap-mcp" placeholder="z.B. files:http://localhost:9999/mcp">
+        </div>
+        <p class="mode-hint">Sub-Agent analysiert Aufgaben und empfiehlt passende Capabilities</p>
+      </div>
+    </section>
+
     <section id="info-section">
       <p id="session-info">Session: <span id="session-id">-</span></p>
+      <p id="init-status" class="status-pending">&#x23f3; Nicht initialisiert</p>
+      <button id="init-btn">&#x1f680; Agent initialisieren</button>
       <button id="new-session-btn">Neue Session</button>
     </section>
   </aside>
@@ -42,12 +173,12 @@
   <main id="chat-area">
     <div id="messages">
       <div class="message system">
-        <div class="msg-content">Strands Agent bereit. W&auml;hle Tools/Skills aus und sende eine Nachricht.</div>
+        <div class="msg-content">Strands Agent bereit. W&auml;hle Tools/Skills/MCP-Tools aus und klicke "Agent initialisieren".</div>
       </div>
     </div>
     <div id="input-area">
-      <textarea id="prompt-input" rows="2" placeholder="Nachricht eingeben..."></textarea>
-      <button id="send-btn">Senden</button>
+      <textarea id="prompt-input" rows="2" placeholder="Zuerst initialisieren, dann Nachricht eingeben..." disabled></textarea>
+      <button id="send-btn" disabled>Senden</button>
     </div>
   </main>
 </div>

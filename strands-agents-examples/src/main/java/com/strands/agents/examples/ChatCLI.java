@@ -4,11 +4,16 @@ import com.strands.agents.core.*;
 import com.strands.agents.core.model.agent.AgentResult;
 import com.strands.agents.core.model.event.*;
 import com.strands.agents.core.model.message.*;
-import com.strands.agents.mcp.*;
+import com.strands.agents.core.tools.McpToolMethod;
 import com.strands.agents.sessions.FileSessionManager;
-import com.strands.agents.skills.*;
+import com.strands.agents.skills.AgentSkillsPlugin;
+import com.strands.agents.skills.Skill;
+import com.strands.agents.skills.SkillParser;
+import dev.langchain4j.mcp.client.DefaultMcpClient;
+import dev.langchain4j.mcp.client.McpClient;
+import dev.langchain4j.mcp.client.transport.http.StreamableHttpMcpTransport;
+import dev.langchain4j.mcp.client.transport.stdio.StdioMcpTransport;
 import dev.langchain4j.model.chat.ChatModel;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -179,8 +184,8 @@ public class ChatCLI {
                     try {
                         var tools = mcpClient.listTools();
                         System.out.println("  Tools (" + tools.size() + "):");
-                        for (var t : tools) {
-                            System.out.println("    - " + t.name() + ": " + (t.description() != null ? t.description() : ""));
+                        for (var spec : tools) {
+                            System.out.println("    - " + spec.name() + ": " + (spec.description() != null ? spec.description() : ""));
                         }
                     } catch (Exception e) {
                         System.out.println("  Fehler: " + e.getMessage());
@@ -204,15 +209,14 @@ public class ChatCLI {
     static void connectMcpStdio(ToolRegistry registry, String command) {
         try {
             var parts = command.split("\\s+");
-            var transport = new StdioTransport(parts);
-            mcpClient = new McpClient(transport);
-            mcpClient.connect();
+            var transport = StdioMcpTransport.builder()
+                .command(List.of(parts)).build();
+            mcpClient = DefaultMcpClient.builder().transport(transport).build();
             var tools = mcpClient.listTools();
             System.out.println("  MCP (Stdio): " + String.join(" ", parts) + " -> " + tools.size() + " Tools");
-            for (var mcpTool : tools) {
-                var spec = mcpClient.toToolSpecification(mcpTool);
-                registry.register(spec.name(), spec, new McpToolMethod(mcpClient, mcpTool.name(), spec));
-                System.out.println("    - " + mcpTool.name() + ": " + mcpTool.description());
+            for (var spec : tools) {
+                registry.register(spec.name(), spec, new McpToolMethod(mcpClient, spec.name(), spec));
+                System.out.println("    - " + spec.name() + ": " + spec.description());
             }
         } catch (Exception e) {
             System.out.println("  MCP-Fehler: " + e.getMessage());
@@ -223,15 +227,13 @@ public class ChatCLI {
 
     static void connectMcpSse(ToolRegistry registry, String url) {
         try {
-            var transport = new SseTransport(new URI(url));
-            mcpClient = new McpClient(transport);
-            mcpClient.connect();
+            var transport = StreamableHttpMcpTransport.builder().url(url).build();
+            mcpClient = DefaultMcpClient.builder().transport(transport).build();
             var tools = mcpClient.listTools();
             System.out.println("  MCP (SSE): " + url + " -> " + tools.size() + " Tools");
-            for (var mcpTool : tools) {
-                var spec = mcpClient.toToolSpecification(mcpTool);
-                registry.register(spec.name(), spec, new McpToolMethod(mcpClient, mcpTool.name(), spec));
-                System.out.println("    - " + mcpTool.name() + ": " + mcpTool.description());
+            for (var spec : tools) {
+                registry.register(spec.name(), spec, new McpToolMethod(mcpClient, spec.name(), spec));
+                System.out.println("    - " + spec.name() + ": " + spec.description());
             }
         } catch (Exception e) {
             System.out.println("  MCP-Fehler: " + e.getMessage());

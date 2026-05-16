@@ -1,0 +1,7 @@
+target/
+.sessions/
+database.db
+*.md
+.git/
+.gitignore
+deploy/

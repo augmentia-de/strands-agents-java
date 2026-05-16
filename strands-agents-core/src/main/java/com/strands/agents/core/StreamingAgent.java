@@ -4,6 +4,7 @@ import com.strands.agents.core.model.agent.AgentResult;
 import com.strands.agents.core.model.event.TokenEvent;
 import com.strands.agents.core.resilience.ResilienceConfig;
 import dev.langchain4j.model.chat.StreamingChatModel;
+import java.util.List;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import java.time.Instant;
@@ -45,6 +46,15 @@ public class StreamingAgent extends StrandsAgent {
                           SessionManager sessionManager, ResilienceConfig resilienceConfig) {
         super(new StreamingModelBridge(streamingModel), toolRegistry, toolExecutor,
             conversationManager, sessionManager, resilienceConfig);
+        this.streamingModel = streamingModel;
+    }
+
+    public StreamingAgent(StreamingChatModel streamingModel, ToolRegistry toolRegistry,
+                          ToolExecutor toolExecutor, ConversationManager conversationManager,
+                          SessionManager sessionManager, ResilienceConfig resilienceConfig,
+                          List<Plugin> plugins) {
+        super(new StreamingModelBridge(streamingModel), toolRegistry, toolExecutor,
+            conversationManager, sessionManager, resilienceConfig, plugins);
         this.streamingModel = streamingModel;
     }
 

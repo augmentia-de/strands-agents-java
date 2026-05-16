@@ -119,6 +119,10 @@ public class ToolRegistry {
         return tools.keySet();
     }
 
+    public static ToolMethod createMethod(com.strands.agents.core.tools.AgentTool<?> tool) {
+        return new AgentToolMethod(tool, toToolSpecification(tool));
+    }
+
     public ToolRegistry withOnly(Set<String> names) {
         var filtered = new ToolRegistry();
         for (var name : names) {

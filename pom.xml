@@ -13,19 +13,19 @@
 
     <modules>
         <module>strands-agents-core</module>
-        <module>strands-agents-mcp</module>
         <module>strands-agents-sessions</module>
         <module>strands-agents-skills</module>
         <module>strands-agents-telemetry</module>
         <module>strands-agents-vault</module>
-        <module>strands-agents-examples</module>
         <module>strands-agents-quarkus</module>
+        <module>strands-agents-examples</module>
     </modules>
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <langchain4j.version>1.12.2</langchain4j.version>
+        <langchain4j-mcp.version>1.12.2-beta22</langchain4j-mcp.version>
         <jackson.version>2.18.2</jackson.version>
         <junit.version>5.10.5</junit.version>
         <assertj.version>3.24.2</assertj.version>

@@ -4,7 +4,6 @@ import com.strands.agents.core.resilience.ResilienceConfig;
 import dev.langchain4j.model.chat.ChatModel;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 
 public record AgentConfig(
     String name,
@@ -16,7 +15,8 @@ public record AgentConfig(
     SessionManager sessionManager,
     ResilienceConfig resilienceConfig,
     List<Plugin> plugins,
-    Path skillsDir
+    Path skillsDir,
+    List<String> initialSkills
 ) {
     public static final int DEFAULT_MAX_ITERATIONS = 10;
 
@@ -25,8 +25,11 @@ public record AgentConfig(
     }
 
     public StrandsAgent createAgent(ChatModel model) {
-        var agent = new StrandsAgent(model, toolRegistry, new ToolExecutor(),
-            conversationManager, sessionManager, resilienceConfig, plugins);
+        var effectiveRegistry = toolRegistry != null ? toolRegistry : new ToolRegistry();
+        var effectivePlugins = plugins != null ? plugins : List.<Plugin>of();
+
+        var agent = new StrandsAgent(model, effectiveRegistry, new ToolExecutor(),
+            conversationManager, sessionManager, resilienceConfig, effectivePlugins);
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             agent.setSystemPrompt(systemPrompt);
         }
@@ -49,6 +52,7 @@ public record AgentConfig(
         private ResilienceConfig resilienceConfig = ResilienceConfig.DEFAULT;
         private List<Plugin> plugins = List.of();
         private Path skillsDir = null;
+        private List<String> initialSkills = List.of();
 
         public Builder name(String name) { this.name = name; return this; }
         public Builder modelName(String modelName) { this.modelName = modelName; return this; }
@@ -60,10 +64,12 @@ public record AgentConfig(
         public Builder resilienceConfig(ResilienceConfig resilienceConfig) { this.resilienceConfig = resilienceConfig; return this; }
         public Builder plugins(List<Plugin> plugins) { this.plugins = plugins; return this; }
         public Builder skillsDir(Path skillsDir) { this.skillsDir = skillsDir; return this; }
+        public Builder initialSkills(List<String> initialSkills) { this.initialSkills = initialSkills; return this; }
 
         public AgentConfig build() {
             return new AgentConfig(name, modelName, systemPrompt, toolRegistry, maxIterations,
-                conversationManager, sessionManager, resilienceConfig, plugins, skillsDir);
+                conversationManager, sessionManager, resilienceConfig, plugins, skillsDir,
+                initialSkills);
         }
     }
 }
