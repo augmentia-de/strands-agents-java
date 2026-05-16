@@ -18,6 +18,17 @@ public record LlmConfig(
         );
     }
 
+    public static LlmConfig fromVault(SecretProvider vault, String path) {
+        var secrets = vault.getSecrets(path);
+        return new LlmConfig(
+            secrets.get("api_key"),
+            secrets.getOrDefault("base_url", System.getenv("OPENAI_BASE_URL")),
+            secrets.getOrDefault("model", System.getenv("LLM_CHAT_MODEL")),
+            parseDoubleOrNull(secrets.get("temperature")),
+            parseIntOrNull(secrets.get("max_retries"))
+        );
+    }
+
     private static Double parseDoubleOrNull(String s) {
         if (s == null || s.isBlank()) return null;
         try { return Double.parseDouble(s); } catch (NumberFormatException e) { return null; }

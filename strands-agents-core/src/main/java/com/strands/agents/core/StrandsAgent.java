@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.concurrent.Flow;
 import java.util.concurrent.SubmissionPublisher;
@@ -49,6 +51,11 @@ public class StrandsAgent implements Agent {
     private AgentEventListener eventListener;
     private String systemPrompt = "";
     private final List<Consumer<StringBuilder>> pluginHooks = new ArrayList<>();
+    private GuardrailPlugin guardrailPlugin;
+    private HITLPlugin hitlPlugin;
+    private volatile AgentPhase phase = AgentPhase.IDLE;
+    private final ReentrantLock pauseLock = new ReentrantLock();
+    private final Condition pauseCondition = pauseLock.newCondition();
 
     public StrandsAgent(ChatModel model) {
         this(model, new ToolRegistry(), new ToolExecutor(), null, null);
@@ -94,6 +101,10 @@ public class StrandsAgent implements Agent {
                         ResilienceConfig resilienceConfig, List<Plugin> plugins) {
         this(model, toolRegistry, toolExecutor, conversationManager, sessionManager, resilienceConfig);
         if (plugins != null && !plugins.isEmpty()) {
+            for (var p : plugins) {
+                if (p instanceof GuardrailPlugin gp) this.guardrailPlugin = gp;
+                if (p instanceof HITLPlugin hp) this.hitlPlugin = hp;
+            }
             var registry = new PluginRegistry(plugins);
             registry.initialize(this);
             setEventListener(registry);
@@ -187,11 +198,14 @@ public class StrandsAgent implements Agent {
         int totalOutputTokens = 0;
         int toolCallCount = 0;
 
+        phase = AgentPhase.EXECUTING;
         fire(new AgentStartedEvent(sid, Instant.now(), prompt));
 
         chatMemory.add(UserMessage.from(prompt));
 
         for (int iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+            checkPaused();
+
             var currentMessages = chatMemory.messages();
             var domainMessages = ChatMessageConverter.toDomainMessages(currentMessages);
 
@@ -205,10 +219,17 @@ public class StrandsAgent implements Agent {
                     }
                 }
                 currentMessages = prunedLangChain;
+                domainMessages = ChatMessageConverter.toDomainMessages(currentMessages);
+            }
+
+            // Input guardrails
+            if (guardrailPlugin != null) {
+                var guardResult = runInputGuardrails(domainMessages);
+                if (guardResult != null) return guardResult;
             }
 
             var sb = new StringBuilder(systemPrompt != null ? systemPrompt : "");
-            var bie = new BeforeInvocationEvent(sid, Instant.now(), sb);
+            var bie = new BeforeInvocationEvent(sid, Instant.now(), sb, domainMessages);
             fire(bie);
             for (var hook : pluginHooks) {
                 hook.accept(sb);
@@ -223,6 +244,7 @@ public class StrandsAgent implements Agent {
             try {
                 response = callWithResilience(currentMessages, toolSpecs);
             } catch (Exception e) {
+                phase = AgentPhase.FAILED;
                 var durationMs = (System.nanoTime() - start) / 1_000_000;
                 var result = new AgentResult(
                     sid,
@@ -236,6 +258,14 @@ public class StrandsAgent implements Agent {
             }
             AiMessage aiMessage = response.aiMessage();
 
+            // Output guardrails
+            var responseText = aiMessage.text() != null ? aiMessage.text() : "";
+            fire(new AfterInvocationEvent(sid, Instant.now(), responseText, domainMessages));
+            if (guardrailPlugin != null) {
+                var guardResult = runOutputGuardrails(responseText, domainMessages);
+                if (guardResult != null) return guardResult;
+            }
+
             chatMemory.add(aiMessage);
 
             if (response.tokenUsage() != null) {
@@ -244,18 +274,45 @@ public class StrandsAgent implements Agent {
             }
 
             if (!aiMessage.hasToolExecutionRequests()) {
+                phase = AgentPhase.COMPLETED;
                 var durationMs = (System.nanoTime() - start) / 1_000_000;
                 var generatedMessages = ChatMessageConverter.toDomainMessages(chatMemory.messages());
 
                 var result = new AgentResult(
                     sid,
-                    aiMessage.text(),
+                    responseText,
                     generatedMessages,
                     new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
                     StopReason.COMPLETED
                 );
                 fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
                 return result;
+            }
+
+            // HITL before tool execution
+            if (hitlPlugin != null && hitlPlugin.authority() == HITLAuthority.CONFIRM) {
+                phase = AgentPhase.WAITING_FOR_HUMAN;
+                fire(new AgentStateChangedEvent(sid, Instant.now(),
+                    AgentPhase.EXECUTING, AgentPhase.WAITING_FOR_HUMAN,
+                    prompt, iteration, 0));
+                var approval = hitlPlugin.provider().requestApproval(
+                    "tool-execution",
+                    "Tool-Calls: " + aiMessage.toolExecutionRequests().stream()
+                        .map(ToolExecutionRequest::name).toList());
+                if (!approval.approved()) {
+                    phase = AgentPhase.FAILED;
+                    var durationMs = (System.nanoTime() - start) / 1_000_000;
+                    var result = new AgentResult(
+                        sid,
+                        "HITL abgelehnt: " + approval.feedback(),
+                        ChatMessageConverter.toDomainMessages(chatMemory.messages()),
+                        new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
+                        StopReason.INTERRUPTED
+                    );
+                    fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
+                    return result;
+                }
+                phase = AgentPhase.EXECUTING;
             }
 
             toolCallCount += aiMessage.toolExecutionRequests().size();
@@ -281,6 +338,7 @@ public class StrandsAgent implements Agent {
                     fire(new ToolExecutionFinishedEvent(sid, Instant.now(), r));
                 }
             } catch (Exception e) {
+                phase = AgentPhase.FAILED;
                 var durationMs = (System.nanoTime() - start) / 1_000_000;
                 var result = new AgentResult(
                     sid,
@@ -294,6 +352,7 @@ public class StrandsAgent implements Agent {
             }
         }
 
+        phase = AgentPhase.FAILED;
         var durationMs = (System.nanoTime() - start) / 1_000_000;
         var result = new AgentResult(
             sid,
@@ -304,6 +363,64 @@ public class StrandsAgent implements Agent {
         );
         fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
         return result;
+    }
+
+    private AgentResult runInputGuardrails(List<Message> domainMessages) {
+        for (var g : guardrailPlugin.inputGuardrails()) {
+            var result = g.validate(domainMessages, guardrailPlugin.name());
+            if (!result.pass()) {
+                return handleGuardrailBlock(result);
+            }
+        }
+        return null;
+    }
+
+    private AgentResult runOutputGuardrails(String response, List<Message> domainMessages) {
+        for (var g : guardrailPlugin.outputGuardrails()) {
+            var result = g.validate(domainMessages, "output:" + response);
+            if (!result.pass()) {
+                return handleGuardrailBlock(result);
+            }
+        }
+        return null;
+    }
+
+    private AgentResult handleGuardrailBlock(GuardrailResult guardResult) {
+        return switch (guardrailPlugin.blockAction()) {
+            case THROW -> {
+                throw new GuardrailException(guardResult.reason());
+            }
+            case FALLBACK -> {
+                phase = AgentPhase.FAILED;
+                fire(new AgentFinishedEvent(sessionId, Instant.now(), guardrailPlugin.fallbackMessage()));
+                yield new AgentResult(
+                    sessionId,
+                    guardrailPlugin.fallbackMessage(),
+                    List.of(),
+                    new ExecutionMetrics(0, 0, 0, 0),
+                    StopReason.ERROR
+                );
+            }
+            case ESCALATE -> {
+                if (hitlPlugin != null) {
+                    var approval = hitlPlugin.provider().requestApproval(
+                        "guardrail-block",
+                        "Guardrail: " + guardResult.reason());
+                    if (approval.approved()) {
+                        yield null; // continue execution
+                    }
+                }
+                phase = AgentPhase.FAILED;
+                fire(new AgentFinishedEvent(sessionId, Instant.now(), guardrailPlugin.fallbackMessage()));
+                yield new AgentResult(
+                    sessionId,
+                    guardrailPlugin.fallbackMessage(),
+                    List.of(),
+                    new ExecutionMetrics(0, 0, 0, 0),
+                    StopReason.ERROR
+                );
+            }
+        };
     }
 
     protected ChatResponse doChat(ChatRequest request) {
@@ -392,5 +509,60 @@ public class StrandsAgent implements Agent {
 
     public ToolRegistry getToolRegistry() {
         return toolRegistry;
+    }
+
+    protected ToolExecutor getToolExecutor() {
+        return toolExecutor;
+    }
+
+    public AgentPhase getPhase() {
+        return phase;
+    }
+
+    public void pauseExecution() {
+        phase = AgentPhase.WAITING_FOR_HUMAN;
+    }
+
+    public void resumeExecution() {
+        pauseLock.lock();
+        try {
+            phase = AgentPhase.EXECUTING;
+            pauseCondition.signalAll();
+        } finally {
+            pauseLock.unlock();
+        }
+    }
+
+    public void approve() {
+        resumeExecution();
+    }
+
+    public void reject(String reason) {
+        pauseLock.lock();
+        try {
+            phase = AgentPhase.FAILED;
+            pauseCondition.signalAll();
+        } finally {
+            pauseLock.unlock();
+        }
+    }
+
+    private void checkPaused() {
+        if (phase == AgentPhase.WAITING_FOR_HUMAN) {
+            pauseLock.lock();
+            try {
+                while (phase == AgentPhase.WAITING_FOR_HUMAN) {
+                    pauseCondition.await();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("HITL interrupted", e);
+            } finally {
+                pauseLock.unlock();
+            }
+            if (phase == AgentPhase.FAILED) {
+                throw new RuntimeException("HITL rejected");
+            }
+        }
     }
 }

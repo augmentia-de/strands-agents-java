@@ -29,12 +29,18 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.strands.agents</groupId>
+            <artifactId>strands-agents-skills</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-open-ai</artifactId>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
+            <scope>runtime</scope>
         </dependency>
     </dependencies>
 
@@ -44,6 +50,27 @@
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.1.0</version>
+            </plugin>
+            <plugin>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>jib-maven-plugin</artifactId>
+                <configuration>
+                    <to>
+                        <image>strands-agent:${project.version}</image>
+                        <tags>
+                            <tag>latest</tag>
+                        </tags>
+                    </to>
+                    <container>
+                        <mainClass>com.strands.agents.examples.Main</mainClass>
+                        <jvmFlags>
+                            <jvmFlag>--enable-preview</jvmFlag>
+                        </jvmFlags>
+                        <environment>
+                            <OPENAI_API_KEY>placeholder</OPENAI_API_KEY>
+                        </environment>
+                    </container>
+                </configuration>
             </plugin>
         </plugins>
     </build>

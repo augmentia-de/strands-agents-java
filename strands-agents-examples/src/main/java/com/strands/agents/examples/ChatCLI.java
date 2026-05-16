@@ -7,8 +7,10 @@ import com.strands.agents.core.model.message.*;
 import com.strands.agents.core.tools.CalculatorTool;
 import com.strands.agents.mcp.*;
 import com.strands.agents.sessions.FileSessionManager;
+import com.strands.agents.skills.*;
 import dev.langchain4j.model.chat.ChatModel;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -48,6 +50,12 @@ public class ChatCLI {
             if (modelName != null) System.out.println("  Model: " + modelName);
         }
 
+        var llmLogPath = Path.of("logs/llm-calls.log");
+        var llmLogger = new FileLlmLogger(llmLogPath);
+        model = new LoggingChatModel(model, llmLogger);
+        Runtime.getRuntime().addShutdownHook(new Thread(llmLogger::close));
+        System.out.println("  LLM-Log: " + llmLogPath.toAbsolutePath());
+
         var registry = new ToolRegistry();
         registry.register(new CalculatorTool());
 
@@ -61,7 +69,22 @@ public class ChatCLI {
 
         var conversationManager = new SlidingWindowConversationManager(20);
         var sessionManager = new FileSessionManager(sessionDir);
-        var agent = new StrandsAgent(model, registry, new ToolExecutor(), conversationManager, sessionManager);
+
+        var skillsDir = Path.of("skills");
+        List<Plugin> plugins = List.of();
+        if (Files.isDirectory(skillsDir)) {
+            try {
+                var skills = SkillParser.fromDirectory(skillsDir);
+                if (!skills.isEmpty()) {
+                    plugins = List.of(new AgentSkillsPlugin(skills));
+                    System.out.println("  Skills: " + skills.stream().map(Skill::name).toList());
+                }
+            } catch (Exception e) {
+                System.out.println("  ⚠️ Skills-Fehler: " + e.getMessage());
+            }
+        }
+
+        var agent = new StrandsAgent(model, registry, new ToolExecutor(), conversationManager, sessionManager, null, plugins);
 
         var actualSessionId = sessionId != null ? sessionId : UUID.randomUUID().toString();
         var session = sessionManager.createSession("chat-user", Map.of());
@@ -73,6 +96,9 @@ public class ChatCLI {
                 case ToolExecutionStartedEvent e -> System.out.println("  🔧 Tool: " + e.toolCall().toolName());
                 case ToolExecutionFinishedEvent e ->
                     System.out.println("  ✅ " + e.result().toolName() + " → " + truncate(e.result().result(), 80));
+                case BeforeInvocationEvent e -> {}
+                case AfterInvocationEvent e -> {}
+                case AgentStateChangedEvent e -> System.out.println("  🔄 " + e.previousPhase() + " → " + e.currentPhase());
                 case TokenEvent e -> {}
                 case AgentFinishedEvent e -> {}
             }

@@ -37,6 +37,9 @@ public class Main {
                 case ToolExecutionFinishedEvent e ->
                     System.out.println("[EVENT] Tool-Result: " + e.result().toolName()
                         + " → " + e.result().result());
+                case BeforeInvocationEvent e -> {}
+                case AfterInvocationEvent e -> {}
+                case AgentStateChangedEvent e -> {}
                 case TokenEvent e -> {}
                 case AgentFinishedEvent e ->
                     System.out.println("[EVENT] Beendet");

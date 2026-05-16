@@ -22,6 +22,11 @@ public class LoggingHook implements AgentEventListener {
                 e.sessionId(), e.result().toolName(), e.result().isError());
             case TokenEvent e -> log.trace("Token: session={}, token=\"{}\"",
                 e.sessionId(), e.token());
+            case BeforeInvocationEvent e -> log.debug("BeforeInvocation: session={}",
+                e.sessionId());
+            case AfterInvocationEvent e -> log.debug("AfterInvocation: session={}", e.sessionId());
+            case AgentStateChangedEvent e -> log.info("Zustandswechsel: session={}, {} → {} (goal=\"{}\")",
+                e.sessionId(), e.previousPhase(), e.currentPhase(), truncate(e.goal(), 60));
             case AgentFinishedEvent e -> log.info("Agent beendet: session={}, answer=\"{}\"",
                 e.sessionId(), truncate(e.finalAnswer(), 80));
         }

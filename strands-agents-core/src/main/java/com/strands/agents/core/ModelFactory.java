@@ -9,6 +9,10 @@ public class ModelFactory {
         return createOpenAi(LlmConfig.fromEnv());
     }
 
+    public static ChatModel createOpenAiFromVault(SecretProvider vault, String path) {
+        return createOpenAi(LlmConfig.fromVault(vault, path));
+    }
+
     public static ChatModel createOpenAi(LlmConfig config) {
         var builder = OpenAiChatModel.builder()
             .apiKey(config.apiKey());

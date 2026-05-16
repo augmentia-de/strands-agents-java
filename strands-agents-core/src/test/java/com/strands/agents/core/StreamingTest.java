@@ -6,6 +6,7 @@ import com.strands.agents.core.model.agent.StopReason;
 import com.strands.agents.core.model.event.*;
 import com.strands.agents.core.tools.CalculatorTool;
 import java.util.ArrayList;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Flow;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +34,7 @@ class StreamingTest {
     @Test
     void eventStreamShouldReceiveLifecycleEvents() {
         var agent = new StrandsAgent(new MockChatModel());
-        var events = new ArrayList<AgentEvent>();
+        var events = new CopyOnWriteArrayList<AgentEvent>();
         var done = new java.util.concurrent.CompletableFuture<Void>();
 
         agent.eventStream().subscribe(new Flow.Subscriber<>() {
@@ -64,7 +65,7 @@ class StreamingTest {
     @Test
     void eventStreamShouldContainAllEventTypes() {
         var agent = new StrandsAgent(new MockChatModel());
-        var events = new ArrayList<AgentEvent>();
+        var events = new CopyOnWriteArrayList<AgentEvent>();
 
         agent.eventStream().subscribe(new Flow.Subscriber<>() {
             @Override
@@ -90,7 +91,7 @@ class StreamingTest {
     @Test
     void executeEventsShouldDeliverEvents() {
         var agent = new StrandsAgent(new MockChatModel());
-        var events = new ArrayList<AgentEvent>();
+        var events = new CopyOnWriteArrayList<AgentEvent>();
 
         var future = agent.executeEvents("Hallo", new Flow.Subscriber<>() {
             @Override
@@ -144,7 +145,7 @@ class StreamingTest {
     @Test
     void streamingAgentShouldFireTokenEvents() {
         var agent = new StreamingAgent(new MockStreamingChatModel());
-        var events = new ArrayList<AgentEvent>();
+        var events = new CopyOnWriteArrayList<AgentEvent>();
 
         agent.eventStream().subscribe(new Flow.Subscriber<>() {
             @Override
@@ -168,7 +169,7 @@ class StreamingTest {
     @Test
     void streamingAgentExecuteStreamingShouldFireTokenEvents() {
         var agent = new StreamingAgent(new MockStreamingChatModel());
-        var events = new ArrayList<AgentEvent>();
+        var events = new CopyOnWriteArrayList<AgentEvent>();
 
         agent.eventStream().subscribe(new Flow.Subscriber<>() {
             @Override

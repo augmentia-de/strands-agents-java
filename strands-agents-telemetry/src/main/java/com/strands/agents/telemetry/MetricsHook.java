@@ -26,6 +26,8 @@ public class MetricsHook implements AgentEventListener {
                 metrics.getToolExecutions().increment();
             }
             case TokenEvent e -> {}
+            case AgentStateChangedEvent e -> {}
+            case AfterInvocationEvent e -> {}
             case AgentFinishedEvent e -> {
                 // execution duration is measured externally
             }

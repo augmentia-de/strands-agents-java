@@ -40,6 +40,9 @@ public class TracingHook implements AgentEventListener {
             case ToolExecutionFinishedEvent e -> {
                 tracing.endToolSpan(e.sessionId(), e.result().toolName(), e.result().isError());
             }
+            case BeforeInvocationEvent e -> {}
+            case AfterInvocationEvent e -> {}
+            case AgentStateChangedEvent e -> {}
             case TokenEvent e -> {}
             case AgentFinishedEvent e -> {
                 tracing.endLlmSpan(e.sessionId(), 0, 0);
