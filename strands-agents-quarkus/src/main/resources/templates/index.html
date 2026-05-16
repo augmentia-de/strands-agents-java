@@ -1,0 +1,57 @@
+{#include base}
+{#body}
+<div id="app">
+  <aside id="sidebar">
+    <h2>Strands Agent</h2>
+    <section id="tools-section">
+      <h3 data-toggle="tools">Tools &#9662;</h3>
+      <div id="tools-list">
+        {#if hasTools}
+          {#for tool in tools}
+            <label class="chip-select">
+              <input type="checkbox" name="tool" value="{tool.name}" checked>
+              <span>{tool.name}</span>
+            </label>
+          {/for}
+        {#else}
+          <p class="empty">Keine Tools registriert</p>
+        {/if}
+      </div>
+    </section>
+    <section id="skills-section">
+      <h3 data-toggle="skills">Skills &#9662;</h3>
+      <div id="skills-list">
+        {#if hasSkills}
+          {#for skill in skills}
+            <label class="chip-select">
+              <input type="checkbox" name="skill" value="{skill.name}" checked>
+              <span>{skill.name}</span>
+            </label>
+          {/for}
+        {#else}
+          <p class="empty">Keine Skills geladen</p>
+        {/if}
+      </div>
+    </section>
+    <section id="info-section">
+      <p id="session-info">Session: <span id="session-id">-</span></p>
+      <button id="new-session-btn">Neue Session</button>
+    </section>
+  </aside>
+
+  <main id="chat-area">
+    <div id="messages">
+      <div class="message system">
+        <div class="msg-content">Strands Agent bereit. W&auml;hle Tools/Skills aus und sende eine Nachricht.</div>
+      </div>
+    </div>
+    <div id="input-area">
+      <textarea id="prompt-input" rows="2" placeholder="Nachricht eingeben..."></textarea>
+      <button id="send-btn">Senden</button>
+    </div>
+  </main>
+</div>
+
+<script src="/app.js"></script>
+{/body}
+{/include}
