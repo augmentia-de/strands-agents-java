@@ -19,7 +19,7 @@ fi
 echo ">>> Docker-Image bauen ..."
 docker build -f "$PROJECT_DIR/docker/Dockerfile" -t strands-agent:latest "$PROJECT_DIR"
 
-# ---- Sicherstellen, dass das data/-Verzeichnis existiert ----
+# ---- Sicherstellen, dass die data/- und skills/-Verzeichnisse existieren ----
 mkdir -p "$PROJECT_DIR/data"
 
 # ---- Container starten ----
@@ -27,17 +27,21 @@ echo ">>> Container starten ..."
 docker run -d \
     --name strands-agent \
     --restart unless-stopped \
-    -p 8080:8080 \
+    --add-host=host.docker.internal:host-gateway \
+    -p 8084:8084 \
     -e OPENAI_API_KEY="${OPENAI_API_KEY}" \
     -e OPENAI_BASE_URL="${OPENAI_BASE_URL:-}" \
     -e LLM_CHAT_MODEL="${LLM_CHAT_MODEL:-gpt-4o}" \
-    -e LLM_TEMPERATURE="${LLM_TEMPERATURE:-0.7}" \
-    -e LLM_MAX_RETRIES="${LLM_MAX_RETRIES:-3}" \
+    -e QUARKUS_HTTP_PORT=8084 \
+    -e STRANDS_SKILLS_DIR=/app/skills \
+    -e STRANDS_AGENT_TOOLS=com.strands.agents.core.tools.CalculatorTool \
+    -e STRANDS_MCP_URL="${STRANDS_MCP_URL:-}" \
     -v "$PROJECT_DIR/data:/app/data" \
+    -v "$PROJECT_DIR/skills:/app/skills" \
     strands-agent:latest
 
 echo ""
-echo "✅ strands-agent läuft auf http://localhost:8080"
+echo "✅ strands-agent läuft auf http://localhost:8084"
 echo ""
 echo "   Stop:  docker stop strands-agent"
 echo "   Logs:  docker logs -f strands-agent"

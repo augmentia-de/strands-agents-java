@@ -13,6 +13,8 @@ COPY strands-agents-vault/pom.xml strands-agents-vault/pom.xml
 COPY strands-agents-vault/src strands-agents-vault/src
 COPY strands-agents-quarkus/pom.xml strands-agents-quarkus/pom.xml
 COPY strands-agents-quarkus/src strands-agents-quarkus/src
+COPY strands-agents-examples/pom.xml strands-agents-examples/pom.xml
+COPY skills/ skills/
 RUN mvn package -DskipTests -q -pl strands-agents-quarkus -am
 
 FROM eclipse-temurin:21-jre
@@ -21,4 +23,5 @@ WORKDIR /app
 COPY --from=build /app/strands-agents-quarkus/target/quarkus-app/ /app/
 COPY --from=build /app/skills/ /app/skills/
 EXPOSE 8080
-ENTRYPOINT ["java", "--enable-preview", "-jar", "quarkus-app/quarkus-run.jar"]
+# QUARKUS_HTTP_PORT typically set to 8080 via env in compose/deploy
+ENTRYPOINT ["java", "--enable-preview", "-jar", "quarkus-run.jar"]

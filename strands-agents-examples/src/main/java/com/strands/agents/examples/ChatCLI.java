@@ -218,7 +218,7 @@ public class ChatCLI {
             var tools = mcpClient.listTools();
             System.out.println("  MCP (Stdio): " + String.join(" ", parts) + " -> " + tools.size() + " Tools");
             for (var spec : tools) {
-                registry.register(spec.name(), spec, new McpToolMethod(mcpClient, spec.name(), spec));
+                registry.register(spec.name(), spec, new McpToolMethod(mcpClient, String.join(" ", parts), spec.name(), spec));
                 System.out.println("    - " + spec.name() + ": " + spec.description());
             }
         } catch (Exception e) {
@@ -235,7 +235,7 @@ public class ChatCLI {
             var tools = mcpClient.listTools();
             System.out.println("  MCP (SSE): " + url + " -> " + tools.size() + " Tools");
             for (var spec : tools) {
-                registry.register(spec.name(), spec, new McpToolMethod(mcpClient, spec.name(), spec));
+                registry.register(spec.name(), spec, new McpToolMethod(mcpClient, url, spec.name(), spec));
                 System.out.println("    - " + spec.name() + ": " + spec.description());
             }
         } catch (Exception e) {

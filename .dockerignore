@@ -13,3 +13,5 @@ database.db
 *.swo
 *~
 /others/
+*.log
+/data/

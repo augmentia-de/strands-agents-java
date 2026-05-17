@@ -14,6 +14,7 @@ import com.strands.agents.quarkus.dto.SkillInfo;
 import com.strands.agents.quarkus.dto.ToolInfo;
 import com.strands.agents.sessions.FileSessionManager;
 import com.strands.agents.skills.*;
+import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import jakarta.annotation.PostConstruct;
@@ -399,6 +400,17 @@ public class AgentService {
             .toList();
     }
 
+    private static String mcpPrefix(String mcpUrl) {
+        try {
+            var uri = new URI(mcpUrl);
+            var host = uri.getHost();
+            var port = uri.getPort();
+            return "mcp_" + (host != null ? host : "unknown") + (port > 0 ? "_" + port : "");
+        } catch (Exception e) {
+            return "mcp_" + Math.abs(mcpUrl.hashCode()) % 10000;
+        }
+    }
+
     public List<ToolInfo> discoverMcpTools(String mcpUrl) {
         try {
             var transport = StreamableHttpMcpTransport.builder()
@@ -406,10 +418,11 @@ public class AgentService {
             var client = DefaultMcpClient.builder().transport(transport).build();
             var tools = client.listTools();
             client.close();
+            var prefix = mcpPrefix(mcpUrl);
             return tools.stream()
                 .map(spec -> {
                     var info = new ToolInfo();
-                    info.name = spec.name();
+                    info.name = prefix + "_" + spec.name();
                     info.description = spec.description() != null ? spec.description() : "";
                     info.parameters = spec.parameters() != null ? spec.parameters().toString() : "";
                     return info;
@@ -425,11 +438,18 @@ public class AgentService {
             .url(mcpUrl).logRequests(true).logResponses(true).build();
         var client = DefaultMcpClient.builder().transport(transport).build();
         var tools = client.listTools();
+        var prefix = mcpPrefix(mcpUrl);
         int registered = 0;
         for (var spec : tools) {
-            if (selectedTools != null && !selectedTools.contains(spec.name())) continue;
-            var prefixed = "mcp_" + spec.name();
-            registry.register(prefixed, spec, new McpToolMethod(client, spec.name(), spec));
+            var prefixedName = prefix + "_" + spec.name();
+            if (selectedTools != null && !selectedTools.contains(prefixedName)) continue;
+            var prefixedSpec = ToolSpecification.builder()
+                .name(prefixedName)
+                .description(spec.description())
+                .parameters(spec.parameters())
+                .build();
+            registry.register(prefixedName, prefixedSpec,
+                new McpToolMethod(client, mcpUrl, spec.name(), prefixedSpec));
             registered++;
         }
         System.out.println("MCP verbunden: " + mcpUrl + " (" + registered + "/" + tools.size() + " Tools registriert)");

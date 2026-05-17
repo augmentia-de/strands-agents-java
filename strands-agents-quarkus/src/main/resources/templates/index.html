@@ -100,7 +100,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
         {#if hasTools}
           {#for tool in tools}
             <label class="chip-select">
-              <input type="checkbox" name="tool" value="{tool.name}" checked>
+              <input type="checkbox" name="tool" value="{tool.name}">
               <span title="{tool.description}">{tool.name}</span>
             </label>
           {/for}
@@ -116,7 +116,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
         {#if hasSkills}
           {#for skill in skills}
             <label class="chip-select">
-              <input type="checkbox" name="skill" value="{skill.name}" checked>
+              <input type="checkbox" name="skill" value="{skill.name}">
               <span title="{skill.description}">{skill.name}</span>
             </label>
           {/for}

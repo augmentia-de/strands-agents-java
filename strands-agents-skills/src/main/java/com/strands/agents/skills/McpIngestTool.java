@@ -6,6 +6,7 @@ import com.strands.agents.core.ToolRegistry;
 import com.strands.agents.core.tools.AgentTool;
 import com.strands.agents.core.tools.McpToolMethod;
 import com.strands.agents.core.tools.ToolResult;
+import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.mcp.client.DefaultMcpClient;
 import dev.langchain4j.mcp.client.transport.http.StreamableHttpMcpTransport;
 import dev.langchain4j.mcp.client.transport.stdio.StdioMcpTransport;
@@ -84,10 +85,17 @@ public record McpIngestTool(ToolRegistry toolRegistry)
             var tools = client.listTools();
 
             var registered = new ArrayList<String>();
+            var prefix = "mcp_" + params.serverName();
             for (var spec : tools) {
-                var prefixed = "mcp_" + params.serverName() + "_" + spec.name();
-                toolRegistry.register(prefixed, spec, new McpToolMethod(client, spec.name(), spec));
-                registered.add(prefixed);
+                var prefixedName = prefix + "_" + spec.name();
+                var prefixedSpec = ToolSpecification.builder()
+                    .name(prefixedName)
+                    .description(spec.description())
+                    .parameters(spec.parameters())
+                    .build();
+                toolRegistry.register(prefixedName, prefixedSpec,
+                    new McpToolMethod(client, params.serverName(), spec.name(), prefixedSpec));
+                registered.add(prefixedName);
             }
 
             var sb = new StringBuilder();
