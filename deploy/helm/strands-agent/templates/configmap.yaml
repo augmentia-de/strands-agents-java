@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "strands-agent.fullname" . }}-config
+  labels:
+    {{- include "strands-agent.labels" . | nindent 4 }}
+data:
+  # Quarkus
+  QUARKUS_HTTP_PORT: {{ .Values.env.QUARKUS_HTTP_PORT | quote }}
+  # LLM provider
+  OPENAI_BASE_URL: {{ .Values.env.OPENAI_BASE_URL | quote }}
+  LLM_CHAT_MODEL: {{ .Values.env.LLM_CHAT_MODEL | quote }}
+  LLM_TEMPERATURE: {{ .Values.env.LLM_TEMPERATURE | quote }}
+  LLM_MAX_RETRIES: {{ .Values.env.LLM_MAX_RETRIES | quote }}
+  # Strands Agent
+  STRANDS_AGENT_TOOLS: {{ .Values.env.STRANDS_AGENT_TOOLS | quote }}
+  STRANDS_SKILLS_DIR: {{ .Values.env.STRANDS_SKILLS_DIR | quote }}
+  STRANDS_SESSION_DIR: {{ .Values.env.STRANDS_SESSION_DIR | quote }}
+  STRANDS_LLM_LOG_ENABLED: {{ .Values.env.STRANDS_LLM_LOG_ENABLED | quote }}
+  STRANDS_LLM_LOG_PATH: {{ .Values.env.STRANDS_LLM_LOG_PATH | quote }}
+  STRANDS_MCP_URL: {{ .Values.env.STRANDS_MCP_URL | quote }}
+  STRANDS_MCP_INGEST: {{ .Values.env.STRANDS_MCP_INGEST | quote }}
+  STRANDS_SKILLS_SEARCH: {{ .Values.env.STRANDS_SKILLS_SEARCH | quote }}
+  MCP_SERVER_URL: {{ .Values.env.MCP_SERVER_URL | quote }}
+  {{- if .Values.vault.enabled }}
+  VAULT_ADDR: {{ .Values.env.VAULT_ADDR | quote }}
+  VAULT_MOUNT_PATH: {{ .Values.env.VAULT_MOUNT_PATH | quote }}
+  {{- end }}

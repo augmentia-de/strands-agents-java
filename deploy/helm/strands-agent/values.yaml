@@ -1,0 +1,63 @@
+replicaCount: 1
+
+image:
+  repository: strands-agent
+  tag: latest
+  pullPolicy: IfNotPresent
+
+env:
+  # ---- LLM provider (Secret) ----
+  OPENAI_API_KEY: ""
+  # ---- LLM provider (ConfigMap) ----
+  OPENAI_BASE_URL: "https://openrouter.ai/api/v1"
+  LLM_CHAT_MODEL: "openai/gpt-oss-120b:free"
+  LLM_TEMPERATURE: "0.7"
+  LLM_MAX_RETRIES: "3"
+  # ---- Strands Agent (ConfigMap) ----
+  QUARKUS_HTTP_PORT: "8080"
+  STRANDS_AGENT_TOOLS: "com.strands.agents.core.tools.CalculatorTool"
+  STRANDS_SKILLS_DIR: "/app/skills"
+  STRANDS_SESSION_DIR: "/app/.sessions"
+  STRANDS_LLM_LOG_ENABLED: "true"
+  STRANDS_LLM_LOG_PATH: "/app/logs/llm-calls.log"
+  STRANDS_MCP_URL: "http://mcp-server:3000/mcp"
+  STRANDS_MCP_INGEST: "false"
+  STRANDS_SKILLS_SEARCH: "false"
+  MCP_SERVER_URL: "http://mcp-server:3000/mcp"
+  # ---- Vault (optional) ----
+  VAULT_ADDR: ""
+  VAULT_TOKEN: ""
+  VAULT_MOUNT_PATH: secret
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "2"
+    memory: "1Gi"
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+service:
+  type: ClusterIP
+  port: 8080
+  nodePort:
+
+health:
+  enabled: true
+  path: /q/health
+
+prometheus:
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+
+vault:
+  enabled: false
+  agentInject: false

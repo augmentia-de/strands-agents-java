@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: strands-agent-config
+  labels:
+    app: strands-agent
+data:
+  # Quarkus
+  QUARKUS_HTTP_PORT: "8080"
+  # LLM provider
+  OPENAI_BASE_URL: "https://openrouter.ai/api/v1"
+  LLM_CHAT_MODEL: "openai/gpt-oss-120b:free"
+  LLM_TEMPERATURE: "0.7"
+  LLM_MAX_RETRIES: "3"
+  # Strands Agent
+  STRANDS_AGENT_TOOLS: "com.strands.agents.core.tools.CalculatorTool"
+  STRANDS_SKILLS_DIR: "/app/skills"
+  STRANDS_SESSION_DIR: "/app/.sessions"
+  STRANDS_LLM_LOG_ENABLED: "true"
+  STRANDS_LLM_LOG_PATH: "/app/logs/llm-calls.log"
+  STRANDS_MCP_URL: "http://mcp-server:3000/mcp"
+  STRANDS_MCP_INGEST: "false"
+  STRANDS_SKILLS_SEARCH: "false"
+  # Legacy alias (maps to STRANDS_MCP_URL)
+  MCP_SERVER_URL: "http://mcp-server:3000/mcp"

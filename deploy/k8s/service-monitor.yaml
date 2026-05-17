@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: strands-agent
+  labels:
+    app: strands-agent
+spec:
+  selector:
+    matchLabels:
+      app: strands-agent
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /metrics
