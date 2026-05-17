@@ -54,11 +54,7 @@ public class ChatCLI {
             if (modelName != null) System.out.println("  Model: " + modelName);
         }
 
-        var llmLogPath = Path.of("logs/llm-calls.log");
-        var llmLogger = new FileLlmLogger(llmLogPath);
-        model = new LoggingChatModel(model, llmLogger);
-        Runtime.getRuntime().addShutdownHook(new Thread(llmLogger::close));
-        System.out.println("  LLM-Log: " + llmLogPath.toAbsolutePath());
+        System.out.println("  LLM-Log: logs/llm-calls.log (10×2MB rotating)");
 
         var registry = ToolRegistry.builder()
             .standard()
@@ -90,7 +86,14 @@ public class ChatCLI {
             }
         }
 
-        var agent = new StrandsAgent(model, registry, new ToolExecutor(), conversationManager, sessionManager, null, plugins);
+        var agent = AgentConfig.builder()
+            .toolRegistry(registry)
+            .conversationManager(conversationManager)
+            .sessionManager(sessionManager)
+            .plugins(plugins)
+            .logLlmCalls(Path.of("logs/llm-calls.log"))
+            .build()
+            .createAgent(model);
 
         var actualSessionId = sessionId != null ? sessionId : UUID.randomUUID().toString();
         var session = sessionManager.createSession("chat-user", Map.of());

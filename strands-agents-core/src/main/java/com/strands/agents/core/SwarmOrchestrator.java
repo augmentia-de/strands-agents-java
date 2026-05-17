@@ -66,7 +66,8 @@ public class SwarmOrchestrator implements Agent {
                 "[Orchestrator → " + matchedRoute.topic() + "]: " + result.finalAnswer(),
                 result.generatedMessages(),
                 result.metrics(),
-                result.stopReason()
+                result.stopReason(),
+                result.structuredOutput()
             );
         }
 
@@ -76,7 +77,8 @@ public class SwarmOrchestrator implements Agent {
             "[Orchestrator → Default]: " + result.finalAnswer(),
             result.generatedMessages(),
             result.metrics(),
-            result.stopReason()
+            result.stopReason(),
+            result.structuredOutput()
         );
     }
 

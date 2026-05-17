@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
@@ -18,23 +19,63 @@ public class FileLlmLogger implements AutoCloseable {
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
             .withZone(ZoneId.systemDefault());
 
-    private final FileChannel channel;
-    private final Path path;
+    static final long MAX_FILE_SIZE = 2L * 1024 * 1024;
+    static final int MAX_FILES = 10;
+
+    private final String basePath;
+    private final String extension;
+    private final Path dir;
+    private final Path originalPath;
+    private int currentIndex;
+    private FileChannel channel;
+    private long currentSize;
     private long callIndex;
 
-    public FileLlmLogger(Path path) {
-        this.path = path;
+    public FileLlmLogger(Path logPath) {
+        this.originalPath = logPath;
+        String name = logPath.toString();
+        int dot = name.lastIndexOf('.');
+        this.basePath = (dot > 0) ? name.substring(0, dot) : name;
+        this.extension = (dot > 0) ? name.substring(dot) : "";
+        this.dir = logPath.getParent();
+        this.currentIndex = 0;
+        openChannel(true);
+        write("=== LLM-Call-Log gestartet: " + now() + " ===\n");
+    }
+
+    private Path fileForIndex(int index) {
+        return Path.of(basePath + "." + index + extension);
+    }
+
+    private void openChannel(boolean truncate) {
         try {
-            var dir = path.getParent();
-            if (dir != null && !java.nio.file.Files.exists(dir))
-                java.nio.file.Files.createDirectories(dir);
-            this.channel = FileChannel.open(path,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.APPEND);
-            write("=== LLM-Call-Log gestartet: " + now() + " ===\n");
+            if (dir != null && !Files.exists(dir))
+                Files.createDirectories(dir);
+            var path = fileForIndex(currentIndex);
+            var opts = truncate
+                ? new StandardOpenOption[]{StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING}
+                : new StandardOpenOption[]{StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND};
+            this.channel = FileChannel.open(path, opts);
+            this.currentSize = truncate ? 0 : channel.size();
         } catch (IOException e) {
-            throw new RuntimeException("Failed to open LLM log: " + path, e);
+            throw new RuntimeException("Failed to open LLM log: " + fileForIndex(currentIndex), e);
+        }
+    }
+
+    private void closeChannel() {
+        try {
+            if (channel != null && channel.isOpen())
+                channel.close();
+        } catch (IOException e) {
+            System.err.println("LLM-Log close error: " + e.getMessage());
+        }
+    }
+
+    private void rotateIfNeeded(int newBytes) {
+        if (currentSize + newBytes > MAX_FILE_SIZE) {
+            closeChannel();
+            currentIndex = (currentIndex + 1) % MAX_FILES;
+            openChannel(true);
         }
     }
 
@@ -77,12 +118,15 @@ public class FileLlmLogger implements AutoCloseable {
             }
         }
         sb.append("\n");
-        write(sb.toString());
+
+        var text = sb.toString();
+        var bytes = text.getBytes(StandardCharsets.UTF_8);
+        rotateIfNeeded(bytes.length);
+        write(bytes);
     }
 
-    private void write(String text) {
+    private void write(byte[] bytes) {
         try {
-            var bytes = text.getBytes(StandardCharsets.UTF_8);
             var buf = ByteBuffer.wrap(bytes);
             while (buf.hasRemaining())
                 channel.write(buf);
@@ -90,6 +134,10 @@ public class FileLlmLogger implements AutoCloseable {
         } catch (IOException e) {
             System.err.println("LLM-Log write error: " + e.getMessage());
         }
+    }
+
+    private void write(String text) {
+        write(text.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String now() {
@@ -100,13 +148,13 @@ public class FileLlmLogger implements AutoCloseable {
     public synchronized void close() {
         try {
             write("=== LLM-Call-Log beendet: " + now() + " ===\n");
-            channel.close();
-        } catch (IOException e) {
+            closeChannel();
+        } catch (Exception e) {
             System.err.println("LLM-Log close error: " + e.getMessage());
         }
     }
 
     public Path path() {
-        return path;
+        return originalPath;
     }
 }

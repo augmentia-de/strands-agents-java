@@ -1,71 +1,153 @@
 package com.strands.agents.examples;
 
-import com.strands.agents.core.AgentTool;
-import com.strands.agents.core.ModelFactory;
-import com.strands.agents.core.StrandsAgent;
+import java.lang.reflect.Method;
+import java.util.Map;
 
-/**
- * Autonomous Swarm Demo (Java).
- * 
- * This demo showcases "Swarm Intelligence" where agents collaborate autonomously 
- * using handoffs via AgentTools, mirroring the Python swarm.py functionality.
- * 
- * Key concepts:
- * 1. Specialized Agents: Each agent has a specific role and system prompt.
- * 2. Agent-as-a-Tool: Agents are registered as tools within other agents.
- * 3. Autonomous Handoffs: The LLM decides when to call another agent based on the task.
- */
+import dev.langchain4j.model.chat.ChatModel;
+import com.strands.agents.core.*;
+import com.strands.agents.core.model.agent.*;
+import com.strands.agents.core.model.event.*;
+import com.strands.agents.core.tools.CalculatorTool;
+
 public class AutonomousSwarmDemo {
 
     public static void main(String[] args) {
-        System.out.println("🐝 Starting Autonomous Swarm Demo (Java)");
-        
-        AutonomousSwarmDemo demo = new AutonomousSwarmDemo();
-        demo.runSwarmCollaboration();
+        if (System.getenv("OPENAI_API_KEY") == null || System.getenv("OPENAI_API_KEY").isBlank()) {
+            System.out.println("OPENAI_API_KEY not set.");
+            System.exit(1);
+        }
+        new AutonomousSwarmDemo().run();
     }
 
-    public void runSwarmCollaboration() {
-        // 1. Create specialized agents
-        // In a real scenario, these could use different models (e.g., GPT-4 for lead, Claude for analysis)
-        StrandsAgent researcher = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
-        researcher.setSystemPrompt("You are an expert Market Researcher. Your objective is to extract, " +
-                "synthesize, and summarize critical market trends, competitive intelligence, and consumer insights. " +
-                "Focus on providing high-signal data. If you encounter financial data requiring deep ROI, " +
-                "market share calculations, or complex modeling, delegate the task to the 'finance_expert' tool. " +
-                "Always conclude with a concise, executive summary of your findings.");
+    void run() {
+        var model = ModelFactory.createOpenAiFromEnv();
 
-        StrandsAgent financeExpert = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
-        financeExpert.setSystemPrompt("You are a Senior Financial Analyst. Your expertise covers " +
-                "quantitative modeling, ROI projections, and market share assessment. " +
-                "Analyze the qualitative data provided to you and transform it into precise " +
-                "numerical insights and financial forecasts. Focus on accuracy and statistical significance.");
+        System.out.println("=== AUTONOMOUS SWARM DEMO ===\n");
 
-        // 2. Enable Handoffs
-        // Register the financeExpert as a tool for the researcher.
-        // This allows the researcher to "hand off" work to the expert autonomously.
-        researcher.getToolRegistry().register(new AgentTool(
-            financeExpert, 
-            "finance_expert", 
-            "Use this tool to delegate complex financial calculations or ROI analysis to an expert."
-        ));
+        demoOrchestrator(model);
+        System.out.println();
+        demoAgentTool(model);
+    }
 
-        // 3. Execute the swarm
-        // We start with the researcher. The researcher will decide on its own 
-        // whether to call the finance_expert based on the prompt.
-        String task = "Analyze the potential of the European EV market in 2024. " +
-                     "I need both general trends and a specific ROI estimation for a new charging station network.";
-        
-        System.out.println("\n--- Task: " + task + " ---");
-        System.out.println("Requesting researcher to start...");
+    // ---------------------------------------------------------------
+    // Pattern A: Orchestrator-based routing (SwarmOrchestrator)
+    // ---------------------------------------------------------------
+    void demoOrchestrator(ChatModel model) {
+        System.out.println("── Pattern A: Orchestrator-based ────");
 
-        var result = researcher.execute(task);
+        var researchAgent = AgentConfig.builder()
+            .toolRegistry(ToolRegistry.builder().standard().include("web_search", "web_fetch").build())
+            .systemPrompt("""
+                You are a market research analyst. Research the given topic thoroughly.
+                Use web_search and web_fetch to gather current data.
+                Always conclude with a clear summary of your findings.""")
+            .build()
+            .createAgent(model);
 
-        // 4. Print results
-        System.out.println("\n--- FINAL CONSOLIDATED RESULT ---");
-        System.out.println(result.finalAnswer());
-        
-        System.out.println("\n--- EXECUTION METRICS ---");
-        System.out.println("Session ID: " + result.sessionId());
-        System.out.println("Stop Reason: " + result.stopReason());
+        var financeAgent = AgentConfig.builder()
+            .toolRegistry(ToolRegistry.builder().with(new CalculatorTool()).build())
+            .systemPrompt("""
+                You are a senior financial analyst. Analyze data and produce
+                financial projections, ROI estimates, and risk assessments.
+                Use the calculator tool for precise computations.""")
+            .build()
+            .createAgent(model);
+
+        var orchestrator = new SwarmOrchestrator(
+            Map.of("research", researchAgent, "finance", financeAgent),
+            researchAgent);
+
+        System.out.println("  Routes: research, finance\n");
+
+        var r1 = orchestrator.execute(
+            "research the European EV market trends for 2024");
+        System.out.println("  [research] " + truncate(r1.finalAnswer(), 200));
+        System.out.println("  Tokens: " + r1.metrics().inputTokens()
+            + " in / " + r1.metrics().outputTokens() + " out, "
+            + r1.metrics().durationMs() + " ms\n");
+
+        var r2 = orchestrator.execute(
+            "finance: calculate the projected ROI for a new EV charging network");
+        System.out.println("  [finance] " + truncate(r2.finalAnswer(), 200));
+        System.out.println("  Tokens: " + r2.metrics().inputTokens()
+            + " in / " + r2.metrics().outputTokens() + " out, "
+            + r2.metrics().durationMs() + " ms");
+    }
+
+    // ---------------------------------------------------------------
+    // Pattern B: Agent-as-a-Tool (autonomous handoff)
+    // ---------------------------------------------------------------
+    void demoAgentTool(ChatModel model) {
+        System.out.println("── Pattern B: Agent-as-a-Tool ──────");
+        System.out.println("  (LLM decides autonomously when to delegate)\n");
+
+        Method executeMethod;
+        try {
+            executeMethod = AgentTool.class.getMethod("execute", String.class);
+        } catch (NoSuchMethodException e) {
+            System.out.println("  Error: AgentTool.execute(String) not found");
+            return;
+        }
+
+        // Sub-agent: financial analyst with CalculatorTool
+        var financeAgent = AgentConfig.builder()
+            .toolRegistry(ToolRegistry.builder().with(new CalculatorTool()).build())
+            .systemPrompt("""
+                You are a Senior Financial Analyst.
+                Your expertise covers quantitative modeling, ROI projections,
+                and risk assessment. Use the calculator for precise numbers.""")
+            .build()
+            .createAgent(model);
+
+        var financeTool = new AgentTool(financeAgent, "finance_expert",
+            "Delegate complex financial calculations or ROI analysis.");
+
+        // Parent agent: researcher with web tools + finance_expert as tool
+        var researcher = AgentConfig.builder()
+            .toolRegistry(ToolRegistry.builder()
+                .standard().include("web_search", "web_fetch")
+                .build())
+            .systemPrompt("""
+                You are an expert Market Researcher.
+                Research topics thoroughly using web_search and web_fetch.
+                If you encounter financial data, ROI calculations, or complex
+                modeling, delegate to the 'finance_expert' tool.
+                Always produce a final consolidated report.""")
+            .build()
+            .createAgent(model);
+
+        researcher.getToolRegistry().register("finance_expert", financeTool, executeMethod);
+
+        // Event listener for real-time handoff visibility
+        researcher.setEventListener(event -> {
+            switch (event) {
+                case ToolExecutionStartedEvent e ->
+                    System.out.println("  → Tool call: " + e.toolCall().toolName());
+                case ToolExecutionFinishedEvent e ->
+                    System.out.println("  ← Tool done: " + e.result().toolName()
+                        + " (" + truncate(e.result().result(), 80) + ")");
+                default -> {}
+            }
+        });
+
+        var result = researcher.execute(
+            "Analyze the European EV market for 2024. Research market trends, " +
+            "then delegate the financial ROI analysis to the finance_expert " +
+            "for a new charging station network.");
+
+        System.out.println("\n  Final: " + truncate(result.finalAnswer(), 300));
+        System.out.println("  Tokens: " + result.metrics().inputTokens()
+            + " in / " + result.metrics().outputTokens() + " out, "
+            + result.metrics().durationMs() + " ms");
+        System.out.println("  Stop reason: " + result.stopReason());
+    }
+
+    // ---------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------
+
+    private String truncate(String s, int max) {
+        if (s == null) return "null";
+        return s.length() <= max ? s : s.substring(0, max) + "...";
     }
 }

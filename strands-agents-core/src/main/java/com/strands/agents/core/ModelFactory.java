@@ -20,9 +20,11 @@ public class ModelFactory {
         if (config.baseUrl() != null && !config.baseUrl().isBlank()) {
             builder.baseUrl(config.baseUrl());
         }
-        if (config.modelName() != null && !config.modelName().isBlank()) {
-            builder.modelName(config.modelName());
+        var modelName = config.modelName();
+        if (modelName == null || modelName.isBlank()) {
+            modelName = "gpt-4o";
         }
+        builder.modelName(modelName);
         if (config.temperature() != null) {
             builder.temperature(config.temperature());
         }

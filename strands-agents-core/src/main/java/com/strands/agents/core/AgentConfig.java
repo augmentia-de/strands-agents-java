@@ -1,6 +1,7 @@
 package com.strands.agents.core;
 
 import com.strands.agents.core.resilience.ResilienceConfig;
+import com.strands.agents.core.structured.StructuredOutputConfig;
 import dev.langchain4j.model.chat.ChatModel;
 import java.nio.file.Path;
 import java.util.List;
@@ -16,7 +17,9 @@ public record AgentConfig(
     ResilienceConfig resilienceConfig,
     List<Plugin> plugins,
     Path skillsDir,
-    List<String> initialSkills
+    List<String> initialSkills,
+    StructuredOutputConfig structuredOutputConfig,
+    Path llmLogPath
 ) {
     public static final int DEFAULT_MAX_ITERATIONS = 10;
 
@@ -28,10 +31,19 @@ public record AgentConfig(
         var effectiveRegistry = toolRegistry != null ? toolRegistry : new ToolRegistry();
         var effectivePlugins = plugins != null ? plugins : List.<Plugin>of();
 
+        if (llmLogPath != null) {
+            var logger = new FileLlmLogger(llmLogPath);
+            model = new LoggingChatModel(model, logger);
+            Runtime.getRuntime().addShutdownHook(new Thread(logger::close));
+        }
+
         var agent = new StrandsAgent(model, effectiveRegistry, new ToolExecutor(),
             conversationManager, sessionManager, resilienceConfig, effectivePlugins);
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             agent.setSystemPrompt(systemPrompt);
+        }
+        if (structuredOutputConfig != null) {
+            agent.setStructuredOutputConfig(structuredOutputConfig);
         }
         return agent;
     }
@@ -43,7 +55,7 @@ public record AgentConfig(
 
     public static class Builder {
         private String name = "unnamed";
-        private String modelName = "openai/gpt-4o";
+        private String modelName = "gpt-4o";
         private String systemPrompt = "";
         private ToolRegistry toolRegistry = new ToolRegistry();
         private int maxIterations = DEFAULT_MAX_ITERATIONS;
@@ -53,6 +65,8 @@ public record AgentConfig(
         private List<Plugin> plugins = List.of();
         private Path skillsDir = null;
         private List<String> initialSkills = List.of();
+        private StructuredOutputConfig structuredOutputConfig = null;
+        private Path llmLogPath = null;
 
         public Builder name(String name) { this.name = name; return this; }
         public Builder modelName(String modelName) { this.modelName = modelName; return this; }
@@ -65,11 +79,15 @@ public record AgentConfig(
         public Builder plugins(List<Plugin> plugins) { this.plugins = plugins; return this; }
         public Builder skillsDir(Path skillsDir) { this.skillsDir = skillsDir; return this; }
         public Builder initialSkills(List<String> initialSkills) { this.initialSkills = initialSkills; return this; }
+        public Builder structuredOutputConfig(StructuredOutputConfig config) { this.structuredOutputConfig = config; return this; }
+        public Builder structuredOutputModel(Class<?> modelClass) { this.structuredOutputConfig = StructuredOutputConfig.staticModel(modelClass); return this; }
+        public Builder structuredOutputSchema(String jsonSchema) { this.structuredOutputConfig = StructuredOutputConfig.dynamicSchema(jsonSchema); return this; }
+        public Builder logLlmCalls(Path path) { this.llmLogPath = path; return this; }
 
         public AgentConfig build() {
             return new AgentConfig(name, modelName, systemPrompt, toolRegistry, maxIterations,
                 conversationManager, sessionManager, resilienceConfig, plugins, skillsDir,
-                initialSkills);
+                initialSkills, structuredOutputConfig, llmLogPath);
         }
     }
 }

@@ -92,3 +92,9 @@ Einige Module enthalten jedoch bereits **Grundlagen**, die in diese Richtung wei
 | 22 | **Spring Boot / Quarkus** – DI-Framework | 📅 Nicht impl. | Keine Spring-Boot- oder Quarkus-Abhängigkeit. Agent wird über `main()` + Builder gestartet. |
 
 Details in [`docs/`](docs/) und [`docs/options.md`](docs/options.md).
+
+## License
+
+This project is a Java port of the [Strands Agents SDK](https://github.com/strands-agents) and is licensed under the **Apache License 2.0**.
+
+See the [LICENSE](LICENSE) and [NOTICE](NOTICE) files for details.

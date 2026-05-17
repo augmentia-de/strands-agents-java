@@ -1,105 +1,200 @@
 package com.strands.agents.examples;
 
-import com.strands.agents.core.A2AExecutor;
-import com.strands.agents.core.A2AResult;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import com.strands.agents.core.AgentConfig;
 import com.strands.agents.core.ModelFactory;
-import com.strands.agents.core.StrandsAgent;
 import com.strands.agents.core.ToolRegistry;
-import com.strands.agents.core.ToolExecutor;
 import com.strands.agents.core.model.agent.AgentResult;
 
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
-/**
- * Demo showing how to implement complex workflows in Java using Strands.
- * This mirrors the functionality of the Python workflow tool by using:
- * - A2AExecutor for parallel execution and retries
- * - CompletableFuture for dependency management
- * - Specialized StrandsAgent instances for different tasks/models
- */
 public class WorkflowDemo {
 
+    record ResearchData(String topic, List<String> keyPoints, List<String> sources) {}
+    record ArticleDraft(String title, String introduction, List<String> sections) {}
+    record ReviewFeedback(String verdict, List<String> changes, boolean approved) {}
+    record PublishedArticle(String title, String content, String slug, int wordCount) {}
+
+    private static ObjectMapper createMapper() {
+        var m = new ObjectMapper();
+        m.registerModule(new JavaTimeModule());
+        m.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        m.configure(JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true);
+        return m;
+    }
+
+    private static final ObjectMapper MAPPER = createMapper();
+    private static final String TOPIC = "The Future of AI-Assisted Software Development";
+
     public static void main(String[] args) {
-        System.out.println("🚀 Starting Advanced Java Workflow Demo");
-        
-        WorkflowDemo demo = new WorkflowDemo();
-        demo.runParallelResearchWorkflow();
+        if (System.getenv("OPENAI_API_KEY") == null || System.getenv("OPENAI_API_KEY").isBlank()) {
+            System.out.println("Fehler: OPENAI_API_KEY ist nicht gesetzt.");
+            System.exit(1);
+        }
+        new WorkflowDemo().run();
     }
 
-    public void runParallelResearchWorkflow() {
-        // 1. Setup shared components
-        // A2AExecutor uses Virtual Threads and handles timeouts/retries
-        A2AExecutor executor = new A2AExecutor(120, 2, java.util.Map.of("workflow", "research-2024"));
+    void run() {
+        Map<String, Object> state = new HashMap<>();
 
-        // 2. Create specialized agents for different tasks (could use different models)
-        StrandsAgent researchAgent = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
-        StrandsAgent analystAgent = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
-        StrandsAgent writerAgent = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+        var model = ModelFactory.createOpenAiFromEnv();
 
-        System.out.println("📋 Phase 1: Parallel Data Collection");
+        System.out.println("=== CONTENT PIPELINE WORKFLOW ===\n");
+        System.out.println("Thema: " + TOPIC + "\n");
 
-        // Start multiple tasks in parallel
-        CompletableFuture<A2AResult> dataTask1 = executor.callAsync(researchAgent, 
-            "Analyze current trends in Solar Energy for 2024. Provide 3 key points.");
-        
-        CompletableFuture<A2AResult> dataTask2 = executor.callAsync(researchAgent, 
-            "Analyze current trends in Wind Energy for 2024. Provide 3 key points.");
+        // ---------------------------------------------------------------
+        // Step 1: Research – via web_search echte Informationen sammeln
+        // ---------------------------------------------------------------
+        System.out.println("[Step 1/4] Research (web_search) ────");
 
-        // 3. Dependency Management: Analysis starts when BOTH collection tasks are done
-        CompletableFuture<A2AResult> analysisTask = CompletableFuture.allOf(dataTask1, dataTask2)
-            .thenCompose(v -> {
-                System.out.println("📊 Phase 2: Cross-Sector Analysis");
-                
-                String combinedData = String.format("Solar Trends: %s\n\nWind Trends: %s", 
-                    dataTask1.join().result(), dataTask2.join().result());
-                
-                String prompt = "Based on the following data, identify common challenges for both sectors:\n" + combinedData;
-                return executor.callAsync(analystAgent, prompt);
-            });
+        var researchAgent = AgentConfig.builder()
+            .structuredOutputModel(ResearchData.class)
+            .toolRegistry(ToolRegistry.builder().standard().include("web_search", "web_fetch").build())
+            .logLlmCalls(Path.of("logs/llm-calls.log"))
+            .build()
+            .createAgent(model);
 
-        // 4. Final Step: Reporting
-        CompletableFuture<A2AResult> reportTask = analysisTask.thenCompose(analysisResult -> {
-            System.out.println("📝 Phase 3: Final Report Generation");
-            
-            String prompt = "Create a summary report for an executive board based on this analysis: " + analysisResult.result();
-            return executor.callAsync(writerAgent, prompt);
+        var r1 = exec(researchAgent,
+            "Use the web_search tool to find current information about the topic '" + TOPIC + "'.\n" +
+            "Search for recent developments, key trends, and relevant sources.\n" +
+            "Then use web_fetch to retrieve the full content of at least one relevant source.\n" +
+            "Finally, extract 3-5 key points and list all sources you found.");
+
+        var research = parse(r1, ResearchData.class);
+        state.put("research", research);
+        if (research == null) { System.out.println("  Research fehlgeschlagen"); return; }
+        System.out.println("  Topic: " + research.topic());
+        System.out.println("  Key Points: " + String.join(" | ", research.keyPoints()));
+        System.out.println("  Sources: " + String.join(", ", research.sources()));
+        System.out.println();
+
+        // ---------------------------------------------------------------
+        // Step 2: Draft – Artikel auf Basis der Research-Daten schreiben
+        // ---------------------------------------------------------------
+        System.out.println("[Step 2/4] Draft ────────────────────");
+
+        var draftAgent = AgentConfig.builder()
+            .structuredOutputModel(ArticleDraft.class)
+            .build()
+            .createAgent(model);
+
+        var r2 = exec(draftAgent,
+            "Schreibe einen Artikel-Entwurf auf Basis dieser Research-Daten:\n" +
+            "Key Points: " + String.join(", ", research.keyPoints()) + "\n" +
+            "Quellen: "    + String.join(", ", research.sources()));
+
+        var draft = parse(r2, ArticleDraft.class);
+        state.put("draft", draft);
+        if (draft == null) { System.out.println("  Draft fehlgeschlagen"); return; }
+        System.out.println("  Title: " + draft.title());
+        System.out.println("  Sections: " + String.join(" | ", draft.sections()));
+        System.out.println();
+
+        // ---------------------------------------------------------------
+        // Step 3: Review – Entwurf bewerten (liest aus state["draft"])
+        // ---------------------------------------------------------------
+        System.out.println("[Step 3/4] Review ───────────────────");
+
+        var reviewAgent = AgentConfig.builder()
+            .structuredOutputModel(ReviewFeedback.class)
+            .build()
+            .createAgent(model);
+
+        var r3 = exec(reviewAgent,
+            "Review den folgenden Artikel-Entwurf:\n" +
+            "Titel: "        + draft.title() + "\n" +
+            "Einleitung: "   + draft.introduction() + "\n" +
+            "Sektionen: "    + String.join(", ", draft.sections()) + "\n\n" +
+            "Gib konstruktives Feedback und liste notwendige Änderungen.");
+
+        var review = parse(r3, ReviewFeedback.class);
+        state.put("review", review);
+        if (review == null) { System.out.println("  Review fehlgeschlagen"); return; }
+        System.out.println("  Verdict: " + review.verdict());
+        System.out.println("  Changes: " + String.join(" | ", review.changes()));
+        System.out.println("  Approved: " + review.approved());
+        System.out.println();
+
+        // ---------------------------------------------------------------
+        // Step 4: Publish – finaler Artikel via write-Tool speichern
+        // ---------------------------------------------------------------
+        System.out.println("[Step 4/4] Publish (write tool) ────");
+
+        var publishAgent = AgentConfig.builder()
+            .structuredOutputModel(PublishedArticle.class)
+            .toolRegistry(ToolRegistry.builder().standard().include("write").build())
+            .build()
+            .createAgent(model);
+
+        var prevDraft  = (ArticleDraft)  state.get("draft");
+        var prevReview = (ReviewFeedback) state.get("review");
+
+        var r4 = exec(publishAgent,
+            "Write the final article to the file 'output/workflow/article.md' using the write tool.\n" +
+            "The article must include the full content.\n\n" +
+            "Use this draft as the basis:\n" +
+            "Title: "       + prevDraft.title() + "\n" +
+            "Introduction: " + prevDraft.introduction() + "\n" +
+            "Sections: "    + String.join(", ", prevDraft.sections()) + "\n\n" +
+            "Apply these review changes:\n" +
+            "  " + String.join("\n  ", prevReview.changes()) + "\n\n" +
+            "After writing the file, return the published article metadata " +
+            "(title, content, slug, word count) as structured data.");
+
+        var published = parse(r4, PublishedArticle.class);
+        if (published == null) { System.out.println("  Publish fehlgeschlagen"); return; }
+        System.out.println("  Title: " + published.title());
+        System.out.println("  Slug: " + published.slug());
+        System.out.println("  WordCount: " + published.wordCount());
+        System.out.println("  Content: " + truncate(published.content(), 200));
+        System.out.println();
+
+        // ---------------------------------------------------------------
+        // Zusammenfassung
+        // ---------------------------------------------------------------
+        System.out.println("=== WORKFLOW COMPLETE ===");
+        System.out.println("State-Map Inhalt:");
+        state.forEach((key, value) -> {
+            System.out.print("  " + key + " -> ");
+            if (value instanceof ResearchData rd)
+                System.out.println("ResearchData(topic=" + rd.topic() + ", points=" + rd.keyPoints().size() + ")");
+            else if (value instanceof ArticleDraft ad)
+                System.out.println("ArticleDraft(title=" + ad.title() + ", sections=" + ad.sections().size() + ")");
+            else if (value instanceof ReviewFeedback rf)
+                System.out.println("ReviewFeedback(verdict=" + rf.verdict() + ", approved=" + rf.approved() + ")");
+            else
+                System.out.println(value);
         });
-
-        // 5. Handle results and errors
-        reportTask.handle((result, ex) -> {
-            if (ex != null) {
-                System.err.println("❌ Workflow failed: " + ex.getMessage());
-            } else {
-                System.out.println("\n--- FINAL WORKFLOW REPORT ---");
-                System.out.println(result.result());
-                System.out.println("-----------------------------");
-                System.out.println("⏱️ Total Time: " + result.durationMs() + "ms");
-            }
-            return null;
-        }).join();
+        System.out.println("\nArtifact saved to: " + Path.of("output/workflow/article.md").toAbsolutePath().normalize());
+        System.out.println("Demonstriert: per-agent Tools (web_search, write), Structured Output & Cross-Step Access");
     }
 
-    /**
-     * Demonstrates a more dynamic approach with a list of tasks (similar to the Python list of dicts).
-     */
-    public void runDynamicBatchWorkflow(List<String> topics) {
-        A2AExecutor executor = new A2AExecutor();
-        StrandsAgent agent = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+    private AgentResult exec(com.strands.agents.core.StrandsAgent agent, String prompt) {
+        var result = agent.execute(prompt);
+        System.out.println("  Tokens: " + result.metrics().inputTokens()
+            + " in / " + result.metrics().outputTokens() + " out, "
+            + result.metrics().durationMs() + " ms");
+        return result;
+    }
 
-        System.out.println("📦 Processing batch of " + topics.size() + " topics in parallel...");
+    private <T> T parse(AgentResult result, Class<T> type) {
+        try {
+            return MAPPER.readValue(result.structuredOutput(), type);
+        } catch (Exception e) {
+            System.out.println("  Parse-Fehler für " + type.getSimpleName()
+                + ": " + e.getMessage());
+            return null;
+        }
+    }
 
-        List<CompletableFuture<A2AResult>> futures = topics.stream()
-            .map(topic -> executor.callAsync(agent, "Summarize the significance of " + topic))
-            .collect(Collectors.toList());
-
-        // Wait for all to complete
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-            .thenAccept(v -> {
-                System.out.println("✅ Batch processing complete.");
-                futures.forEach(f -> System.out.println("- " + f.join().agentName() + " finished a task."));
-            }).join();
+    private String truncate(String s, int max) {
+        if (s == null) return "null";
+        return s.length() <= max ? s : s.substring(0, max) + "...";
     }
 }

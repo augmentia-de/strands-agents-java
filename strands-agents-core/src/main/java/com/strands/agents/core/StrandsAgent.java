@@ -8,6 +8,7 @@ import com.strands.agents.core.model.session.Session;
 import com.strands.agents.core.model.tool.ToolCall;
 import com.strands.agents.core.model.tool.ToolExecutionResult;
 import com.strands.agents.core.resilience.*;
+import com.strands.agents.core.structured.StructuredOutputConfig;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.AiMessage;
@@ -19,6 +20,10 @@ import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.ResponseFormat;
+import dev.langchain4j.model.chat.request.ResponseFormatType;
+import dev.langchain4j.model.chat.request.json.JsonRawSchema;
+import dev.langchain4j.model.chat.request.json.JsonSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -32,7 +37,14 @@ import java.util.concurrent.Flow;
 import java.util.concurrent.SubmissionPublisher;
 import java.util.UUID;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 public class StrandsAgent implements Agent {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+        .configure(JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true);
 
     static final int MAX_TOOL_ITERATIONS = 10;
     static final ExecutorService VIRTUAL_EXECUTOR =
@@ -56,6 +68,7 @@ public class StrandsAgent implements Agent {
     private volatile AgentPhase phase = AgentPhase.IDLE;
     private final ReentrantLock pauseLock = new ReentrantLock();
     private final Condition pauseCondition = pauseLock.newCondition();
+    private StructuredOutputConfig structuredOutputConfig;
 
     public StrandsAgent(ChatModel model) {
         this(model, new ToolRegistry(), new ToolExecutor(), null, null);
@@ -128,6 +141,22 @@ public class StrandsAgent implements Agent {
 
     public void setEventListener(AgentEventListener eventListener) {
         this.eventListener = eventListener;
+    }
+
+    public void setStructuredOutputModel(Class<?> modelClass) {
+        this.structuredOutputConfig = StructuredOutputConfig.staticModel(modelClass);
+    }
+
+    public void setStructuredOutputSchema(String jsonSchema) {
+        this.structuredOutputConfig = StructuredOutputConfig.dynamicSchema(jsonSchema);
+    }
+
+    public void setStructuredOutputConfig(StructuredOutputConfig config) {
+        this.structuredOutputConfig = config;
+    }
+
+    public StructuredOutputConfig getStructuredOutputConfig() {
+        return structuredOutputConfig;
     }
 
     public String getSystemPrompt() {
@@ -212,6 +241,9 @@ public class StrandsAgent implements Agent {
         int totalInputTokens = 0;
         int totalOutputTokens = 0;
         int toolCallCount = 0;
+        boolean structuredForceAttempted = false;
+        boolean structuredForceActive = false;
+        String structuredOutputResult = null;
 
         phase = AgentPhase.EXECUTING;
         fire(new AgentStartedEvent(sid, Instant.now(), prompt));
@@ -253,7 +285,9 @@ public class StrandsAgent implements Agent {
 
             fire(new ModelRequestedEvent(sid, Instant.now(), domainMessages));
 
-            var toolSpecs = toolRegistry.getSpecifications();
+            var toolSpecs = structuredForceActive
+                ? List.<dev.langchain4j.agent.tool.ToolSpecification>of()
+                : toolRegistry.getSpecifications();
 
             ChatResponse response;
             try {
@@ -288,6 +322,22 @@ public class StrandsAgent implements Agent {
                 totalOutputTokens += response.tokenUsage().outputTokenCount();
             }
 
+            // Structured output: try to extract JSON if enabled
+            if (structuredOutputConfig != null && structuredOutputConfig.isEnabled()
+                && !aiMessage.hasToolExecutionRequests()) {
+                try {
+                    OBJECT_MAPPER.readTree(responseText);
+                    structuredOutputResult = responseText;
+                } catch (JsonProcessingException e) {
+                    if (!structuredForceAttempted) {
+                        structuredForceAttempted = true;
+                        structuredForceActive = true;
+                        chatMemory.add(UserMessage.from(structuredOutputConfig.forcePrompt()));
+                        continue;
+                    }
+                }
+            }
+
             if (!aiMessage.hasToolExecutionRequests()) {
                 phase = AgentPhase.COMPLETED;
                 var durationMs = (System.nanoTime() - start) / 1_000_000;
@@ -298,7 +348,8 @@ public class StrandsAgent implements Agent {
                     responseText,
                     generatedMessages,
                     new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
-                    StopReason.COMPLETED
+                    StopReason.COMPLETED,
+                    structuredOutputResult
                 );
                 fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
                 return result;
@@ -485,6 +536,20 @@ public class StrandsAgent implements Agent {
         }
         if (toolSpecs != null && !toolSpecs.isEmpty()) {
             builder.toolSpecifications(toolSpecs);
+        }
+        if (structuredOutputConfig != null && structuredOutputConfig.isEnabled()) {
+            var schemaStr = structuredOutputConfig.effectiveSchema();
+            if (schemaStr != null) {
+                var rawSchema = JsonRawSchema.from(schemaStr);
+                var jsonSchema = JsonSchema.builder()
+                    .name(structuredOutputConfig.mode().name())
+                    .rootElement(rawSchema)
+                    .build();
+                builder.responseFormat(ResponseFormat.builder()
+                    .type(ResponseFormatType.JSON)
+                    .jsonSchema(jsonSchema)
+                    .build());
+            }
         }
         return builder.build();
     }

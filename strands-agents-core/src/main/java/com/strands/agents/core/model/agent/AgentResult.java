@@ -8,5 +8,11 @@ public record AgentResult(
     String finalAnswer,
     List<Message> generatedMessages,
     ExecutionMetrics metrics,
-    StopReason stopReason
-) {}
+    StopReason stopReason,
+    String structuredOutput
+) {
+    public AgentResult(String sessionId, String finalAnswer, List<Message> generatedMessages,
+                       ExecutionMetrics metrics, StopReason stopReason) {
+        this(sessionId, finalAnswer, generatedMessages, metrics, stopReason, null);
+    }
+}
