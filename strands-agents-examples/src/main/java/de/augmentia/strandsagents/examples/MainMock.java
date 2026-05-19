@@ -1,6 +1,12 @@
 package de.augmentia.strandsagents.examples;
 
-import de.augmentia.strandsagents.core.*;
+
+import de.augmentia.strandsagents.core.ToolExecutor;
+import de.augmentia.strandsagents.core.ToolRegistry;
+import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.a2a.AgentTool;
+import de.augmentia.strandsagents.core.agent.swarm.SwarmOrchestrator;
+import de.augmentia.strandsagents.core.config.AgentConfig;
 import de.augmentia.strandsagents.core.model.event.*;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;

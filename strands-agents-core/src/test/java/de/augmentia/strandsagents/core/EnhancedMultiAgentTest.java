@@ -5,6 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import de.augmentia.strandsagents.core.agent.MockChatModel;
+import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.a2a.A2AExecutor;
+import de.augmentia.strandsagents.core.agent.a2a.AgentTool;
+import de.augmentia.strandsagents.core.agent.routing.LlmRouter;
+import de.augmentia.strandsagents.core.agent.swarm.SwarmOrchestrator;
 import org.junit.jupiter.api.Test;
 
 class EnhancedMultiAgentTest {

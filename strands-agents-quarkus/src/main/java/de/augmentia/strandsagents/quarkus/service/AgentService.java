@@ -1,7 +1,20 @@
 package de.augmentia.strandsagents.quarkus.service;
 
 import de.augmentia.strandsagents.core.*;
+import de.augmentia.strandsagents.core.agent.MockChatModel;
+import de.augmentia.strandsagents.core.agent.MockStreamingChatModel;
+import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.StreamingAgent;
+import de.augmentia.strandsagents.core.config.ModelFactory;
+import de.augmentia.strandsagents.core.logging.FileLlmLogger;
+import de.augmentia.strandsagents.core.logging.LoggingChatModel;
 import de.augmentia.strandsagents.core.model.event.AgentStateChangedEvent;
+import de.augmentia.strandsagents.core.plugin.Plugin;
+import de.augmentia.strandsagents.core.plugin.guardrail.ApprovalResult;
+import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailPlugin;
+import de.augmentia.strandsagents.core.plugin.hitl.HITLAuthority;
+import de.augmentia.strandsagents.core.plugin.hitl.HITLPlugin;
+import de.augmentia.strandsagents.core.plugin.hitl.HITLProvider;
 import de.augmentia.strandsagents.core.tools.McpToolMethod;
 import de.augmentia.strandsagents.skills.*;
 import dev.langchain4j.mcp.client.DefaultMcpClient;

@@ -1,8 +1,9 @@
 package de.augmentia.strandsagents.examples;
 
 import java.time.Instant;
-import de.augmentia.strandsagents.core.AgentConfig;
-import de.augmentia.strandsagents.core.ModelFactory;
+
+import de.augmentia.strandsagents.core.config.AgentConfig;
+import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.model.agent.AgentResult;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;

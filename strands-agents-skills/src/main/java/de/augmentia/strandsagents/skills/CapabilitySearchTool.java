@@ -2,7 +2,7 @@ package de.augmentia.strandsagents.skills;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import de.augmentia.strandsagents.core.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.StrandsAgent;
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.tools.AgentTool;

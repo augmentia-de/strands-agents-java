@@ -1,8 +1,9 @@
 package de.augmentia.strandsagents.examples;
 
-import de.augmentia.strandsagents.core.AgentTool;
-import de.augmentia.strandsagents.core.ModelFactory;
-import de.augmentia.strandsagents.core.StrandsAgent;
+
+import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.a2a.AgentTool;
+import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.tools.BashTool;
 import de.augmentia.strandsagents.core.tools.WriteTool;
 import dev.langchain4j.agent.tool.P;

@@ -2,6 +2,10 @@ package de.augmentia.strandsagents.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.augmentia.strandsagents.core.agent.MockChatModel;
+import de.augmentia.strandsagents.core.agent.MockStreamingChatModel;
+import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.StreamingAgent;
 import de.augmentia.strandsagents.core.model.agent.StopReason;
 import de.augmentia.strandsagents.core.model.event.*;
 import de.augmentia.strandsagents.core.model.event.*;

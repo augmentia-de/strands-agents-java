@@ -4,8 +4,13 @@ import java.lang.reflect.Method;
 import java.util.Map;
 
 import de.augmentia.strandsagents.core.*;
+import de.augmentia.strandsagents.core.agent.a2a.AgentTool;
+import de.augmentia.strandsagents.core.agent.swarm.SwarmOrchestrator;
+import de.augmentia.strandsagents.core.config.AgentConfig;
+import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.model.event.ToolExecutionFinishedEvent;
 import de.augmentia.strandsagents.core.model.event.ToolExecutionStartedEvent;
+
 import dev.langchain4j.model.chat.ChatModel;
 import de.augmentia.strandsagents.core.tools.CalculatorTool;
 

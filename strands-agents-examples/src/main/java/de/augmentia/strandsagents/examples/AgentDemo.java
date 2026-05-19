@@ -1,7 +1,17 @@
 package de.augmentia.strandsagents.examples;
 
 import de.augmentia.strandsagents.core.*;
+import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.config.ModelFactory;
+import de.augmentia.strandsagents.core.conversation.ConversationManager;
+import de.augmentia.strandsagents.core.SessionManager;
+import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.core.model.agent.AgentResult;
+import de.augmentia.strandsagents.core.plugin.Plugin;
+import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailPlugin;
+import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailResult;
+import de.augmentia.strandsagents.core.plugin.hitl.HITLAuthority;
+import de.augmentia.strandsagents.core.plugin.hitl.HITLPlugin;
 import de.augmentia.strandsagents.core.resilience.CircuitBreakerConfig;
 import de.augmentia.strandsagents.core.resilience.ResilienceConfig;
 import de.augmentia.strandsagents.core.resilience.RetryConfig;

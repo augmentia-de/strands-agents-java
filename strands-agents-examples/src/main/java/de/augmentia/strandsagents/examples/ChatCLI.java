@@ -1,8 +1,13 @@
 package de.augmentia.strandsagents.examples;
 
 import de.augmentia.strandsagents.core.*;
+import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.config.AgentConfig;
+import de.augmentia.strandsagents.core.config.ModelFactory;
+import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.core.model.agent.AgentResult;
 import de.augmentia.strandsagents.core.model.event.*;
+import de.augmentia.strandsagents.core.plugin.Plugin;
 import de.augmentia.strandsagents.core.tools.McpToolMethod;
 import de.augmentia.strandsagents.sessions.FileSessionManager;
 import de.augmentia.strandsagents.skills.AgentSkillsPlugin;

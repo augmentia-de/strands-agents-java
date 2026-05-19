@@ -2,7 +2,8 @@ package de.augmentia.strandsagents.vault;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.augmentia.strandsagents.core.SecretProvider;
+import de.augmentia.strandsagents.core.secret.SecretProvider;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;

@@ -1,9 +1,11 @@
 package de.augmentia.strandsagents.examples;
 
-import de.augmentia.strandsagents.core.A2AExecutor;
-import de.augmentia.strandsagents.core.A2AResult;
-import de.augmentia.strandsagents.core.ModelFactory;
-import de.augmentia.strandsagents.core.StrandsAgent;
+
+import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.a2a.A2AExecutor;
+import de.augmentia.strandsagents.core.agent.a2a.A2AResult;
+import de.augmentia.strandsagents.core.config.ModelFactory;
+
 import java.util.ArrayList;
 import java.util.List;
 

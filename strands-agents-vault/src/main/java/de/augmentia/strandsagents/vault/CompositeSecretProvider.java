@@ -1,6 +1,8 @@
 package de.augmentia.strandsagents.vault;
 
-import de.augmentia.strandsagents.core.SecretProvider;
+
+import de.augmentia.strandsagents.core.secret.SecretProvider;
+
 import java.util.List;
 import java.util.Map;
 

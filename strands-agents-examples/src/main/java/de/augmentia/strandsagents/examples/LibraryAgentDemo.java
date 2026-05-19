@@ -1,9 +1,10 @@
 package de.augmentia.strandsagents.examples;
 
-import de.augmentia.strandsagents.core.AgentConfig;
-import de.augmentia.strandsagents.core.GuardrailPlugin;
-import de.augmentia.strandsagents.core.GuardrailResult;
-import de.augmentia.strandsagents.core.StrandsAgent;
+
+import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.config.AgentConfig;
+import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailPlugin;
+import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailResult;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 

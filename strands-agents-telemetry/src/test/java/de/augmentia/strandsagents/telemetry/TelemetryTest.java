@@ -2,8 +2,9 @@ package de.augmentia.strandsagents.telemetry;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.augmentia.strandsagents.core.MockChatModel;
-import de.augmentia.strandsagents.core.StrandsAgent;
+
+import de.augmentia.strandsagents.core.agent.MockChatModel;
+import de.augmentia.strandsagents.core.agent.StrandsAgent;
 import de.augmentia.strandsagents.core.model.event.*;
 import de.augmentia.strandsagents.core.model.tool.ToolCall;
 import de.augmentia.strandsagents.core.model.tool.ToolExecutionResult;

@@ -4,10 +4,11 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import de.augmentia.strandsagents.core.AgentConfig;
-import de.augmentia.strandsagents.core.ModelFactory;
-import de.augmentia.strandsagents.core.StrandsAgent;
+
 import de.augmentia.strandsagents.core.ToolRegistry;
+import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.config.AgentConfig;
+import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.model.agent.AgentResult;
 
 import com.fasterxml.jackson.core.JsonParser;

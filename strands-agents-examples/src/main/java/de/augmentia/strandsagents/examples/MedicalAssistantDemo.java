@@ -1,7 +1,8 @@
 package de.augmentia.strandsagents.examples;
 
-import de.augmentia.strandsagents.core.ModelFactory;
-import de.augmentia.strandsagents.core.StrandsAgent;
+
+import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.config.ModelFactory;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import com.fasterxml.jackson.databind.ObjectMapper;

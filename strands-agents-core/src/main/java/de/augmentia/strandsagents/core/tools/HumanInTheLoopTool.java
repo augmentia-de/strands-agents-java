@@ -1,7 +1,8 @@
 package de.augmentia.strandsagents.core.tools;
 
-import de.augmentia.strandsagents.core.ApprovalResult;
-import de.augmentia.strandsagents.core.HITLProvider;
+
+import de.augmentia.strandsagents.core.plugin.guardrail.ApprovalResult;
+import de.augmentia.strandsagents.core.plugin.hitl.HITLProvider;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 

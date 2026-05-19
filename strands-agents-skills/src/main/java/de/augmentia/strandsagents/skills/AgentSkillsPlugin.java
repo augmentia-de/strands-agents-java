@@ -1,8 +1,10 @@
 package de.augmentia.strandsagents.skills;
 
-import de.augmentia.strandsagents.core.Plugin;
-import de.augmentia.strandsagents.core.StrandsAgent;
+
 import de.augmentia.strandsagents.core.ToolRegistry;
+import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.plugin.Plugin;
+
 import java.nio.file.Files;
 import java.util.*;
 import java.util.stream.Collectors;

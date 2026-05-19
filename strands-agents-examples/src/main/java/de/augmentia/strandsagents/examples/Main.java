@@ -1,9 +1,9 @@
 package de.augmentia.strandsagents.examples;
 
-import de.augmentia.strandsagents.core.ModelFactory;
-import de.augmentia.strandsagents.core.StrandsAgent;
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
+import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.model.agent.AgentResult;
 import de.augmentia.strandsagents.core.model.event.AgentStartedEvent;
 import de.augmentia.strandsagents.core.model.event.ToolExecutionFinishedEvent;

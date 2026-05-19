@@ -2,6 +2,8 @@ package de.augmentia.strandsagents.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.augmentia.strandsagents.core.agent.MockChatModel;
+import de.augmentia.strandsagents.core.agent.planning.*;
 import de.augmentia.strandsagents.core.model.agent.AgentPhase;
 import de.augmentia.strandsagents.core.model.agent.StopReason;
 import de.augmentia.strandsagents.core.model.event.AgentStateChangedEvent;

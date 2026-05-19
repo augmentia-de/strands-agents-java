@@ -2,6 +2,8 @@ package de.augmentia.strandsagents.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.augmentia.strandsagents.core.config.AgentConfig;
+import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import org.junit.jupiter.api.Test;
 
 class AgentConfigTest {
