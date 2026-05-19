@@ -1,4 +1,4 @@
-package com.strands.agents.vault;
+package de.augmentia.strandsagents.vault;
 
 import static org.assertj.core.api.Assertions.*;
 import java.io.IOException;

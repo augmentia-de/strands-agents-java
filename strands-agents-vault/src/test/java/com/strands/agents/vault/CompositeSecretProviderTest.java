@@ -1,7 +1,7 @@
-package com.strands.agents.vault;
+package de.augmentia.strandsagents.vault;
 
 import static org.assertj.core.api.Assertions.*;
-import com.strands.agents.core.SecretProvider;
+import de.augmentia.strandsagents.core.SecretProvider;
 import java.nio.file.Path;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

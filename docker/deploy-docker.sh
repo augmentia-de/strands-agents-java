@@ -34,7 +34,7 @@ docker run -d \
     -e LLM_CHAT_MODEL="${LLM_CHAT_MODEL:-gpt-4o}" \
     -e QUARKUS_HTTP_PORT=8084 \
     -e STRANDS_SKILLS_DIR=/app/skills \
-    -e STRANDS_AGENT_TOOLS=com.strands.agents.core.tools.CalculatorTool \
+    -e STRANDS_AGENT_TOOLS=de.augmentia.strandsagents.core.tools.CalculatorTool \
     -e STRANDS_MCP_URL="${STRANDS_MCP_URL:-}" \
     -v "$PROJECT_DIR/data:/app/data" \
     -v "$PROJECT_DIR/skills:/app/skills" \

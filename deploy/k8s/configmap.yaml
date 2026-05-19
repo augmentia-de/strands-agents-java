@@ -13,7 +13,7 @@ data:
   LLM_TEMPERATURE: "0.7"
   LLM_MAX_RETRIES: "3"
   # Strands Agent
-  STRANDS_AGENT_TOOLS: "com.strands.agents.core.tools.CalculatorTool"
+  STRANDS_AGENT_TOOLS: "de.augmentia.strandsagents.core.tools.CalculatorTool"
   STRANDS_SKILLS_DIR: "/app/skills"
   STRANDS_SESSION_DIR: "/app/.sessions"
   STRANDS_LLM_LOG_ENABLED: "true"

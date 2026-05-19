@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.strands.agents</groupId>
+        <groupId>de.augmentia.strandsagents</groupId>
         <artifactId>strands-agents-java</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
@@ -14,17 +14,17 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.strands.agents</groupId>
+            <groupId>de.augmentia.strandsagents</groupId>
             <artifactId>strands-agents-core</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.strands.agents</groupId>
+            <groupId>de.augmentia.strandsagents</groupId>
             <artifactId>strands-agents-sessions</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.strands.agents</groupId>
+            <groupId>de.augmentia.strandsagents</groupId>
             <artifactId>strands-agents-skills</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -62,7 +62,7 @@
                         </tags>
                     </to>
                     <container>
-                        <mainClass>com.strands.agents.examples.Main</mainClass>
+                        <mainClass>de.augmentia.strandsagents.examples.Main</mainClass>
                         <jvmFlags>
                             <jvmFlag>--enable-preview</jvmFlag>
                         </jvmFlags>

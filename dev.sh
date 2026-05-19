@@ -68,7 +68,7 @@ cmd_run() {
     mvn -q -pl strands-agents-examples \
         exec:exec \
         -Dexec.executable="java" \
-        -Dexec.args="--enable-preview -cp %classpath com.strands.agents.examples.Main"
+        -Dexec.args="--enable-preview -cp %classpath de.augmentia.strandsagents.examples.Main"
 }
 
 cmd_run_mock() {
@@ -78,7 +78,7 @@ cmd_run_mock() {
     mvn -q -pl strands-agents-examples \
         exec:exec \
         -Dexec.executable="java" \
-        -Dexec.args="--enable-preview -cp %classpath com.strands.agents.examples.MainMock"
+        -Dexec.args="--enable-preview -cp %classpath de.augmentia.strandsagents.examples.MainMock"
 }
 
 cmd_chat() {
@@ -93,7 +93,7 @@ cmd_chat() {
     mvn -q -pl strands-agents-examples \
         exec:exec \
         -Dexec.executable="java" \
-        -Dexec.args="--enable-preview -cp %classpath com.strands.agents.examples.ChatCLI $mock_flag"
+        -Dexec.args="--enable-preview -cp %classpath de.augmentia.strandsagents.examples.ChatCLI $mock_flag"
 }
 
 cmd_clean() {
