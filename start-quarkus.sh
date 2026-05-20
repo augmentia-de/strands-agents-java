@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ---- API-Keys laden ----
+if [ -f "$SCRIPT_DIR/set_keys.sh" ]; then
+    source "$SCRIPT_DIR/set_keys.sh"
+fi
+
+# ---- Config (Überschreibbar via env) ----
+export STRANDS_SKILLS_DIR="${STRANDS_SKILLS_DIR:-$SCRIPT_DIR/skills}"
+export STRANDS_SESSION_DIR="${STRANDS_SESSION_DIR:-$SCRIPT_DIR/.sessions}"
+export STRANDS_LLM_LOG_ENABLED="${STRANDS_LLM_LOG_ENABLED:-true}"
+export STRANDS_LLM_LOG_PATH="${STRANDS_LLM_LOG_PATH:-$SCRIPT_DIR/logs/llm-calls.log}"
+export STRANDS_AGENT_TOOLS="${STRANDS_AGENT_TOOLS:-de.augmentia.strands-agents.core.tools.CalculatorTool}"
+
+usage() {
+    cat <<EOF
+Usage: ./start-quarkus.sh [mode]
+
+Modes:
+  dev          Quarkus Dev Mode (Hot Reload) – Standard
+  prod         Produktions-Modus (build + jar)
+  build-only   Nur bauen, nicht starten
+  help         Diese Hilfe
+
+EOF
+}
+
+curl -X POST http://localhost:8082/agentDemo \
+     -H "Content-Type: application/json" \
+     -d '{"message": "Hello Agent", "sessionId": "12345"}'
+
+cmd_dev() {
+    echo ">>> Quarkus Dev Mode starten (Hot Reload)"
+    echo "    Skills:      $STRANDS_SKILLS_DIR"
+    echo "    Sessions:    $STRANDS_SESSION_DIR"
+    echo "    LLM-Log:     $STRANDS_LLM_LOG_ENABLED"
+    echo "    Model:       ${LLM_CHAT_MODEL:-gpt-4o-mini}"
+    echo ""
+    cd "$SCRIPT_DIR"
+    mvn io.quarkus.platform:quarkus-maven-plugin:3.17.4:dev \
+        -pl strands-agents-quarkus -am
+}
+
+cmd_prod() {
+    echo ">>> Produktions-Build + Start"
+    cd "$SCRIPT_DIR"
+    mvn clean package -DskipTests -pl strands-agents-quarkus -am
+    java --enable-preview \
+        -jar strands-agents-quarkus/target/quarkus-app/quarkus-run.jar
+}
+
+cmd_build_only() {
+    echo ">>> Nur bauen (production jar)"
+    cd "$SCRIPT_DIR"
+    mvn clean package -DskipTests -pl strands-agents-quarkus -am
+    echo ""
+    echo "✅ Jar liegt in strands-agents-quarkus/target/quarkus-app/"
+}
+
+case "${1:-dev}" in
+    dev)        cmd_dev ;;
+    prod)       cmd_prod ;;
+    build-only) cmd_build_only ;;
+    help|--help|-h) usage ;;
+    *)
+        echo "Unbekannter Modus: $1"
+        usage
+        exit 1
+        ;;
+esac
