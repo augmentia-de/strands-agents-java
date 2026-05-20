@@ -1,7 +1,7 @@
 package de.augmentia.strandsagents.examples;
 
 
-import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.agent.a2a.A2AExecutor;
 import de.augmentia.strandsagents.core.agent.a2a.A2AResult;
 import de.augmentia.strandsagents.core.config.ModelFactory;
@@ -44,7 +44,7 @@ public class RecursiveThinkingDemo {
         // 1. Setup the "Thinking Agent"
         // In a real world scenario, you might use a more powerful model for thinking
         // (e.g., switching from GPT-4o-mini to GPT-4o for the actual thinking cycles).
-        StrandsAgent thinkingAgent = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+        Agent thinkingAgent = new Agent(ModelFactory.createOpenAiFromEnv());
         thinkingAgent.setSystemPrompt("You are an Elite Analytical Strategist. Your goal is to subject an initial " +
                 "concept to rigorous recursive analysis. In each cycle, you must:\n" +
                 "1. **Analyze:** Evaluate the current thought from multiple perspectives (economic, social, technical).\n" +

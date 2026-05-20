@@ -15,7 +15,7 @@
     <dependencies>
         <dependency>
             <groupId>de.augmentia.strandsagents</groupId>
-            <artifactId>strands-agents-core</artifactId>
+            <artifactId>strands-agents</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

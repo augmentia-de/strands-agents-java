@@ -1,7 +1,7 @@
 package de.augmentia.strandsagents.examples;
 
 
-import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.config.AgentConfig;
 import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailPlugin;
 import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailResult;
@@ -41,7 +41,7 @@ public class LibraryAgentDemo {
         );
 
         // 3. Create the agent using AgentConfig
-        StrandsAgent agent = AgentConfig.builder()
+        Agent agent = AgentConfig.builder()
             .systemPrompt("You are a Senior Library Services Assistant. Your primary responsibility is to " +
                 "process book renewal requests while strictly adhering to the Standard Operating Procedure (SOP).\n\n" +
                 "**MANDATORY WORKFLOW:**\n" +

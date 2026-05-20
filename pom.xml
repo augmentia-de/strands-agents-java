@@ -12,14 +12,9 @@
     <name>Strands Agents SDK (Java 21)</name>
 
     <modules>
-        <module>strands-agents-core</module>
-        <module>strands-agents-sessions</module>
-        <module>strands-agents-skills</module>
-        <module>strands-agents-telemetry</module>
-        <module>strands-agents-vault</module>
+        <module>strands-agents</module>
         <module>strands-agents-quarkus</module>
         <module>strands-agents-examples</module>
-        <module>strands-agents-all</module>
     </modules>
 
     <properties>
@@ -39,7 +34,7 @@
         <dependencies>
             <dependency>
                 <groupId>de.augmentia.strandsagents</groupId>
-                <artifactId>strands-agents-core</artifactId>
+                <artifactId>strands-agents</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

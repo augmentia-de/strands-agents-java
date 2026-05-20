@@ -1,10 +1,10 @@
 package de.augmentia.strandsagents.examples;
 
 import de.augmentia.strandsagents.core.*;
-import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.conversation.ConversationManager;
-import de.augmentia.strandsagents.core.SessionManager;
+import de.augmentia.strandsagents.sessions.SessionManager;
 import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.core.model.agent.AgentResult;
 import de.augmentia.strandsagents.core.plugin.Plugin;
@@ -86,7 +86,7 @@ public class AgentDemo {
 
         // --- INSTANTIATION ---
         // Using the most comprehensive constructor available
-        StrandsAgent agent = new StrandsAgent(
+        Agent agent = new Agent(
             model,
             toolRegistry,
             toolExecutor,

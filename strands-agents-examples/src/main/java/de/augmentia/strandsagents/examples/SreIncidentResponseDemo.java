@@ -1,7 +1,7 @@
 package de.augmentia.strandsagents.examples;
 
 
-import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.agent.a2a.AgentTool;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import dev.langchain4j.agent.tool.P;
@@ -33,13 +33,13 @@ public class SreIncidentResponseDemo {
 
     public void runIncidentWorkflow() {
         // 1. Setup specialized agents
-        StrandsAgent monitoringAgent = createMonitoringAgent();
-        StrandsAgent rcaAgent = createRcaAgent();
-        StrandsAgent opsAgent = createOpsAgent();
+        Agent monitoringAgent = createMonitoringAgent();
+        Agent rcaAgent = createRcaAgent();
+        Agent opsAgent = createOpsAgent();
         
         // 2. Setup the Supervisor (Incident Commander)
         // We use the "Agents-as-Tools" pattern, just like in the Python example.
-        StrandsAgent supervisor = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+        Agent supervisor = new Agent(ModelFactory.createOpenAiFromEnv());
         supervisor.setSystemPrompt("You are the SRE Incident Commander (IC) leading a critical system response.\n\n" +
                 "Your objective is to restore service stability by orchestrating specialized SRE agents:\n" +
                 "1. **Audit:** Use 'monitoring_agent' to gather high-fidelity alarm data, performance metrics, and log segments.\n" +
@@ -68,23 +68,23 @@ public class SreIncidentResponseDemo {
         System.out.println("==========================================");
     }
 
-    private StrandsAgent createMonitoringAgent() {
-        StrandsAgent agent = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+    private Agent createMonitoringAgent() {
+        Agent agent = new Agent(ModelFactory.createOpenAiFromEnv());
         agent.setSystemPrompt("You are a CloudWatch Observability Specialist. " +
                 "Extract precise metrics and relevant log lines to provide a clear picture of system health.");
         agent.getToolRegistry().register(new MonitoringTools());
         return agent;
     }
 
-    private StrandsAgent createRcaAgent() {
-        StrandsAgent agent = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+    private Agent createRcaAgent() {
+        Agent agent = new Agent(ModelFactory.createOpenAiFromEnv());
         agent.setSystemPrompt("You are a Senior SRE (Root Cause Analysis). " +
                 "Analyze telemetry and log data to identify the failure mechanism and evaluate impact.");
         return agent;
     }
 
-    private StrandsAgent createOpsAgent() {
-        StrandsAgent agent = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+    private Agent createOpsAgent() {
+        Agent agent = new Agent(ModelFactory.createOpenAiFromEnv());
         agent.setSystemPrompt("You are a Kubernetes and Platform Engineer. " +
                 "Execute infrastructure-level remediation with a focus on safety, speed, and reversibility.");
         agent.getToolRegistry().register(new OpsTools());

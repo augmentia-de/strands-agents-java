@@ -1,7 +1,7 @@
 package de.augmentia.strandsagents.examples;
 
 
-import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.agent.a2a.AgentTool;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import dev.langchain4j.agent.tool.P;
@@ -28,12 +28,12 @@ public class ProductivityAssistantDemo {
 
     public void runAssistant() {
         // 1. Create specialized sub-agents
-        StrandsAgent emailAgent = createEmailAgent();
-        StrandsAgent calendarAgent = createCalendarAgent();
-        StrandsAgent searchAgent = createSearchAgent();
+        Agent emailAgent = createEmailAgent();
+        Agent calendarAgent = createCalendarAgent();
+        Agent searchAgent = createSearchAgent();
 
         // 2. Setup the Coordinator (Personal Assistant)
-        StrandsAgent coordinator = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+        Agent coordinator = new Agent(ModelFactory.createOpenAiFromEnv());
         coordinator.setSystemPrompt("You are an advanced Personal Productivity Orchestrator. " +
                 "Your role is to maximize the user's efficiency by coordinating a team of specialized agents:\n" +
                 "- **email_agent**: High-level communication specialist for drafting, analyzing, and managing professional emails.\n" +
@@ -67,23 +67,23 @@ public class ProductivityAssistantDemo {
         System.out.println("==========================================");
     }
 
-    private StrandsAgent createEmailAgent() {
-        StrandsAgent agent = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+    private Agent createEmailAgent() {
+        Agent agent = new Agent(ModelFactory.createOpenAiFromEnv());
         agent.setSystemPrompt("You are a Professional Communications Consultant. " +
                 "Draft emails that are clear, impactful, and tailored to the target audience.");
         return agent;
     }
 
-    private StrandsAgent createCalendarAgent() {
-        StrandsAgent agent = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+    private Agent createCalendarAgent() {
+        Agent agent = new Agent(ModelFactory.createOpenAiFromEnv());
         agent.setSystemPrompt("You are a Logistics and Schedule Optimizer. " +
                 "Ensure calendars are organized and conflicts are proactively identified.");
         agent.getToolRegistry().register(new CalendarTools());
         return agent;
     }
 
-    private StrandsAgent createSearchAgent() {
-        StrandsAgent agent = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+    private Agent createSearchAgent() {
+        Agent agent = new Agent(ModelFactory.createOpenAiFromEnv());
         agent.setSystemPrompt("You are a Lead Intelligence Researcher. " +
                 "Provide high-signal, accurate information synthesized from multiple web sources.");
         agent.getToolRegistry().register(new SearchTools());

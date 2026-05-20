@@ -1,7 +1,7 @@
 package de.augmentia.strandsagents.examples;
 
 
-import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.agent.a2a.AgentTool;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.tools.BashTool;
@@ -38,12 +38,12 @@ public class CodeAssistantDemo {
 
     public void runCodeAssistant() {
         // 1. Setup specialized sub-agents
-        StrandsAgent generator = createGeneratorAgent();
-        StrandsAgent reviewer = createReviewerAgent();
-        StrandsAgent executor = createExecutorAgent();
+        Agent generator = createGeneratorAgent();
+        Agent reviewer = createReviewerAgent();
+        Agent executor = createExecutorAgent();
 
         // 2. Setup the Coordinator (Code Assistant)
-        StrandsAgent assistant = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+        Agent assistant = new Agent(ModelFactory.createOpenAiFromEnv());
         assistant.setSystemPrompt("You are an elite Software Engineering Assistant specializing in multi-language development.\n\n" +
                 "Your mission is to resolve complex engineering tasks by orchestrating a team of specialized agents:\n" +
                 "- **code_generator**: Use this to write clean, efficient, and idiomatic code or scripts.\n" +
@@ -77,23 +77,23 @@ public class CodeAssistantDemo {
         System.out.println("==========================================");
     }
 
-    private StrandsAgent createGeneratorAgent() {
-        StrandsAgent agent = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+    private Agent createGeneratorAgent() {
+        Agent agent = new Agent(ModelFactory.createOpenAiFromEnv());
         agent.setSystemPrompt("You are a Lead Software Developer. Your output must be high-quality, " +
                 "production-ready, and extensively documented code. Prioritize readability and maintainability.");
         agent.getToolRegistry().register(new WriteTool(Path.of("")));
         return agent;
     }
 
-    private StrandsAgent createReviewerAgent() {
-        StrandsAgent agent = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+    private Agent createReviewerAgent() {
+        Agent agent = new Agent(ModelFactory.createOpenAiFromEnv());
         agent.setSystemPrompt("You are a Senior Code Reviewer. You analyze code for performance, security, " +
                 "and architectural soundness. Provide actionable improvements and highlight potential pitfalls.");
         return agent;
     }
 
-    private StrandsAgent createExecutorAgent() {
-        StrandsAgent agent = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+    private Agent createExecutorAgent() {
+        Agent agent = new Agent(ModelFactory.createOpenAiFromEnv());
         agent.setSystemPrompt("You are a DevSecOps Specialist. You execute system commands and scripts with precision. " +
                 "Always report execution status and capture all logs/outputs for analysis.");
         agent.getToolRegistry().register(new BashTool(Path.of("")));

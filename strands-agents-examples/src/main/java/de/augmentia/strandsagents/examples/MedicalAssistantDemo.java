@@ -1,7 +1,7 @@
 package de.augmentia.strandsagents.examples;
 
 
-import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
@@ -35,7 +35,7 @@ public class MedicalAssistantDemo {
 
     public void runMedicalAgent() {
         // 1. Setup the Medical Specialist Agent
-        StrandsAgent medicalAgent = new StrandsAgent(ModelFactory.createOpenAiFromEnv());
+        Agent medicalAgent = new Agent(ModelFactory.createOpenAiFromEnv());
         medicalAgent.setSystemPrompt("You are a Senior Medical Information Analyst specializing in clinical document processing and standardized medical terminology.\n\n" +
                 "Your core responsibilities:\n" +
                 "1. **Content Extraction:** Process clinical documents (PDFs, clinical notes, images) to accurately extract the patient's medical narrative.\n" +

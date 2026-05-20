@@ -1,7 +1,7 @@
 package de.augmentia.strandsagents.examples;
 
 import de.augmentia.strandsagents.core.*;
-import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.config.AgentConfig;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
@@ -156,7 +156,7 @@ public class ChatCLI {
         closeMcp();
     }
 
-    static boolean handleCommand(String input, StrandsAgent agent, ToolRegistry registry, String sessionId) {
+    static boolean handleCommand(String input, Agent agent, ToolRegistry registry, String sessionId) {
         var parts = input.split("\\s+", 2);
         switch (parts[0].toLowerCase()) {
             case "/exit", "/quit" -> {

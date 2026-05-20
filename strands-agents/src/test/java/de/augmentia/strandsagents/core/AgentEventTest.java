@@ -1,0 +1,78 @@
+package de.augmentia.strandsagents.core;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.augmentia.strandsagents.core.agent.MockChatModel;
+import de.augmentia.strandsagents.core.agent.Agent;
+
+import java.util.ArrayList;
+
+import de.augmentia.strandsagents.core.model.event.AgentEvent;
+import de.augmentia.strandsagents.core.model.event.AgentFinishedEvent;
+import de.augmentia.strandsagents.core.model.event.AgentStartedEvent;
+import de.augmentia.strandsagents.core.model.event.ModelRequestedEvent;
+import org.junit.jupiter.api.Test;
+
+class AgentEventTest {
+
+    @Test
+    void shouldFireLifecycleEventsInOrder() {
+        var events = new ArrayList<AgentEvent>();
+        var agent = new Agent(new MockChatModel());
+        agent.setEventListener(events::add);
+
+        agent.execute("Hallo");
+
+        assertThat(events).isNotEmpty();
+        assertThat(events.get(0)).isInstanceOf(AgentStartedEvent.class);
+        assertThat(((AgentStartedEvent) events.get(0)).initialPrompt()).isEqualTo("Hallo");
+        assertThat(events.get(events.size() - 1)).isInstanceOf(AgentFinishedEvent.class);
+    }
+
+    @Test
+    void shouldFireModelRequestedEvent() {
+        var events = new ArrayList<AgentEvent>();
+        var agent = new Agent(new MockChatModel());
+        agent.setEventListener(events::add);
+
+        agent.execute("Test");
+
+        var modelRequested = events.stream()
+            .filter(e -> e instanceof ModelRequestedEvent)
+            .map(e -> (ModelRequestedEvent) e)
+            .toList();
+        assertThat(modelRequested).hasSize(1);
+        assertThat(modelRequested.get(0).promptHistory()).isNotEmpty();
+    }
+
+    @Test
+    void shouldIncludeSessionIdInEvents() {
+        var events = new ArrayList<AgentEvent>();
+        var agent = new Agent(new MockChatModel());
+        agent.setEventListener(events::add);
+
+        agent.execute("Test");
+
+        var sessionId = agent.getSessionId();
+        assertThat(events).allMatch(e -> e.sessionId().equals(sessionId));
+    }
+
+    @Test
+    void shouldFireAgentFinishedWithCorrectStopReason() {
+        var events = new ArrayList<AgentEvent>();
+        var agent = new Agent(new MockChatModel());
+        agent.setEventListener(events::add);
+
+        agent.execute("Hallo");
+
+        var finished = (AgentFinishedEvent) events.get(events.size() - 1);
+        assertThat(finished.finalAnswer()).contains("Mock antwortet");
+    }
+
+    @Test
+    void shouldWorkWithoutEventListener() {
+        var agent = new Agent(new MockChatModel());
+        var result = agent.execute("Hallo");
+        assertThat(result.finalAnswer()).isNotEmpty();
+    }
+}

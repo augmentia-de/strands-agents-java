@@ -3,7 +3,7 @@ package de.augmentia.strandsagents.examples;
 
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.agent.a2a.AgentTool;
 import de.augmentia.strandsagents.core.agent.swarm.SwarmOrchestrator;
 import de.augmentia.strandsagents.core.config.AgentConfig;
@@ -37,7 +37,7 @@ public class MainMock {
             .with("de.augmentia.strandsagents.core.tools.CalculatorTool")
             .build();
         var model = new DemoMockModel();
-        var agent = new StrandsAgent(model, registry, new ToolExecutor());
+        var agent = new Agent(model, registry, new ToolExecutor());
         agent.setEventListener(event -> {
             switch (event) {
                 case AgentStartedEvent e -> System.out.println("  [EVENT] Gestartet");
@@ -64,7 +64,7 @@ public class MainMock {
         System.out.println("─── 2. A2A: Agent ruft Sub-Agent als Tool auf ───");
 
         var subModel = new DemoMockModel();
-        var subAgent = new StrandsAgent(subModel);
+        var subAgent = new Agent(subModel);
         subAgent.setEventListener(e -> {});
 
         var agentTool = new AgentTool(subAgent, "recherche",
@@ -80,7 +80,7 @@ public class MainMock {
         System.out.println("  Registrierte Tools: " + registry.getToolNames());
 
         var parentModel = new DemoMockModel();
-        var parentAgent = new StrandsAgent(parentModel, registry, new ToolExecutor());
+        var parentAgent = new Agent(parentModel, registry, new ToolExecutor());
         var result = parentAgent.execute("Recherchiere das Wetter");
         System.out.println("  Parent-Agent: " + result.finalAnswer());
         System.out.println();
@@ -89,10 +89,10 @@ public class MainMock {
     static void demoSwarmOrchestrator() {
         System.out.println("─── 3. Swarm: Orchestrator routet nach Topic ───");
 
-        var wetterAgent = new StrandsAgent(new DemoMockModel("Wetterbericht: %s"));
-        var matheAgent = new StrandsAgent(new DemoMockModel("Mathe-Ergebnis: %s"));
+        var wetterAgent = new Agent(new DemoMockModel("Wetterbericht: %s"));
+        var matheAgent = new Agent(new DemoMockModel("Mathe-Ergebnis: %s"));
 
-        var defaultAgent = new StrandsAgent(new DemoMockModel("Allgemein: %s"));
+        var defaultAgent = new Agent(new DemoMockModel("Allgemein: %s"));
 
         var orchestrator = new SwarmOrchestrator(Map.of(
             "wetter", wetterAgent,

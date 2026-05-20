@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.config.AgentConfig;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.model.agent.AgentResult;
@@ -177,7 +177,7 @@ public class WorkflowDemo {
         System.out.println("Demonstriert: per-agent Tools (web_search, write), Structured Output & Cross-Step Access");
     }
 
-    private AgentResult exec(StrandsAgent agent, String prompt) {
+    private AgentResult exec(Agent agent, String prompt) {
         var result = agent.execute(prompt);
         System.out.println("  Tokens: " + result.metrics().inputTokens()
             + " in / " + result.metrics().outputTokens() + " out, "

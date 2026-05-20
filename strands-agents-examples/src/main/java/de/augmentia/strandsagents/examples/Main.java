@@ -2,7 +2,7 @@ package de.augmentia.strandsagents.examples;
 
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.model.agent.AgentResult;
 import de.augmentia.strandsagents.core.model.event.AgentStartedEvent;
@@ -39,7 +39,7 @@ public class Main {
         var skills = loadDemoSkills();
         var skillsPlugin = new AgentSkillsPlugin(skills, List.of("example-skills"));
 
-        var agent = new StrandsAgent(createModel(), registry, new ToolExecutor(),
+        var agent = new Agent(createModel(), registry, new ToolExecutor(),
             null, null, null, List.of(skillsPlugin));
         agent.setSystemPrompt("You are a helpful assistant. Skills have been pre-loaded.");
         setupEvents(agent);
@@ -60,7 +60,7 @@ public class Main {
         var model = createModel();
         registry.register(ToolRegistry.createMethod(new McpIngestTool(registry)));
 
-        var agent = new StrandsAgent(model, registry, new ToolExecutor(),
+        var agent = new Agent(model, registry, new ToolExecutor(),
             null, null, null, List.of(skillsPlugin));
         agent.setSystemPrompt("You have skill_search to discover and activate skills, "
             + "and mcp_ingest to connect external MCP servers.");
@@ -84,10 +84,10 @@ public class Main {
             .build();
 
         var model = createModel();
-        var capTool = new CapabilitySearchTool(capRegistry, model);
+        var capTool = new de.augmentia.strandsagents.skills.CapabilitySearchTool(capRegistry, model);
         registry.register(ToolRegistry.createMethod(capTool));
 
-        var agent = new StrandsAgent(model, registry, new ToolExecutor(),
+        var agent = new Agent(model, registry, new ToolExecutor(),
             null, null, null, List.of(skillsPlugin));
         agent.setSystemPrompt("Use capability_search to discover skills and tools relevant to your task.");
         setupEvents(agent);
@@ -97,7 +97,7 @@ public class Main {
         System.out.println();
     }
 
-    static void interact(StrandsAgent agent, String prompt) {
+    static void interact(Agent agent, String prompt) {
         System.out.println("---");
         System.out.println("Du:    " + prompt);
         AgentResult result = agent.execute(prompt);
@@ -127,7 +127,7 @@ public class Main {
             null, List.of(), java.util.Map.of(), null, null));
     }
 
-    private static void setupEvents(StrandsAgent agent) {
+    private static void setupEvents(Agent agent) {
         agent.setEventListener(event -> {
             switch (event) {
                 case AgentStartedEvent e ->

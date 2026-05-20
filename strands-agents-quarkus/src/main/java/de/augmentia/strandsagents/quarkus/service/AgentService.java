@@ -3,7 +3,7 @@ package de.augmentia.strandsagents.quarkus.service;
 import de.augmentia.strandsagents.core.*;
 import de.augmentia.strandsagents.core.agent.MockChatModel;
 import de.augmentia.strandsagents.core.agent.MockStreamingChatModel;
-import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.agent.StreamingAgent;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.logging.FileLlmLogger;
@@ -63,7 +63,7 @@ public class AgentService {
     private final ConcurrentHashMap<String, InitializedSession> initializedAgents = new ConcurrentHashMap<>();
 
     private record InitializedSession(
-        StrandsAgent agent,
+        Agent agent,
         ToolRegistry registry,
         McpClient mcpClient,
         List<String> phases,
@@ -168,7 +168,7 @@ public class AgentService {
 
         var modelToUse = wrapModel(model);
         var streamingModel = findStreamingModel();
-        var agent = new StrandsAgent(modelToUse, selectedTools, new ToolExecutor(),
+        var agent = new Agent(modelToUse, selectedTools, new ToolExecutor(),
             null, sessionManager, null, plugins);
 
         var phases = new CopyOnWriteArrayList<String>();
@@ -216,7 +216,7 @@ public class AgentService {
         var plugins = buildPlugins(activeSkills, initialSkills);
         var modelToUse = wrapModel(model);
 
-        var agent = new StrandsAgent(modelToUse, activeTools, new ToolExecutor(),
+        var agent = new Agent(modelToUse, activeTools, new ToolExecutor(),
             null, sessionManager, null, plugins);
 
         var phases = new CopyOnWriteArrayList<String>();

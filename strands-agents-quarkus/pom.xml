@@ -31,23 +31,7 @@
     <dependencies>
         <dependency>
             <groupId>de.augmentia.strandsagents</groupId>
-            <artifactId>strands-agents-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>de.augmentia.strandsagents</groupId>
-            <artifactId>strands-agents-sessions</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>de.augmentia.strandsagents</groupId>
-            <artifactId>strands-agents-skills</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>de.augmentia.strandsagents</groupId>
-            <artifactId>strands-agents-telemetry</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>de.augmentia.strandsagents</groupId>
-            <artifactId>strands-agents-vault</artifactId>
+            <artifactId>strands-agents</artifactId>
         </dependency>
         <dependency>
             <groupId>dev.langchain4j</groupId>
