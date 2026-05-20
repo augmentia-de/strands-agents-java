@@ -138,7 +138,7 @@ class ConversationManagerTest {
         assertThat(pruned.get(0)).isInstanceOf(UserMessage.class);
     }
 
-    // ── Integration: SlidingWindow + StrandsAgent ─────────────────────
+    // ── Integration: SlidingWindow + Agent ─────────────────────
 
     @Test
     void agentWithSlidingWindowLimitsHistory() {
@@ -165,7 +165,7 @@ class ConversationManagerTest {
         assertThat(memory.messages()).hasSizeLessThanOrEqualTo(2);
     }
 
-    // ── Integration: Summarizing + StrandsAgent ───────────────────────
+    // ── Integration: Summarizing + Agent ───────────────────────
 
     @Test
     void agentWithSummarizingProducesSummary() {

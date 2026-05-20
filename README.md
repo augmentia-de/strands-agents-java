@@ -33,7 +33,7 @@ var registry = new ToolRegistry();
 registry.register(new CalculatorTool());
 
 // 3. Agent erstellen
-var agent = new StrandsAgent(model, registry, new ToolExecutor());
+var agent = new Agent(model, registry, new ToolExecutor());
 
 // 4. Optional: Events beobachten
 agent.setEventListener(event -> System.out.println("Event: " + event));
@@ -45,7 +45,7 @@ System.out.println(result.finalAnswer());
 
 Mit MockChatModel (kein API-Key):
 ```java
-var agent = new StrandsAgent(new MockChatModel());
+var agent = new Agent(new MockChatModel());
 var result = agent.execute("Hallo Welt");
 ```
 

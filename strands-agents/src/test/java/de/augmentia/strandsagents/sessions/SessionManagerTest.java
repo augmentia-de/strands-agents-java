@@ -5,8 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
+import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.agent.MockChatModel;
-import de.augmentia.strandsagents.core.agent.StrandsAgent;
+import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.model.agent.AgentState;
 import de.augmentia.strandsagents.core.model.agent.AgentStatus;
 import de.augmentia.strandsagents.core.model.agent.StopReason;
@@ -212,7 +213,7 @@ class SessionManagerTest {
     @Test
     void agentWithFileSessionManagerPersistsConversation(@TempDir Path tempDir) {
         var sessionManager = new FileSessionManager(tempDir);
-        var agent = new StrandsAgent(
+        var agent = new Agent(
             new MockChatModel(),
             new ToolRegistry(),
             new ToolExecutor(),
@@ -236,7 +237,7 @@ class SessionManagerTest {
     void agentWithJdbcSessionManagerPersistsConversation() throws Exception {
         var ds = simpleDataSource();
         var sessionManager = new JdbcSessionManager(ds);
-        var agent = new StrandsAgent(
+        var agent = new Agent(
             new MockChatModel(),
             new ToolRegistry(),
             new ToolExecutor(),
@@ -256,7 +257,7 @@ class SessionManagerTest {
 
     @Test
     void agentWithoutSessionManagerStillWorks() {
-        var agent = new StrandsAgent(
+        var agent = new Agent(
             new MockChatModel()
         );
 

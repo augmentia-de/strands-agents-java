@@ -69,7 +69,7 @@ class EnhancedMultiAgentTest {
         var executor = new A2AExecutor();
         var result = executor.call(agent, "Hallo");
 
-        assertThat(result.agentName()).isEqualTo("StrandsAgent");
+        assertThat(result.agentName()).isEqualTo("Agent");
         assertThat(result.prompt()).isEqualTo("Hallo");
         assertThat(result.result()).isNotEmpty();
         assertThat(result.durationMs()).isGreaterThanOrEqualTo(0);

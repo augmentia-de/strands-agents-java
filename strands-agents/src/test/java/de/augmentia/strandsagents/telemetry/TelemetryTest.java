@@ -3,8 +3,8 @@ package de.augmentia.strandsagents.telemetry;
 import static org.assertj.core.api.Assertions.assertThat;
 
 
+import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.agent.MockChatModel;
-import de.augmentia.strandsagents.core.agent.StrandsAgent;
 import de.augmentia.strandsagents.core.model.event.*;
 import de.augmentia.strandsagents.core.model.tool.ToolCall;
 import de.augmentia.strandsagents.core.model.tool.ToolExecutionResult;
@@ -212,7 +212,7 @@ class TelemetryTest {
 
         hooks.registerHook("recorder", events::add);
 
-        var agent = new StrandsAgent(new MockChatModel());
+        var agent = new Agent(new MockChatModel());
         agent.setEventListener(hooks);
         agent.execute("Hallo");
 
@@ -227,7 +227,7 @@ class TelemetryTest {
 
         hooks.registerHook("metrics", new MetricsHook(meterRegistry));
 
-        var agent = new StrandsAgent(new MockChatModel());
+        var agent = new Agent(new MockChatModel());
         agent.setEventListener(hooks);
         agent.execute("Hallo");
 
@@ -243,7 +243,7 @@ class TelemetryTest {
         hooks.registerHook("recorder", agentEvents::add);
         hooks.registerHook("metrics", new MetricsHook(meterRegistry));
 
-        var agent = new StrandsAgent(new MockChatModel());
+        var agent = new Agent(new MockChatModel());
         agent.setEventListener(hooks);
         agent.execute("Hallo");
 
@@ -260,7 +260,7 @@ class TelemetryTest {
             e -> e instanceof ToolExecutionStartedEvent,
             e -> toolEvents.add((ToolExecutionStartedEvent) e));
 
-        var agent = new StrandsAgent(new MockChatModel());
+        var agent = new Agent(new MockChatModel());
         agent.setEventListener(hooks);
         agent.execute("Hallo");
 

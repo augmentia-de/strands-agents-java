@@ -25,7 +25,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * AgentDemo showcases the comprehensive instantiation of a StrandsAgent.
+ * AgentDemo showcases the comprehensive instantiation of a Agent.
  * 
  * It demonstrates how to manually configure all components:
  * 1. LLM ChatModel
@@ -39,7 +39,7 @@ import java.util.List;
 public class AgentDemo {
 
     public static void main(String[] args) {
-        System.out.println("🚀 Initializing Comprehensive StrandsAgent Demo...");
+        System.out.println("🚀 Initializing Comprehensive Agent Demo...");
 
         // 1. ChatModel: The core LLM (using OpenAI from environment variables)
         ChatModel model = ModelFactory.createOpenAiFromEnv();
