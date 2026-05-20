@@ -39,6 +39,17 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailResult;
+import de.augmentia.strandsagents.core.resilience.CircuitBreakerConfig;
+import de.augmentia.strandsagents.core.resilience.ResilienceConfig;
+import de.augmentia.strandsagents.core.resilience.RetryConfig;
+import de.augmentia.strandsagents.core.tools.BashTool;
+import de.augmentia.strandsagents.core.tools.HumanInTheLoopTool;
+import de.augmentia.strandsagents.core.tools.ReadTool;
+import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.core.conversation.ConversationManager;
+import de.augmentia.strandsagents.sessions.SessionManager;
+
 @ApplicationScoped
 public class AgentService {
 
@@ -354,11 +365,86 @@ public class AgentService {
         if (onComplete != null) onComplete.accept(resp);
     }
 
+    public Agent createDefaultAgent() {
+        ensureInitialized();
+        var selectedTools = fullRegistry.withOnly(new HashSet<>(fullRegistry.getToolNames()));
+        var modelToUse = wrapModel(model);
+        var plugins = buildPlugins(allSkills, initialSkills);
+        return new Agent(modelToUse, selectedTools, new ToolExecutor(),
+            null, sessionManager, null, plugins);
+    }
+
     public void releaseSession(String sessionId) {
         var session = initializedAgents.remove(sessionId);
         if (session != null) {
             session.close();
         }
+    }
+
+    public ChatResponse agentDemo(ChatRequest req) {
+        // 1. ChatModel
+        ChatModel model = createModel(); // Reusing the service's model creation logic
+
+        // 2. ToolRegistry
+        ToolRegistry toolRegistry = new ToolRegistry();
+        toolRegistry.register(new BashTool(Path.of("")));
+        toolRegistry.register(new ReadTool(Path.of("")));
+        toolRegistry.register(new HumanInTheLoopTool());
+
+        // 3. ToolExecutor
+        ToolExecutor toolExecutor = new ToolExecutor();
+
+        // 4. ConversationManager
+        ConversationManager conversationManager = new SlidingWindowConversationManager(10);
+
+        // 5. SessionManager
+        SessionManager sessionManager = new FileSessionManager(Path.of("logs/sessions"));
+
+        // 6. ResilienceConfig
+        ResilienceConfig resilienceConfig = new ResilienceConfig(
+            new RetryConfig(3, 1000, 2.0),
+            new CircuitBreakerConfig(0.5f, 10L, 30L)
+        );
+
+        // 7. Plugins
+        GuardrailPlugin guardrails = new GuardrailPlugin(
+            List.of((messages, context) -> GuardrailResult.ok()),
+            List.of((messages, context) -> GuardrailResult.ok())
+        );
+
+        HITLPlugin hitl = new HITLPlugin(
+            (action, context) -> ApprovalResult.approved(action),
+            HITLAuthority.CONFIRM
+        );
+
+        List<Plugin> plugins = List.of(guardrails, hitl);
+
+        Agent agent = new Agent(
+            model,
+            toolRegistry,
+            toolExecutor,
+            conversationManager,
+            sessionManager,
+            resilienceConfig,
+            plugins
+        );
+
+        agent.setSystemPrompt("You are a highly capable and secure assistant. " +
+                "Always verify actions with the user when using tools.");
+
+        var start = System.nanoTime();
+        var result = agent.execute(req.prompt);
+        var durationMs = (System.nanoTime() - start) / 1_000_000;
+
+        var resp = new ChatResponse();
+        resp.answer = result.finalAnswer();
+        resp.sessionId = result.sessionId();
+        resp.stopReason = result.stopReason();
+        resp.durationMs = durationMs;
+        resp.inputTokens = result.metrics().inputTokens();
+        resp.outputTokens = result.metrics().outputTokens();
+        resp.toolCalls = result.metrics().toolCallsCount();
+        return resp;
     }
 
     public ToolRegistry getFullRegistry() {

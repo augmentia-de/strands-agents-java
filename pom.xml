@@ -28,10 +28,25 @@
         <slf4j.version>2.0.16</slf4j.version>
         <opentelemetry.version>1.44.1</opentelemetry.version>
         <micrometer.version>1.14.3</micrometer.version>
+        <a2a.version>1.0.0.CR1</a2a.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>${junit.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.a2aproject.sdk</groupId>
+                <artifactId>a2a-java-sdk-bom</artifactId>
+                <version>${a2a.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>de.augmentia.strandsagents</groupId>
                 <artifactId>strands-agents</artifactId>

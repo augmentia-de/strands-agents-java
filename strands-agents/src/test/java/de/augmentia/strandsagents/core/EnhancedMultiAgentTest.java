@@ -8,8 +8,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import de.augmentia.strandsagents.core.agent.MockChatModel;
 import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.a2a.A2AExecutor;
-import de.augmentia.strandsagents.core.agent.a2a.AgentTool;
+import de.augmentia.strandsagents.core.agent.a2a.SubAgentExecutor;
+import de.augmentia.strandsagents.core.agent.a2a.SubAgentTool;
+
 import de.augmentia.strandsagents.core.agent.routing.LlmRouter;
 import de.augmentia.strandsagents.core.agent.swarm.SwarmOrchestrator;
 import org.junit.jupiter.api.Test;
@@ -61,12 +62,12 @@ class EnhancedMultiAgentTest {
         assertThat(result.topic()).isEqualTo("wetter");
     }
 
-    // --- A2AExecutor Tests ---
+    // --- SubAgentExecutor Tests ---
 
     @Test
     void a2aExecutorShouldCallAgent() {
         var agent = new Agent(new MockChatModel("Antwort: %s"));
-        var executor = new A2AExecutor();
+        var executor = new SubAgentExecutor();
         var result = executor.call(agent, "Hallo");
 
         assertThat(result.agentName()).isEqualTo("Agent");
@@ -88,7 +89,7 @@ class EnhancedMultiAgentTest {
                 return super.chat(request);
             }
         });
-        var executor = new A2AExecutor(1, 0, Map.of());
+        var executor = new SubAgentExecutor(1, 0, Map.of());
         var result = executor.call(slowAgent, "Hallo");
 
         assertThat(result.result()).contains("A2A-Fehler");
@@ -107,7 +108,7 @@ class EnhancedMultiAgentTest {
                 return super.chat(request);
             }
         });
-        var executor = new A2AExecutor(60, 2, Map.of());
+        var executor = new SubAgentExecutor(60, 2, Map.of());
         var result = executor.call(failingAgent, "Hallo");
 
         assertThat(result.result()).isNotEmpty();
@@ -117,7 +118,7 @@ class EnhancedMultiAgentTest {
     @Test
     void a2aExecutorShouldPropagateMetadata() {
         var agent = new Agent(new MockChatModel());
-        var executor = new A2AExecutor(60, 1, Map.of("traceId", "abc-123", "userId", "user-1"));
+        var executor = new SubAgentExecutor(60, 1, Map.of("traceId", "abc-123", "userId", "user-1"));
         var result = executor.call(agent, "Hallo");
 
         assertThat(result.metadata()).containsEntry("traceId", "abc-123");
@@ -127,7 +128,7 @@ class EnhancedMultiAgentTest {
     @Test
     void a2aExecutorAsyncShouldComplete() {
         var agent = new Agent(new MockChatModel());
-        var executor = new A2AExecutor();
+        var executor = new SubAgentExecutor();
 
         var future = executor.callAsync(agent, "Hallo");
         var result = future.join();
@@ -138,19 +139,19 @@ class EnhancedMultiAgentTest {
     @Test
     void a2aExecutorShouldAcceptCustomAgentName() {
         var agent = new Agent(new MockChatModel());
-        var executor = new A2AExecutor();
+        var executor = new SubAgentExecutor();
         var result = executor.call(agent, "Test", "mein-agent");
 
         assertThat(result.agentName()).isEqualTo("mein-agent");
     }
 
-    // --- AgentTool with A2AExecutor Tests ---
+    // --- SubAgentTool with SubAgentExecutor Tests ---
 
     @Test
-    void agentToolShouldWorkWithA2AExecutor() {
+    void agentToolShouldWorkWithSubAgentExecutor() {
         var subAgent = new Agent(new MockChatModel("Sub: %s"));
-        var executor = new A2AExecutor();
-        var tool = new AgentTool(subAgent, "recherche", "Recherchiert", executor);
+        var executor = new SubAgentExecutor();
+        var tool = new SubAgentTool(subAgent, "recherche", "Recherchiert", executor);
 
         var result = tool.execute("Thema");
         assertThat(result).contains("Sub");
@@ -159,8 +160,8 @@ class EnhancedMultiAgentTest {
     @Test
     void agentToolShouldPropagateMetadataViaExecutor() {
         var subAgent = new Agent(new MockChatModel("Sub: %s"));
-        var executor = new A2AExecutor(60, 1, Map.of("traceId", "trace-xyz"));
-        var tool = new AgentTool(subAgent, "helper", "Hilft", executor);
+        var executor = new SubAgentExecutor(60, 1, Map.of("traceId", "trace-xyz"));
+        var tool = new SubAgentTool(subAgent, "helper", "Hilft", executor);
 
         var result = tool.execute("Bitte helfen");
         assertThat(result).contains("Sub");
@@ -169,7 +170,7 @@ class EnhancedMultiAgentTest {
     @Test
     void agentToolShouldStillRespectRecursionDepth() {
         var inner = new Agent(new MockChatModel("Inner: %s"));
-        var tool = new AgentTool(inner, "nested");
+        var tool = new SubAgentTool(inner, "nested");
         var result = tool.execute("Ebene 1");
         assertThat(result).doesNotContain("Rekursionstiefe");
     }
@@ -244,10 +245,10 @@ class EnhancedMultiAgentTest {
     // --- Integration Tests ---
 
     @Test
-    void fullOrchestrationWithA2AExecutor() {
+    void fullOrchestrationWithSubAgentExecutor() {
         var subAgent = new Agent(new MockChatModel("Sub: %s"));
-        var a2aExecutor = new A2AExecutor(60, 1, Map.of("traceId", "t1"));
-        var agentTool = new AgentTool(subAgent, "sub-agent", "Hilfs-Agent", a2aExecutor);
+        var a2aExecutor = new SubAgentExecutor(60, 1, Map.of("traceId", "t1"));
+        var agentTool = new SubAgentTool(subAgent, "sub-agent", "Hilfs-Agent", a2aExecutor);
 
         var registry = new ToolRegistry();
         registry.register(agentTool);
