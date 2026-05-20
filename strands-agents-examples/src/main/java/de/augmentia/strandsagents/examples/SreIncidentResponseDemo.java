@@ -2,7 +2,7 @@ package de.augmentia.strandsagents.examples;
 
 
 import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.a2a.AgentTool;
+import de.augmentia.strandsagents.core.agent.a2a.SubAgentTool;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
@@ -48,11 +48,11 @@ public class SreIncidentResponseDemo {
                 "4. **Report:** Synthesize all findings into a professional Incident Report including resolution steps and follow-up items.");
 
         // Register sub-agents as tools
-        supervisor.getToolRegistry().register(new AgentTool(monitoringAgent, "monitoring_agent", 
+        supervisor.getToolRegistry().register(new SubAgentTool(monitoringAgent, "monitoring_agent",
                 "Expert monitoring specialist capable of auditing CloudWatch alarms, metrics, and logs."));
-        supervisor.getToolRegistry().register(new AgentTool(rcaAgent, "rca_agent", 
+        supervisor.getToolRegistry().register(new SubAgentTool(rcaAgent, "rca_agent",
                 "Strategic SRE analyst for deep root cause analysis and impact assessment."));
-        supervisor.getToolRegistry().register(new AgentTool(opsAgent, "ops_agent", 
+        supervisor.getToolRegistry().register(new SubAgentTool(opsAgent, "ops_agent",
                 "Operations specialist for executing Kubernetes and Helm remediation tasks."));
 
         // 3. Trigger the workflow

@@ -2,8 +2,8 @@ package de.augmentia.strandsagents.examples;
 
 
 import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.a2a.A2AExecutor;
-import de.augmentia.strandsagents.core.agent.a2a.A2AResult;
+import de.augmentia.strandsagents.core.agent.a2a.SubAgentExecutor;
+import de.augmentia.strandsagents.core.agent.a2a.SubAgentResult;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 
 import java.util.ArrayList;
@@ -53,7 +53,7 @@ public class RecursiveThinkingDemo {
                 "Avoid repetition; prioritize the discovery of new implications and potential counter-arguments.");
 
         // 2. Use A2AExecutor to manage the execution
-        A2AExecutor executor = new A2AExecutor();
+        SubAgentExecutor executor = new SubAgentExecutor();
         
         String currentInsight = initialThought;
         List<String> history = new ArrayList<>();
@@ -72,7 +72,7 @@ public class RecursiveThinkingDemo {
             );
 
             // Execute thinking cycle
-            A2AResult result = executor.call(thinkingAgent, prompt);
+            SubAgentResult result = executor.call(thinkingAgent, prompt);
             
             // Store and update for next iteration
             currentInsight = result.result();

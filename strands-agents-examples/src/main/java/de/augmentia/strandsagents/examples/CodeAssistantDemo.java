@@ -2,7 +2,7 @@ package de.augmentia.strandsagents.examples;
 
 
 import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.a2a.AgentTool;
+import de.augmentia.strandsagents.core.agent.a2a.SubAgentTool;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.tools.BashTool;
 import de.augmentia.strandsagents.core.tools.WriteTool;
@@ -53,11 +53,11 @@ public class CodeAssistantDemo {
                 "Always follow a 'Think -> Plan -> Execute -> Review' workflow. Verify your logic before finalizing the output.");
 
         // Register sub-agents and tools
-        assistant.getToolRegistry().register(new AgentTool(generator, "code_generator", 
+        assistant.getToolRegistry().register(new SubAgentTool(generator, "code_generator",
                 "Expert in writing clean, functional, and idiomatic code across multiple languages."));
-        assistant.getToolRegistry().register(new AgentTool(reviewer, "code_reviewer", 
+        assistant.getToolRegistry().register(new SubAgentTool(reviewer, "code_reviewer",
                 "Expert in deep code analysis, identifying bugs, security issues, and performance optimization opportunities."));
-        assistant.getToolRegistry().register(new AgentTool(executor, "code_executor", 
+        assistant.getToolRegistry().register(new SubAgentTool(executor, "code_executor",
                 "Operations specialist capable of executing scripts, running tests, and managing terminal-level system tasks."));
         assistant.getToolRegistry().register(new ProjectTools());
 

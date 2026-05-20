@@ -2,7 +2,7 @@ package de.augmentia.strandsagents.examples;
 
 
 import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.a2a.AgentTool;
+import de.augmentia.strandsagents.core.agent.a2a.SubAgentTool;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
@@ -42,11 +42,11 @@ public class ProductivityAssistantDemo {
                 "Be proactive, concise, and professional. Seamlessly bridge information between agents to complete complex, multi-stage workflows.");
 
         // Register sub-agents as tools using the Agent-as-a-Tool pattern
-        coordinator.getToolRegistry().register(new AgentTool(emailAgent, "email_agent", 
+        coordinator.getToolRegistry().register(new SubAgentTool(emailAgent, "email_agent",
                 "Strategic communication expert for professional email drafting and analysis."));
-        coordinator.getToolRegistry().register(new AgentTool(calendarAgent, "calendar_agent", 
+        coordinator.getToolRegistry().register(new SubAgentTool(calendarAgent, "calendar_agent",
                 "Efficiency expert for calendar management and schedule coordination."));
-        coordinator.getToolRegistry().register(new AgentTool(searchAgent, "search_agent", 
+        coordinator.getToolRegistry().register(new SubAgentTool(searchAgent, "search_agent",
                 "Research expert for gathering and synthesizing information from across the web."));
 
         // 3. Example Complex Task

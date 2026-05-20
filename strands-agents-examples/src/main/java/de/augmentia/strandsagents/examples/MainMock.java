@@ -4,7 +4,7 @@ package de.augmentia.strandsagents.examples;
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.a2a.AgentTool;
+import de.augmentia.strandsagents.core.agent.a2a.SubAgentTool;
 import de.augmentia.strandsagents.core.agent.swarm.SwarmOrchestrator;
 import de.augmentia.strandsagents.core.config.AgentConfig;
 import de.augmentia.strandsagents.core.model.event.*;
@@ -67,12 +67,12 @@ public class MainMock {
         var subAgent = new Agent(subModel);
         subAgent.setEventListener(e -> {});
 
-        var agentTool = new AgentTool(subAgent, "recherche",
+        var agentTool = new SubAgentTool(subAgent, "recherche",
             "Führt Recherchen in einer Wissensdatenbank durch");
 
         System.out.println("  AgentTool-Typ: " + agentTool.getClass().getSimpleName());
         System.out.println("  @Tool-Methode: execute(String prompt)");
-        System.out.println("  Rekursionstiefe: max " + AgentTool.MAX_RECURSION_DEPTH);
+        System.out.println("  Rekursionstiefe: max " + SubAgentTool.MAX_RECURSION_DEPTH);
 
         var registry = ToolRegistry.builder()
             .with(agentTool)

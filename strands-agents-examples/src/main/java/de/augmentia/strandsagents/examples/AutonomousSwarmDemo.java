@@ -4,7 +4,7 @@ import java.lang.reflect.Method;
 import java.util.Map;
 
 import de.augmentia.strandsagents.core.*;
-import de.augmentia.strandsagents.core.agent.a2a.AgentTool;
+import de.augmentia.strandsagents.core.agent.a2a.SubAgentTool;
 import de.augmentia.strandsagents.core.agent.swarm.SwarmOrchestrator;
 import de.augmentia.strandsagents.core.config.AgentConfig;
 import de.augmentia.strandsagents.core.config.ModelFactory;
@@ -88,7 +88,7 @@ public class AutonomousSwarmDemo {
 
         Method executeMethod;
         try {
-            executeMethod = AgentTool.class.getMethod("execute", String.class);
+            executeMethod = SubAgentTool.class.getMethod("execute", String.class);
         } catch (NoSuchMethodException e) {
             System.out.println("  Error: AgentTool.execute(String) not found");
             return;
@@ -104,7 +104,7 @@ public class AutonomousSwarmDemo {
             .build()
             .createAgent(model);
 
-        var financeTool = new AgentTool(financeAgent, "finance_expert",
+        var financeTool = new SubAgentTool(financeAgent, "finance_expert",
             "Delegate complex financial calculations or ROI analysis.");
 
         // Parent agent: researcher with web tools + finance_expert as tool
