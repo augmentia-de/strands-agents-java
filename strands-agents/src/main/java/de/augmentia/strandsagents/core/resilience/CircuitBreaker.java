@@ -10,6 +10,8 @@ public class CircuitBreaker {
 
     public enum State { CLOSED, OPEN, HALF_OPEN }
 
+    static final int MAX_RECENT_CALLS = 100;
+
     private final CircuitBreakerConfig config;
     private final AtomicReference<State> state = new AtomicReference<>(State.CLOSED);
     private final Queue<Boolean> recentCalls = new LinkedList<>();
@@ -93,7 +95,7 @@ public class CircuitBreaker {
         var cutoff = Instant.now().minusSeconds(config.slidingWindowSeconds());
         while (!recentCalls.isEmpty()) {
             // We don't store timestamps per call, so we rely on count-based sliding window
-            if (recentCalls.size() > 100) {
+            if (recentCalls.size() > MAX_RECENT_CALLS) {
                 recentCalls.poll();
             } else {
                 break;

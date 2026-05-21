@@ -21,9 +21,12 @@ import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ToolRegistry {
 
+    private static final Logger log = LoggerFactory.getLogger(ToolRegistry.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final Map<String, ToolMethod> tools = new LinkedHashMap<>();
@@ -318,7 +321,7 @@ public class ToolRegistry {
                         }
                     }
                 } catch (Exception e) {
-                    System.err.println("Tool not loadable: " + className + " - " + e.getMessage());
+                    log.warn("Tool not loadable: {} - {}", className, e.getMessage());
                 }
             }
 

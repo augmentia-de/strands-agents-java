@@ -68,6 +68,8 @@ public class Agent {
         .configure(JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true);
 
     static final int MAX_TOOL_ITERATIONS = 10;
+    static final int MAX_HOOK_RETRIES = 3;
+    static final int DEFAULT_MAX_MESSAGES = 20;
     static final ExecutorService VIRTUAL_EXECUTOR =
         Executors.newVirtualThreadPerTaskExecutor();
 
@@ -125,7 +127,7 @@ public class Agent {
             : null;
         this.chatMemory = MessageWindowChatMemory.builder()
             .maxMessages(conversationManager instanceof SlidingWindowConversationManager sw
-                ? sw.windowSize() : 20)
+                ? sw.windowSize() : DEFAULT_MAX_MESSAGES)
             .build();
         this.sessionId = UUID.randomUUID().toString();
         this.eventPublisher = new SubmissionPublisher<>();
@@ -362,7 +364,7 @@ public class Agent {
             ChatResponse response = null;
 
             modelCall:
-            for (int hookRetry = 0; hookRetry < 3; hookRetry++) {
+            for (int hookRetry = 0; hookRetry < MAX_HOOK_RETRIES; hookRetry++) {
                 fire(new ModelRequestedEvent(sid, Instant.now(), domainMessages));
 
                 try {

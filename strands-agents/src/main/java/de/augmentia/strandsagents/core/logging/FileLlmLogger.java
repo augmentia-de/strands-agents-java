@@ -12,8 +12,12 @@ import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FileLlmLogger implements AutoCloseable {
+
+    private static final Logger log = LoggerFactory.getLogger(FileLlmLogger.class);
 
     private static final DateTimeFormatter FMT =
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
@@ -67,7 +71,7 @@ public class FileLlmLogger implements AutoCloseable {
             if (channel != null && channel.isOpen())
                 channel.close();
         } catch (IOException e) {
-            System.err.println("LLM-Log close error: " + e.getMessage());
+            log.warn("LLM-Log close error: {}", e.getMessage());
         }
     }
 
@@ -132,7 +136,7 @@ public class FileLlmLogger implements AutoCloseable {
                 channel.write(buf);
             channel.force(false);
         } catch (IOException e) {
-            System.err.println("LLM-Log write error: " + e.getMessage());
+            log.warn("LLM-Log write error: {}", e.getMessage());
         }
     }
 
@@ -150,7 +154,7 @@ public class FileLlmLogger implements AutoCloseable {
             write("=== LLM-Call-Log beendet: " + now() + " ===\n");
             closeChannel();
         } catch (Exception e) {
-            System.err.println("LLM-Log close error: " + e.getMessage());
+            log.warn("LLM-Log close error: {}", e.getMessage());
         }
     }
 

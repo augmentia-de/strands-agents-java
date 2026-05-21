@@ -38,6 +38,8 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailResult;
 import de.augmentia.strandsagents.core.resilience.CircuitBreakerConfig;
@@ -52,6 +54,8 @@ import de.augmentia.strandsagents.sessions.SessionManager;
 
 @ApplicationScoped
 public class AgentService {
+
+    private static final Logger log = LoggerFactory.getLogger(AgentService.class);
 
     private ToolRegistry fullRegistry;
     private List<Skill> allSkills;
@@ -197,7 +201,7 @@ public class AgentService {
             try {
                 mcpClient = connectMcp(mcpUrl, selectedTools, selectedMcpToolNames);
             } catch (Exception e) {
-                System.err.println("MCP-Verbindung fehlgeschlagen: " + e.getMessage());
+                log.warn("MCP-Verbindung fehlgeschlagen: {}", e.getMessage());
             }
         }
 
@@ -550,7 +554,7 @@ public class AgentService {
                 new McpToolMethod(client, mcpUrl, spec.name(), prefixedSpec));
             registered++;
         }
-        System.out.println("MCP verbunden: " + mcpUrl + " (" + registered + "/" + tools.size() + " Tools registriert)");
+        log.info("MCP verbunden: {} ({}/{} Tools registriert)", mcpUrl, registered, tools.size());
         return client;
     }
 
@@ -593,7 +597,7 @@ public class AgentService {
             return ModelFactory.createOpenAiFromEnv();
         } catch (Exception e) {
             var mock = new MockChatModel();
-            System.err.println("OPENAI_API_KEY nicht gesetzt \u2013 nutze MockChatModel");
+            log.warn("OPENAI_API_KEY nicht gesetzt – nutze MockChatModel");
             return mock;
         }
     }
@@ -620,7 +624,7 @@ public class AgentService {
             Runtime.getRuntime().addShutdownHook(new Thread(logger::close));
             return wrapped;
         } catch (Exception e) {
-            System.err.println("LLM-Logging nicht verf\u00fcgbar: " + e.getMessage());
+            log.warn("LLM-Logging nicht verfügbar: {}", e.getMessage());
             return m;
         }
     }
@@ -648,7 +652,7 @@ public class AgentService {
         try {
             return SkillParser.fromDirectory(dir);
         } catch (Exception e) {
-            System.err.println("Skills nicht ladbar: " + e.getMessage());
+            log.warn("Skills nicht ladbar: {}", e.getMessage());
             return List.of();
         }
     }
