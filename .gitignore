@@ -16,3 +16,4 @@ set_keys.sh
 
 /logs/
 /data/
+/strands-agents-quarkus/.sessions/

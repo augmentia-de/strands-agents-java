@@ -1,0 +1,76 @@
+run:
+  variant: 0
+  label: "conversation_structured"
+  timestamp: "2026-05-21T00:00:00Z"
+
+model:
+  type: "mock"
+  responseTemplate: "{\"answer\": \"%s\"}"
+
+tools:
+  preset: "standard"
+  additional:
+    - "de.augmentia.strandsagents.core.tools.TimeTool"
+  include: ~
+  exclude: ~
+
+conversation:
+  type: "sliding"
+  windowSize: 5
+
+session:
+  type: ~
+  directory: ".sessions"
+
+resilience:
+  enabled: true
+  retry:
+    maxAttempts: 2
+    backoffDelayMs: 500
+    backoffMultiplier: 2.0
+  circuitBreaker:
+    failureRateThreshold: 0.5
+    slidingWindowSeconds: 10
+    halfOpenDelaySeconds: 30
+
+plugins:
+  guardrail:
+    enabled: false
+    blockAction: "THROW"
+    fallbackMessage: "Blocked"
+  hitl:
+    enabled: false
+    authority: "AUTO"
+    mode: "SYNC_BLOCKING"
+
+hooks:
+  - name: "logging"
+    enabled: false
+
+structuredOutput:
+  enabled: true
+  mode: "STATIC"
+  outputClass: "de.augmentia.strandsagents.core.model.agent.AgentResult"
+  forcePrompt: ~
+
+systemPrompt: "You are a test assistant. Always answer with JSON."
+testPrompt: "What is the current time?"
+
+asserts:
+  stopReason:
+    - "COMPLETED"
+    - "MAX_ITERATIONS"
+  finalAnswerNotNull: true
+  metricsDurationMsMin: 0
+  metricsToolCallsMin: 0
+  expectedOutputContains: ~
+  expectedOutputNotContains: ~
+
+nextVariant:
+  strategy: "linear"
+  dimensions:
+    - "conversation.type"
+    - "session.type"
+    - "structuredOutput.enabled"
+    - "tools.preset"
+  seed: 42
