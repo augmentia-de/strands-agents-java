@@ -1,0 +1,50 @@
+package de.augmentia.strandsagents.core.hook;
+
+import de.augmentia.strandsagents.core.model.agent.AgentResult;
+import de.augmentia.strandsagents.core.model.message.Message;
+import dev.langchain4j.agent.tool.ToolSpecification;
+import java.util.List;
+import java.util.Map;
+
+public final class HookContexts {
+
+    private HookContexts() {}
+
+    public record BeforeAgentContext(
+        String sessionId,
+        String prompt,
+        Map<String, Object> contextVariables
+    ) {}
+
+    public record AfterAgentContext(
+        String sessionId,
+        AgentResult result
+    ) {}
+
+    public record BeforeModelCallContext(
+        String sessionId,
+        StringBuilder systemPrompt,
+        List<Message> messages,
+        List<ToolSpecification> tools
+    ) {}
+
+    public record AfterModelCallContext(
+        String sessionId,
+        String llmResponse,
+        int inputTokens,
+        int outputTokens
+    ) {}
+
+    public record BeforeToolCallContext(
+        String sessionId,
+        String toolName,
+        Map<String, Object> arguments
+    ) {}
+
+    public record AfterToolCallContext(
+        String sessionId,
+        String toolName,
+        String result,
+        boolean isError
+    ) {}
+}

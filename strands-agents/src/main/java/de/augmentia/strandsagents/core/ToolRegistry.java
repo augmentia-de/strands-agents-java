@@ -135,6 +135,14 @@ public class ToolRegistry {
         return filtered;
     }
 
+    public void remove(String name) {
+        tools.remove(name);
+    }
+
+    public void removeAll(java.util.Collection<String> names) {
+        names.forEach(tools::remove);
+    }
+
     public int size() {
         return tools.size();
     }

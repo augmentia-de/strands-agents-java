@@ -38,6 +38,11 @@ public class ToolExecutor {
         }
     }
 
+    public ToolExecutionResult execute(ToolExecutionRequest request, ToolRegistry registry)
+            throws Exception {
+        return executeSingle(request, registry);
+    }
+
     ToolExecutionResult executeSingle(ToolExecutionRequest request, ToolRegistry registry)
             throws Exception {
 

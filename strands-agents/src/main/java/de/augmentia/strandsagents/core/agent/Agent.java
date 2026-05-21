@@ -17,6 +17,9 @@ import de.augmentia.strandsagents.core.model.message.Message;
 import de.augmentia.strandsagents.core.model.session.Session;
 import de.augmentia.strandsagents.core.model.tool.ToolCall;
 import de.augmentia.strandsagents.core.model.tool.ToolExecutionResult;
+import de.augmentia.strandsagents.core.hook.HookContexts;
+import de.augmentia.strandsagents.core.hook.HookRegistry;
+import de.augmentia.strandsagents.core.hook.HookResult;
 import de.augmentia.strandsagents.core.plugin.Plugin;
 import de.augmentia.strandsagents.core.plugin.PluginRegistry;
 import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailException;
@@ -56,6 +59,7 @@ import java.util.UUID;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class Agent {
@@ -69,7 +73,7 @@ public class Agent {
 
     private final ChatModel model;
     private final ChatMemory chatMemory;
-    private final ToolRegistry toolRegistry;
+    private ToolRegistry toolRegistry;
     private final ToolExecutor toolExecutor;
     private final String sessionId;
     private final ConversationManager conversationManager;
@@ -86,6 +90,7 @@ public class Agent {
     private final ReentrantLock pauseLock = new ReentrantLock();
     private final Condition pauseCondition = pauseLock.newCondition();
     private StructuredOutputConfig structuredOutputConfig;
+    private HookRegistry hookRegistry;
 
     public Agent(ChatModel model) {
         this(model, new ToolRegistry(), new ToolExecutor(), null, null);
@@ -124,12 +129,35 @@ public class Agent {
             .build();
         this.sessionId = UUID.randomUUID().toString();
         this.eventPublisher = new SubmissionPublisher<>();
+        this.hookRegistry = new HookRegistry();
+    }
+
+    public Agent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
+                 ConversationManager conversationManager, SessionManager sessionManager,
+                 ResilienceConfig resilienceConfig, HookRegistry hookRegistry) {
+        this(model, toolRegistry, toolExecutor, conversationManager, sessionManager, resilienceConfig);
+        this.hookRegistry = hookRegistry != null ? hookRegistry : new HookRegistry();
     }
 
     public Agent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                  ConversationManager conversationManager, SessionManager sessionManager,
                  ResilienceConfig resilienceConfig, List<Plugin> plugins) {
         this(model, toolRegistry, toolExecutor, conversationManager, sessionManager, resilienceConfig);
+        if (plugins != null && !plugins.isEmpty()) {
+            for (var p : plugins) {
+                if (p instanceof GuardrailPlugin gp) this.guardrailPlugin = gp;
+                if (p instanceof HITLPlugin hp) this.hitlPlugin = hp;
+            }
+            var registry = new PluginRegistry(plugins);
+            registry.initialize(this);
+            setEventListener(registry);
+        }
+    }
+
+    public Agent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
+                 ConversationManager conversationManager, SessionManager sessionManager,
+                 ResilienceConfig resilienceConfig, List<Plugin> plugins, HookRegistry hookRegistry) {
+        this(model, toolRegistry, toolExecutor, conversationManager, sessionManager, resilienceConfig, hookRegistry);
         if (plugins != null && !plugins.isEmpty()) {
             for (var p : plugins) {
                 if (p instanceof GuardrailPlugin gp) this.guardrailPlugin = gp;
@@ -263,6 +291,18 @@ public class Agent {
         phase = AgentPhase.EXECUTING;
         fire(new AgentStartedEvent(sid, Instant.now(), prompt));
 
+        var beforeAgentResult = hookRegistry.triggerBeforeAgent(
+            new HookContexts.BeforeAgentContext(sid, prompt, contextVariables));
+        if (beforeAgentResult instanceof HookResult.Cancel c) {
+            var durationMs = (System.nanoTime() - start) / 1_000_000;
+            var result = new AgentResult(sid, "Hook cancelled: " + c.reason(),
+                ChatMessageConverter.toDomainMessages(chatMemory.messages()),
+                new ExecutionMetrics(durationMs, 0, 0, 0),
+                StopReason.INTERRUPTED);
+            fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
+            return result;
+        }
+
         chatMemory.add(UserMessage.from(prompt));
 
         for (int iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
@@ -298,32 +338,75 @@ public class Agent {
             }
             systemPrompt = sb.toString();
 
-            fire(new ModelRequestedEvent(sid, Instant.now(), domainMessages));
-
             var toolSpecs = structuredForceActive
                 ? List.<dev.langchain4j.agent.tool.ToolSpecification>of()
                 : toolRegistry.getSpecifications();
 
-            ChatResponse response;
-            try {
-                response = callWithResilience(currentMessages, toolSpecs);
-            } catch (Exception e) {
+            // Hook: beforeModelCall
+            var beforeMc = hookRegistry.triggerBeforeModelCall(
+                new HookContexts.BeforeModelCallContext(sid, new StringBuilder(systemPrompt), domainMessages, toolSpecs));
+            if (beforeMc instanceof HookResult.Cancel c) {
                 phase = AgentPhase.FAILED;
                 var durationMs = (System.nanoTime() - start) / 1_000_000;
-                var result = new AgentResult(
-                    sid,
-                    "LLM-Fehler: " + e.getMessage(),
+                var result = new AgentResult(sid, "Hook cancelled: " + c.reason(),
                     ChatMessageConverter.toDomainMessages(chatMemory.messages()),
                     new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
-                    StopReason.ERROR
-                );
+                    StopReason.INTERRUPTED);
                 fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
                 return result;
             }
-            AiMessage aiMessage = response.aiMessage();
+
+            // LLM call with afterModelCall hook & retry support
+            var responseText = "";
+            AiMessage aiMessage = null;
+            ChatResponse response = null;
+
+            modelCall:
+            for (int hookRetry = 0; hookRetry < 3; hookRetry++) {
+                fire(new ModelRequestedEvent(sid, Instant.now(), domainMessages));
+
+                try {
+                    response = callWithResilience(currentMessages, toolSpecs);
+                } catch (Exception e) {
+                    phase = AgentPhase.FAILED;
+                    var durationMs = (System.nanoTime() - start) / 1_000_000;
+                    var result = new AgentResult(sid, "LLM-Fehler: " + e.getMessage(),
+                        ChatMessageConverter.toDomainMessages(chatMemory.messages()),
+                        new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
+                        StopReason.ERROR);
+                    fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
+                    return result;
+                }
+
+                aiMessage = response.aiMessage();
+                responseText = aiMessage.text() != null ? aiMessage.text() : "";
+
+                var inputTokens = response.tokenUsage() != null ? response.tokenUsage().inputTokenCount() : 0;
+                var outputTokens = response.tokenUsage() != null ? response.tokenUsage().outputTokenCount() : 0;
+
+                // Hook: afterModelCall
+                var afterMc = hookRegistry.triggerAfterModelCall(
+                    new HookContexts.AfterModelCallContext(sid, responseText, inputTokens, outputTokens), responseText);
+                if (afterMc instanceof HookResult.Cancel c) {
+                    phase = AgentPhase.FAILED;
+                    var durationMs = (System.nanoTime() - start) / 1_000_000;
+                    var result = new AgentResult(sid, "Hook cancelled: " + c.reason(),
+                        ChatMessageConverter.toDomainMessages(chatMemory.messages()),
+                        new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
+                        StopReason.INTERRUPTED);
+                    fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
+                    return result;
+                }
+                if (afterMc instanceof HookResult.Modify<?> m) {
+                    responseText = (String) m.value();
+                }
+                if (afterMc instanceof HookResult.Retry) {
+                    continue;
+                }
+                break modelCall;
+            }
 
             // Output guardrails
-            var responseText = aiMessage.text() != null ? aiMessage.text() : "";
             fire(new AfterInvocationEvent(sid, Instant.now(), responseText, domainMessages));
             if (guardrailPlugin != null) {
                 var guardResult = runOutputGuardrails(responseText, domainMessages);
@@ -354,18 +437,23 @@ public class Agent {
             }
 
             if (!aiMessage.hasToolExecutionRequests()) {
-                phase = AgentPhase.COMPLETED;
-                var durationMs = (System.nanoTime() - start) / 1_000_000;
-                var generatedMessages = ChatMessageConverter.toDomainMessages(chatMemory.messages());
-
-                var result = new AgentResult(
+                // Hook: afterAgent
+                var doneResult = new AgentResult(
                     sid,
                     responseText,
-                    generatedMessages,
-                    new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
+                    ChatMessageConverter.toDomainMessages(chatMemory.messages()),
+                    new ExecutionMetrics((System.nanoTime() - start) / 1_000_000, totalInputTokens, totalOutputTokens, toolCallCount),
                     StopReason.COMPLETED,
                     structuredOutputResult
                 );
+                var afterAgent = hookRegistry.triggerAfterAgent(
+                    new HookContexts.AfterAgentContext(sid, doneResult), doneResult.finalAnswer());
+                var finalAnswer = afterAgent instanceof HookResult.Modify<?> m
+                    ? (String) m.value() : doneResult.finalAnswer();
+
+                phase = AgentPhase.COMPLETED;
+                var result = new AgentResult(sid, finalAnswer, doneResult.generatedMessages(),
+                    doneResult.metrics(), doneResult.stopReason(), doneResult.structuredOutput());
                 fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
                 return result;
             }
@@ -398,38 +486,58 @@ public class Agent {
 
             toolCallCount += aiMessage.toolExecutionRequests().size();
 
+            // Execute tools one by one with before/after hooks
             for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
+                var args = parseArgs(req.arguments());
+
+                // Hook: beforeToolCall
+                var beforeTc = hookRegistry.triggerBeforeToolCall(
+                    new HookContexts.BeforeToolCallContext(sid, req.name(), args));
+                if (beforeTc instanceof HookResult.Cancel c) {
+                    fire(new ToolExecutionStartedEvent(sid, Instant.now(),
+                        new ToolCall(req.id(), req.name(), req.arguments())));
+                    fire(new ToolExecutionFinishedEvent(sid, Instant.now(),
+                        new ToolExecutionResult(req.id(), req.name(), "Skipped: " + c.reason(), false)));
+                    continue;
+                }
+
                 fire(new ToolExecutionStartedEvent(sid, Instant.now(),
                     new ToolCall(req.id(), req.name(), req.arguments())));
-            }
 
-            try {
-                Callable<List<ToolExecutionResult>> execAll = () ->
-                    toolExecutor.executeAll(aiMessage.toolExecutionRequests(), toolRegistry);
-                List<ToolExecutionResult> results = contextVariables.isEmpty()
-                    ? wrapWithRetry(() -> execAll.call())
-                    : ScopedValue.where(AgentContext.SESSION, contextVariables)
-                        .call(() -> wrapWithRetry(execAll::call));
-
-                for (ToolExecutionResult r : results) {
-                    var request = findRequest(aiMessage.toolExecutionRequests(), r.toolName());
-                    if (request != null) {
-                        chatMemory.add(ToolExecutionResultMessage.from(request, r.result()));
+                try {
+                    ToolExecutionResult toolResult;
+                    if (contextVariables.isEmpty()) {
+                        toolResult = wrapWithRetry(() ->
+                            toolExecutor.execute(req, toolRegistry));
+                    } else {
+                        toolResult = ScopedValue.where(AgentContext.SESSION, contextVariables)
+                            .call(() -> wrapWithRetry(() ->
+                                toolExecutor.execute(req, toolRegistry)));
                     }
-                    fire(new ToolExecutionFinishedEvent(sid, Instant.now(), r));
+
+                    // Hook: afterToolCall
+                    var afterTcResult = hookRegistry.triggerAfterToolCall(
+                        new HookContexts.AfterToolCallContext(sid, req.name(), toolResult.result(), toolResult.isError()),
+                        toolResult.result());
+                    var modifiedResult = afterTcResult instanceof HookResult.Modify<?> m
+                        ? (String) m.value() : toolResult.result();
+                    var finalToolResult = new ToolExecutionResult(req.id(), req.name(), modifiedResult, toolResult.isError());
+
+                    var request = findRequest(aiMessage.toolExecutionRequests(), req.name());
+                    if (request != null) {
+                        chatMemory.add(ToolExecutionResultMessage.from(request, modifiedResult));
+                    }
+                    fire(new ToolExecutionFinishedEvent(sid, Instant.now(), finalToolResult));
+                } catch (Exception e) {
+                    phase = AgentPhase.FAILED;
+                    var durationMs = (System.nanoTime() - start) / 1_000_000;
+                    var result = new AgentResult(sid, "Tool-Fehler: " + e.getMessage(),
+                        ChatMessageConverter.toDomainMessages(chatMemory.messages()),
+                        new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
+                        StopReason.ERROR);
+                    fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
+                    return result;
                 }
-            } catch (Exception e) {
-                phase = AgentPhase.FAILED;
-                var durationMs = (System.nanoTime() - start) / 1_000_000;
-                var result = new AgentResult(
-                    sid,
-                    "Tool-Fehler: " + e.getMessage(),
-                    ChatMessageConverter.toDomainMessages(chatMemory.messages()),
-                    new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
-                    StopReason.ERROR
-                );
-                fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
-                return result;
             }
         }
 
@@ -442,8 +550,14 @@ public class Agent {
             new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
             StopReason.MAX_ITERATIONS
         );
-        fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
-        return result;
+        var afterAgent = hookRegistry.triggerAfterAgent(
+            new HookContexts.AfterAgentContext(sid, result), result.finalAnswer());
+        var finalAnswer = afterAgent instanceof HookResult.Modify<?> m
+            ? (String) m.value() : result.finalAnswer();
+        var modifiedResult = new AgentResult(sid, finalAnswer, result.generatedMessages(),
+            result.metrics(), result.stopReason(), result.structuredOutput());
+        fire(new AgentFinishedEvent(sid, Instant.now(), modifiedResult.finalAnswer()));
+        return modifiedResult;
     }
 
     private AgentResult runInputGuardrails(List<Message> domainMessages) {
@@ -594,6 +708,18 @@ public class Agent {
             .orElse(null);
     }
 
+    private Map<String, Object> parseArgs(String arguments) {
+        if (arguments == null || arguments.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return OBJECT_MAPPER.readValue(arguments,
+                new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            return Map.of();
+        }
+    }
+
     public ChatMemory getChatMemory() {
         return chatMemory;
     }
@@ -604,6 +730,38 @@ public class Agent {
 
     public ToolRegistry getToolRegistry() {
         return toolRegistry;
+    }
+
+    public void setToolRegistry(ToolRegistry toolRegistry) {
+        this.toolRegistry = toolRegistry;
+    }
+
+    public void addTool(Object toolInstance) {
+        toolRegistry.register(toolInstance);
+    }
+
+    public void addTool(de.augmentia.strandsagents.core.tools.AgentTool<?> tool) {
+        toolRegistry.register(tool);
+    }
+
+    public void removeTool(String name) {
+        toolRegistry.remove(name);
+    }
+
+    public HookRegistry getHookRegistry() {
+        return hookRegistry;
+    }
+
+    public void setHookRegistry(HookRegistry hookRegistry) {
+        this.hookRegistry = hookRegistry != null ? hookRegistry : new HookRegistry();
+    }
+
+    public void addHook(de.augmentia.strandsagents.core.hook.AgentHook hook) {
+        hookRegistry.register(hook);
+    }
+
+    public void removeHook(String name) {
+        hookRegistry.unregister(name);
     }
 
     public ToolExecutor getToolExecutor() {

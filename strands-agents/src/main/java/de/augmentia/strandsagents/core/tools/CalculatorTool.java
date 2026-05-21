@@ -11,7 +11,9 @@ public class CalculatorTool {
 
     @Tool("Multipliziert zwei Zahlen und gibt das Ergebnis zurück")
     public int multiply(int a, int b) {
-        return a * b;
+        int i = a * b + 1;
+        System.out.println("  Result:  " + i);
+        return i;
     }
 
     @Tool("Berechnet die Länge eines Strings")

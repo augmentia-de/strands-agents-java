@@ -4,6 +4,10 @@ import de.augmentia.strandsagents.core.*;
 import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.conversation.ConversationManager;
+import de.augmentia.strandsagents.core.hook.AgentHook;
+import de.augmentia.strandsagents.core.hook.HookContexts;
+import de.augmentia.strandsagents.core.hook.HookRegistry;
+import de.augmentia.strandsagents.core.hook.HookResult;
 import de.augmentia.strandsagents.sessions.SessionManager;
 import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.core.model.agent.AgentResult;
@@ -35,6 +39,7 @@ import java.util.List;
  * 5. SessionManager (persists agent state and messages)
  * 6. ResilienceConfig (Retry and Circuit Breaker logic)
  * 7. Plugins (Guardrails and HITL)
+ * 8. Hooks (logging via HookRegistry + AgentHook)
  */
 public class AgentDemo {
 
@@ -84,8 +89,53 @@ public class AgentDemo {
 
         List<Plugin> plugins = List.of(guardrails, hitl);
 
+        // 8. Hooks: interception points with flow control (cancel, modify, retry)
+        AgentHook loggingHook = new AgentHook() {
+            @Override
+            public String name() { return "logging"; }
+
+            @Override
+            public HookResult beforeAgent(HookContexts.BeforeAgentContext ctx) {
+                System.out.println("🪝 Hook: agent execution starting");
+                return new HookResult.Continue();
+            }
+
+            @Override
+            public HookResult afterAgent(HookContexts.AfterAgentContext ctx, String response) {
+                System.out.println("🪝 Hook: agent execution finished");
+                return new HookResult.Modify<>(response);
+            }
+
+            @Override
+            public HookResult beforeModelCall(HookContexts.BeforeModelCallContext ctx) {
+                System.out.println("🪝 Hook: about to call LLM (" + ctx.messages().size() + " messages)");
+                return new HookResult.Continue();
+            }
+
+            @Override
+            public HookResult afterModelCall(HookContexts.AfterModelCallContext ctx, String response) {
+                System.out.println("🪝 Hook: LLM responded (" + response.length() + " chars)");
+                return new HookResult.Modify<>(response);
+            }
+
+            @Override
+            public HookResult beforeToolCall(HookContexts.BeforeToolCallContext ctx) {
+                System.out.println("🪝 Hook: about to call tool '" + ctx.toolName() + "'");
+                return new HookResult.Continue();
+            }
+
+            @Override
+            public HookResult afterToolCall(HookContexts.AfterToolCallContext ctx, String result) {
+                System.out.println("🪝 Hook: tool '" + ctx.toolName() + "' returned (" + result.length() + " chars)");
+                return new HookResult.Modify<>(result);
+            }
+        };
+
+        HookRegistry hookRegistry = new HookRegistry();
+        hookRegistry.register(loggingHook);
+
         // --- INSTANTIATION ---
-        // Using the most comprehensive constructor available
+        // Using the 8-param constructor with both plugins and hooks
         Agent agent = new Agent(
             model,
             toolRegistry,
@@ -93,7 +143,8 @@ public class AgentDemo {
             conversationManager,
             sessionManager,
             resilienceConfig,
-            plugins
+            plugins,
+            hookRegistry
         );
 
         // Set a system prompt to guide the agent's persona
