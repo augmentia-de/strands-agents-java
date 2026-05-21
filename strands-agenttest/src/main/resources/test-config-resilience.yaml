@@ -1,0 +1,76 @@
+run:
+  variant: 0
+  label: "resilience_retry_test"
+  timestamp: "2026-05-21T00:00:00Z"
+
+model:
+  type: "mock"
+  responseTemplate: "Mock-Antwort: %s"
+
+tools:
+  preset: "empty"
+  additional: ~
+  include: ~
+  exclude: ~
+
+conversation:
+  type: ~
+  windowSize: 10
+
+session:
+  type: ~
+  directory: ".sessions"
+
+resilience:
+  enabled: true
+  retry:
+    maxAttempts: 5
+    backoffDelayMs: 100
+    backoffMultiplier: 1.5
+  circuitBreaker:
+    failureRateThreshold: 0.3
+    slidingWindowSeconds: 5
+    halfOpenDelaySeconds: 10
+
+plugins:
+  guardrail:
+    enabled: false
+    blockAction: "FALLBACK"
+    fallbackMessage: "Blocked"
+  hitl:
+    enabled: false
+    authority: "AUTO"
+    mode: "SYNC_BLOCKING"
+
+hooks:
+  - name: "logging"
+    enabled: false
+
+structuredOutput:
+  enabled: false
+  mode: "STATIC"
+  outputClass: ~
+  forcePrompt: ~
+
+systemPrompt: "You are a test assistant."
+testPrompt: "Hello"
+
+asserts:
+  stopReason:
+    - "COMPLETED"
+    - "MAX_ITERATIONS"
+    - "ERROR"
+  finalAnswerNotNull: true
+  metricsDurationMsMin: 0
+  metricsToolCallsMin: 0
+  expectedOutputContains: ~
+  expectedOutputNotContains: ~
+
+nextVariant:
+  strategy: "exhaustive"
+  dimensions:
+    - "resilience.enabled"
+    - "plugins.guardrail.enabled"
+    - "conversation.type"
+    - "session.type"
+  seed: 42
