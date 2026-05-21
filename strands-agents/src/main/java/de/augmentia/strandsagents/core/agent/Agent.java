@@ -295,7 +295,9 @@ public class Agent {
 
         var beforeAgentResult = hookRegistry.triggerBeforeAgent(
             new HookContexts.BeforeAgentContext(sid, prompt, contextVariables));
-        if (beforeAgentResult instanceof HookResult.Cancel c) {
+        if (beforeAgentResult instanceof HookResult.Modify<?> m) {
+            prompt = (String) m.value();
+        } else if (beforeAgentResult instanceof HookResult.Cancel c) {
             var durationMs = (System.nanoTime() - start) / 1_000_000;
             var result = new AgentResult(sid, "Hook cancelled: " + c.reason(),
                 ChatMessageConverter.toDomainMessages(chatMemory.messages()),
@@ -345,9 +347,17 @@ public class Agent {
                 : toolRegistry.getSpecifications();
 
             // Hook: beforeModelCall
-            var beforeMc = hookRegistry.triggerBeforeModelCall(
-                new HookContexts.BeforeModelCallContext(sid, new StringBuilder(systemPrompt), domainMessages, toolSpecs));
-            if (beforeMc instanceof HookResult.Cancel c) {
+            var beforeMcCtx = new HookContexts.BeforeModelCallContext(
+                sid, new StringBuilder(systemPrompt), domainMessages, toolSpecs);
+            var beforeMcResult = hookRegistry.triggerBeforeModelCall(beforeMcCtx);
+            systemPrompt = beforeMcCtx.systemPrompt().toString();
+            if (beforeMcResult instanceof HookResult.Modify<?> m
+                    && m.value() instanceof List<?> list) {
+                @SuppressWarnings("unchecked")
+                var modifiedTools = (List<dev.langchain4j.agent.tool.ToolSpecification>) list;
+                toolSpecs = modifiedTools;
+            }
+            if (beforeMcResult instanceof HookResult.Cancel c) {
                 phase = AgentPhase.FAILED;
                 var durationMs = (System.nanoTime() - start) / 1_000_000;
                 var result = new AgentResult(sid, "Hook cancelled: " + c.reason(),

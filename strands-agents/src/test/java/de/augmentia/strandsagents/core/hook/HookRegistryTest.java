@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.augmentia.strandsagents.core.model.agent.AgentResult;
 import de.augmentia.strandsagents.core.model.agent.ExecutionMetrics;
 import de.augmentia.strandsagents.core.model.agent.StopReason;
+import dev.langchain4j.agent.tool.ToolSpecification;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -195,7 +196,9 @@ class HookRegistryTest {
         var registry = new HookRegistry();
         registry.register(new TestHook("a"));
         var ctx = new HookContexts.BeforeAgentContext("s1", "p", Map.of());
-        assertThat(registry.triggerBeforeAgent(ctx)).isInstanceOf(HookResult.Continue.class);
+        assertThat(registry.triggerBeforeAgent(ctx))
+            .isInstanceOfSatisfying(HookResult.Modify.class, m ->
+                assertThat(m.value()).isEqualTo("p"));
     }
 
     @Test
@@ -206,6 +209,27 @@ class HookRegistryTest {
         assertThat(registry.triggerBeforeAgent(ctx))
             .isInstanceOfSatisfying(HookResult.Cancel.class, c ->
                 assertThat(c.reason()).contains("cancel-agent"));
+    }
+
+    @Test
+    void triggerBeforeAgentModifiesPrompt() {
+        var registry = new HookRegistry();
+        registry.register(new ModifyBeforeAgentHook("mod", "modified prompt"));
+        var ctx = new HookContexts.BeforeAgentContext("s1", "original", Map.of());
+        assertThat(registry.triggerBeforeAgent(ctx))
+            .isInstanceOfSatisfying(HookResult.Modify.class, m ->
+                assertThat(m.value()).isEqualTo("modified prompt"));
+    }
+
+    @Test
+    void triggerBeforeAgentChainsMultipleModifiers() {
+        var registry = new HookRegistry();
+        registry.register(new ModifyBeforeAgentHook("a", "from a"));
+        registry.register(new ModifyBeforeAgentHook("b", "from b"));
+        var ctx = new HookContexts.BeforeAgentContext("s1", "original", Map.of());
+        assertThat(registry.triggerBeforeAgent(ctx))
+            .isInstanceOfSatisfying(HookResult.Modify.class, m ->
+                assertThat(m.value()).isEqualTo("from b"));
     }
 
     @Test
@@ -254,6 +278,40 @@ class HookRegistryTest {
         assertThat(registry.triggerBeforeModelCall(ctx))
             .isInstanceOfSatisfying(HookResult.Cancel.class, c ->
                 assertThat(c.reason()).contains("cancel-mc"));
+    }
+
+    @Test
+    void triggerBeforeModelCallReturnsToolsWhenNoHooksModify() {
+        var registry = new HookRegistry();
+        registry.register(new TestHook("a"));
+        var sb = new StringBuilder("sys");
+        var tools = List.of(ToolSpecification.builder().name("tool1").build());
+        var ctx = new HookContexts.BeforeModelCallContext("s1", sb, List.of(), tools);
+        var result = registry.triggerBeforeModelCall(ctx);
+        assertThat(result).isInstanceOf(HookResult.Modify.class);
+        assertThat(((HookResult.Modify<?>) result).value()).isEqualTo(tools);
+    }
+
+    @Test
+    void triggerBeforeModelCallModifyTools() {
+        var registry = new HookRegistry();
+        var newTools = List.of(ToolSpecification.builder().name("newTool").build());
+        registry.register(new ModifyBeforeModelCallToolHook("mod-tools", newTools));
+        var sb = new StringBuilder("sys");
+        var ctx = new HookContexts.BeforeModelCallContext("s1", sb, List.of(), List.of());
+        var result = registry.triggerBeforeModelCall(ctx);
+        assertThat(result).isInstanceOf(HookResult.Modify.class);
+        assertThat(((HookResult.Modify<?>) result).value()).isEqualTo(newTools);
+    }
+
+    @Test
+    void triggerBeforeModelCallModifySystemPromptInPlace() {
+        var registry = new HookRegistry();
+        registry.register(new ModifyBeforeModelCallPromptHook("mod-prompt"));
+        var sb = new StringBuilder("original");
+        var ctx = new HookContexts.BeforeModelCallContext("s1", sb, List.of(), List.of());
+        registry.triggerBeforeModelCall(ctx);
+        assertThat(ctx.systemPrompt().toString()).isEqualTo("modified by hook");
     }
 
     // --- HookRegistry: triggerAfterModelCall ---
@@ -371,6 +429,16 @@ class HookRegistryTest {
         @Override public String name() { return name; }
     }
 
+    private static class ModifyBeforeAgentHook implements AgentHook {
+        private final String name;
+        private final String newPrompt;
+        ModifyBeforeAgentHook(String name, String newPrompt) { this.name = name; this.newPrompt = newPrompt; }
+        @Override public String name() { return name; }
+        @Override public HookResult beforeAgent(HookContexts.BeforeAgentContext ctx) {
+            return new HookResult.Modify<>(newPrompt);
+        }
+    }
+
     private static class CancelHook implements AgentHook {
         private final String name;
         CancelHook(String name) { this.name = name; }
@@ -419,6 +487,29 @@ class HookRegistryTest {
         @Override public String name() { return name; }
         @Override public HookResult afterModelCall(HookContexts.AfterModelCallContext ctx, String response) {
             return new HookResult.Retry(reason);
+        }
+    }
+
+    private static class ModifyBeforeModelCallToolHook implements AgentHook {
+        private final String name;
+        private final List<ToolSpecification> newTools;
+        ModifyBeforeModelCallToolHook(String name, List<ToolSpecification> newTools) {
+            this.name = name; this.newTools = newTools;
+        }
+        @Override public String name() { return name; }
+        @Override public HookResult beforeModelCall(HookContexts.BeforeModelCallContext ctx) {
+            return new HookResult.Modify<>(newTools);
+        }
+    }
+
+    private static class ModifyBeforeModelCallPromptHook implements AgentHook {
+        private final String name;
+        ModifyBeforeModelCallPromptHook(String name) { this.name = name; }
+        @Override public String name() { return name; }
+        @Override public HookResult beforeModelCall(HookContexts.BeforeModelCallContext ctx) {
+            ctx.systemPrompt().setLength(0);
+            ctx.systemPrompt().append("modified by hook");
+            return new HookResult.Continue();
         }
     }
 

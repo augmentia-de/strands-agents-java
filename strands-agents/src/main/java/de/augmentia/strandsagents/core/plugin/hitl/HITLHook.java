@@ -5,6 +5,7 @@ import de.augmentia.strandsagents.core.hook.HookContexts;
 import de.augmentia.strandsagents.core.hook.HookResult;
 import de.augmentia.strandsagents.core.plugin.guardrail.ApprovalResult;
 import java.util.List;
+import java.util.Properties;
 import java.util.Scanner;
 
 public class HITLHook implements AgentHook {

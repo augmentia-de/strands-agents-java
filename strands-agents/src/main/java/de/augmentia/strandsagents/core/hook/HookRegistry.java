@@ -1,5 +1,6 @@
 package de.augmentia.strandsagents.core.hook;
 
+import dev.langchain4j.agent.tool.ToolSpecification;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -39,11 +40,16 @@ public class HookRegistry {
     // --- triggers ---
 
     public HookResult triggerBeforeAgent(HookContexts.BeforeAgentContext ctx) {
+        var currentPrompt = ctx.prompt();
         for (var hook : hooks) {
             var result = wrap(() -> hook.beforeAgent(ctx), hook.name());
-            if (!(result instanceof HookResult.Continue)) return result;
+            switch (result) {
+                case HookResult.Modify<?> m -> currentPrompt = (String) m.value();
+                case HookResult.Cancel c -> { return result; }
+                default -> {}
+            }
         }
-        return new HookResult.Continue();
+        return new HookResult.Modify<>(currentPrompt);
     }
 
     public HookResult triggerAfterAgent(HookContexts.AfterAgentContext ctx, String response) {
@@ -61,11 +67,22 @@ public class HookRegistry {
     }
 
     public HookResult triggerBeforeModelCall(HookContexts.BeforeModelCallContext ctx) {
+        var currentTools = ctx.tools();
         for (var hook : hooks) {
             var result = wrap(() -> hook.beforeModelCall(ctx), hook.name());
-            if (!(result instanceof HookResult.Continue)) return result;
+            switch (result) {
+                case HookResult.Modify<?> m -> {
+                    if (m.value() instanceof List<?> list) {
+                        @SuppressWarnings("unchecked")
+                        var specs = (List<ToolSpecification>) list;
+                        currentTools = specs;
+                    }
+                }
+                case HookResult.Cancel c -> { return result; }
+                default -> {}
+            }
         }
-        return new HookResult.Continue();
+        return new HookResult.Modify<>(currentTools);
     }
 
     public HookResult triggerAfterModelCall(HookContexts.AfterModelCallContext ctx, String response) {
