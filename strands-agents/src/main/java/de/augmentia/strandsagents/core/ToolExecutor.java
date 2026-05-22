@@ -54,8 +54,8 @@ public class ToolExecutor {
             result = future.get(timeoutSeconds, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
             future.cancel(true);
-            return new ToolExecutionResult(
-                request.id(), request.name(), "Timeout nach " + timeoutSeconds + "s", true);
+            throw new RuntimeException(
+                "Tool '" + request.name() + "' timeout after " + timeoutSeconds + "s");
         }
 
         return new ToolExecutionResult(

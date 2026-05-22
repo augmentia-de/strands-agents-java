@@ -24,6 +24,20 @@ public class ConfigRunner {
         int total = 0;
         int passed = 0;
 
+        // Save initial config to reset after all variants are done
+        TestConfig initialConfig;
+        try {
+            initialConfig = ConfigParser.fromYaml(configFile);
+        } catch (Exception e) {
+            System.err.println("Fehler beim Lesen der Config: "
+                + e.getMessage());
+            return;
+        }
+        if (initialConfig == null) {
+            System.out.println("Keine Config gefunden – Abbruch.");
+            return;
+        }
+
         while (true) {
             TestConfig config;
             try {
@@ -76,6 +90,14 @@ public class ConfigRunner {
             var nextOpt = VariantEngine.next(config);
             if (nextOpt.isEmpty()) {
                 System.out.println("Alle Varianten durchlaufen.");
+                // Config für nächsten Durchlauf zurücksetzen
+                try {
+                    ConfigParser.toYaml(initialConfig, configFile);
+                    System.out.println("Config reset to variant 0.");
+                } catch (Exception e) {
+                    System.err.println("Fehler beim Zurücksetzen der Config: "
+                        + e.getMessage());
+                }
                 break;
             }
 

@@ -79,7 +79,7 @@ public class Agent {
         .configure(JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true)
         .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-    static final int MAX_TOOL_ITERATIONS = 10;
+    static int MAX_TOOL_ITERATIONS = 10;
     static final int MAX_HOOK_RETRIES = 3;
     static final int DEFAULT_MAX_MESSAGES = 20;
     static final ExecutorService VIRTUAL_EXECUTOR =
@@ -651,7 +651,10 @@ public class Agent {
                         cause = cause.getCause();
                     }
                     log.error("Tool execution error in '{}': {}", req.name(), cause.getMessage());
-                    var errorMessage = "Tool-Fehler: " + cause.getMessage();
+                    var errorMessage = retryConfig != null
+                        ? "Tool '" + req.name() + "' failed after "
+                            + retryConfig.maxAttempts() + " attempts: " + cause.getMessage()
+                        : "Tool error: " + cause.getMessage();
                     var toolResult = new ToolExecutionResult(req.id(), req.name(), errorMessage, true);
 
                     var request = findRequest(aiMessage.toolExecutionRequests(), req.name());
