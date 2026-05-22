@@ -11,8 +11,8 @@ set_keys.sh
 .vscode/
 *.swp
 *.swo
-~*
 /others/
+
 
 /logs/
 /data/

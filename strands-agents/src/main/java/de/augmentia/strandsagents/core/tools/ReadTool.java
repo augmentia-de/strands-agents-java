@@ -43,7 +43,9 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
         var props = schema.putObject("properties");
         addStr(props, "path", "Path to the file to read (relative or absolute)");
         addInt(props, "offset", "Line number to start reading from (1-indexed)");
+        addInt(props, "line_start", "Line number to start reading from (1-indexed, alias for offset)");
         addInt(props, "limit", "Maximum number of lines to read");
+        addInt(props, "line_end", "Line number to end reading at (inclusive)");
         schema.putArray("required").add("path");
         return schema;
     }
@@ -84,14 +86,29 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
 
             var lines = Files.readAllLines(path);
             var total = lines.size();
-            var start = params.offset() != null ? Math.max(0, params.offset() - 1) : 0;
+
+            // Handle offset / line_start
+            Integer effectiveStartLine = params.offset();
+            if (effectiveStartLine == null) effectiveStartLine = params.line_start();
+            
+            var start = effectiveStartLine != null ? Math.max(0, effectiveStartLine - 1) : 0;
             if (start >= lines.size() && total > 0) {
                 throw new IOException("Offset beyond file end");
             }
 
-            List<String> selected = params.limit() != null
-                ? lines.subList(start, Math.min(start + params.limit(), lines.size()))
-                : lines.subList(start, lines.size());
+            // Handle limit / line_end
+            int end;
+            if (params.line_end() != null) {
+                end = Math.min(params.line_end(), lines.size());
+            } else if (params.limit() != null) {
+                end = Math.min(start + params.limit(), lines.size());
+            } else {
+                end = lines.size();
+            }
+
+            if (end < start) end = start;
+
+            List<String> selected = lines.subList(start, end);
 
             var sb = new StringBuilder();
             var outLines = 0;
@@ -141,5 +158,5 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
         return p.isAbsolute() ? p : cwd.resolve(p).normalize();
     }
 
-    public record Params(String path, Integer offset, Integer limit) {}
+    public record Params(String path, Integer offset, Integer limit, Integer line_start, Integer line_end) {}
 }

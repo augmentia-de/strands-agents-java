@@ -95,10 +95,6 @@
             <artifactId>a2a-java-sdk-opentelemetry-client-propagation</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.a2aproject.sdk</groupId>
-            <artifactId>a2a-java-sdk-reference-jsonrpc</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
         </dependency>

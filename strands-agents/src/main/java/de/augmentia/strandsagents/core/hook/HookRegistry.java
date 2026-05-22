@@ -48,8 +48,9 @@ public class HookRegistry {
                 case HookResult.Cancel c -> { return result; }
                 default -> {}
             }
+            return new HookResult.Modify<>(currentPrompt);
         }
-        return new HookResult.Modify<>(currentPrompt);
+        return new HookResult.Continue();
     }
 
     public HookResult triggerAfterAgent(HookContexts.AfterAgentContext ctx, String response) {
@@ -62,8 +63,9 @@ public class HookRegistry {
             } else if (!(result instanceof HookResult.Continue)) {
                 return result;
             }
+            return new HookResult.Modify<>(current);
         }
-        return new HookResult.Modify<>(current);
+        return new HookResult.Continue();
     }
 
     public HookResult triggerBeforeModelCall(HookContexts.BeforeModelCallContext ctx) {
@@ -81,8 +83,9 @@ public class HookRegistry {
                 case HookResult.Cancel c -> { return result; }
                 default -> {}
             }
+            return new HookResult.Modify<>(currentTools);
         }
-        return new HookResult.Modify<>(currentTools);
+        return new HookResult.Continue();
     }
 
     public HookResult triggerAfterModelCall(HookContexts.AfterModelCallContext ctx, String response) {
@@ -96,8 +99,9 @@ public class HookRegistry {
                 case HookResult.Cancel c -> { return result; }
                 default -> {}
             }
+            return new HookResult.Modify<>(current);
         }
-        return new HookResult.Modify<>(current);
+        return new HookResult.Continue();
     }
 
     public HookResult triggerBeforeToolCall(HookContexts.BeforeToolCallContext ctx) {
@@ -118,8 +122,9 @@ public class HookRegistry {
             } else if (!(r instanceof HookResult.Continue)) {
                 return r;
             }
+            return new HookResult.Modify<>(current);
         }
-        return new HookResult.Modify<>(current);
+        return new HookResult.Continue();
     }
 
     @FunctionalInterface

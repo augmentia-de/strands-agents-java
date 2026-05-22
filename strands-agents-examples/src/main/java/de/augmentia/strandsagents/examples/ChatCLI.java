@@ -9,6 +9,7 @@ import de.augmentia.strandsagents.core.model.agent.AgentResult;
 import de.augmentia.strandsagents.core.model.event.*;
 import de.augmentia.strandsagents.core.plugin.Plugin;
 import de.augmentia.strandsagents.core.tools.McpToolMethod;
+import de.augmentia.strandsagents.sessions.FileChatMemoryStore;
 import de.augmentia.strandsagents.sessions.FileSessionManager;
 import de.augmentia.strandsagents.skills.AgentSkillsPlugin;
 import de.augmentia.strandsagents.skills.Skill;
@@ -75,6 +76,7 @@ public class ChatCLI {
 
         var conversationManager = new SlidingWindowConversationManager(20);
         var sessionManager = new FileSessionManager(sessionDir);
+        var chatMemoryStore = new FileChatMemoryStore(Path.of(".chat-memory"));
 
         var skillsDir = Path.of("skills");
         List<Plugin> plugins = List.of();
@@ -94,6 +96,7 @@ public class ChatCLI {
             .toolRegistry(registry)
             .conversationManager(conversationManager)
             .sessionManager(sessionManager)
+            .chatMemoryStore(chatMemoryStore)
             .plugins(plugins)
             .logLlmCalls(Path.of("logs/llm-calls.log"))
             .build()

@@ -41,6 +41,7 @@ public class LsTool implements AgentTool<LsTool.Params> {
         var props = schema.putObject("properties");
         addStr(props, "path", "Directory to list (default: current directory)");
         addBool(props, "recursive", "List recursively (default: false)");
+        addInt(props, "depth", "Maximum depth for recursive listing (default: no limit)");
         addBool(props, "details", "Show file size and date (default: false)");
         return schema;
     }
@@ -57,9 +58,15 @@ public class LsTool implements AgentTool<LsTool.Params> {
         node.put("description", d);
     }
 
+    private void addInt(ObjectNode p, String n, String d) {
+        var node = p.putObject(n);
+        node.put("type", "integer");
+        node.put("description", d);
+    }
+
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
-        log.debug("Tool: ls START path={} recursive={}", params.path(), params.recursive());
+        log.debug("Tool: ls START path={} recursive={} depth={}", params.path(), params.recursive(), params.depth());
         if (abortFlag.get()) {
             log.debug("Tool: ls ABORTED");
             throw new RuntimeException("Operation aborted");
@@ -77,7 +84,8 @@ public class LsTool implements AgentTool<LsTool.Params> {
         var entries = new ArrayList<Path>();
         try {
             if (Boolean.TRUE.equals(params.recursive())) {
-                try (var stream = Files.walk(targetPath)) {
+                int maxDepth = params.depth() != null ? params.depth() : Integer.MAX_VALUE;
+                try (var stream = Files.walk(targetPath, maxDepth)) {
                     stream.skip(1).forEach(entries::add);
                 }
             } else {
@@ -136,6 +144,6 @@ public class LsTool implements AgentTool<LsTool.Params> {
         return p.isAbsolute() ? p : cwd.resolve(p).normalize();
     }
 
-    public record Params(String path, Boolean recursive, Boolean details) {}
+    public record Params(String path, Boolean recursive, Boolean details, Integer depth) {}
     public record LsDetails(int entryCount, String directory) {}
 }

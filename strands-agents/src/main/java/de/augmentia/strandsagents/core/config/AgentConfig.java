@@ -12,6 +12,7 @@ import de.augmentia.strandsagents.core.plugin.Plugin;
 import de.augmentia.strandsagents.core.resilience.ResilienceConfig;
 import de.augmentia.strandsagents.core.structured.StructuredOutputConfig;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 
 
 import java.nio.file.Path;
@@ -25,6 +26,7 @@ public record AgentConfig(
     int maxIterations,
     ConversationManager conversationManager,
     SessionManager sessionManager,
+    ChatMemoryStore chatMemoryStore,
     ResilienceConfig resilienceConfig,
     List<Plugin> plugins,
     Path skillsDir,
@@ -49,7 +51,7 @@ public record AgentConfig(
         }
 
         var agent = new Agent(model, effectiveRegistry, new ToolExecutor(),
-            conversationManager, sessionManager, resilienceConfig, effectivePlugins);
+            conversationManager, sessionManager, chatMemoryStore, resilienceConfig, effectivePlugins);
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             agent.setSystemPrompt(systemPrompt);
         }
@@ -73,6 +75,7 @@ public record AgentConfig(
         private ConversationManager conversationManager = null;
         private SessionManager sessionManager = null;
         private ResilienceConfig resilienceConfig = ResilienceConfig.DEFAULT;
+        private ChatMemoryStore chatMemoryStore = null;
         private List<Plugin> plugins = List.of();
         private Path skillsDir = null;
         private List<String> initialSkills = List.of();
@@ -87,6 +90,7 @@ public record AgentConfig(
         public Builder conversationManager(ConversationManager conversationManager) { this.conversationManager = conversationManager; return this; }
         public Builder sessionManager(SessionManager sessionManager) { this.sessionManager = sessionManager; return this; }
         public Builder resilienceConfig(ResilienceConfig resilienceConfig) { this.resilienceConfig = resilienceConfig; return this; }
+        public Builder chatMemoryStore(ChatMemoryStore chatMemoryStore) { this.chatMemoryStore = chatMemoryStore; return this; }
         public Builder plugins(List<Plugin> plugins) { this.plugins = plugins; return this; }
         public Builder skillsDir(Path skillsDir) { this.skillsDir = skillsDir; return this; }
         public Builder initialSkills(List<String> initialSkills) { this.initialSkills = initialSkills; return this; }
@@ -97,7 +101,7 @@ public record AgentConfig(
 
         public AgentConfig build() {
             return new AgentConfig(name, modelName, systemPrompt, toolRegistry, maxIterations,
-                conversationManager, sessionManager, resilienceConfig, plugins, skillsDir,
+                conversationManager, sessionManager, chatMemoryStore, resilienceConfig, plugins, skillsDir,
                 initialSkills, structuredOutputConfig, llmLogPath);
         }
     }

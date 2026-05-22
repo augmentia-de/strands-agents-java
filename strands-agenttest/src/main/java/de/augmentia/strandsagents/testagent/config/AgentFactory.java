@@ -26,8 +26,12 @@ import de.augmentia.strandsagents.sessions.FileSessionManager;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AgentFactory {
+
+    private static final Logger log = LoggerFactory.getLogger(AgentFactory.class);
 
     private AgentFactory() {}
 
@@ -59,8 +63,7 @@ public class AgentFactory {
                 try {
                     agent.setStructuredOutputModel(Class.forName(so.outputClass()));
                 } catch (ClassNotFoundException e) {
-                    System.err.println("StructuredOutput class not found: "
-                        + so.outputClass());
+                    log.error("StructuredOutput class not found: {}", so.outputClass());
                 }
             }
         }
@@ -180,7 +183,7 @@ public class AgentFactory {
             if (!entry.enabled()) continue;
             switch (entry.name()) {
                 case "logging" -> registry.register(new LoggingAgentHook());
-                default -> System.err.println("Unknown hook: " + entry.name());
+                default -> log.warn("Unknown hook: {}", entry.name());
             }
         }
         return registry;
@@ -192,42 +195,38 @@ public class AgentFactory {
 
         @Override
         public HookResult beforeAgent(HookContexts.BeforeAgentContext ctx) {
-            System.out.println("[HOOK] beforeAgent: " + ctx.prompt());
+            log.debug("[HOOK] beforeAgent: {}", ctx.prompt());
             return new HookResult.Continue();
         }
 
         @Override
         public HookResult afterAgent(HookContexts.AfterAgentContext ctx, String response) {
-            System.out.println("[HOOK] afterAgent: duration="
-                + ctx.result().metrics().durationMs() + "ms");
-            return new HookResult.Modify<>(response);
+            log.debug("[HOOK] afterAgent: duration={}ms", ctx.result().metrics().durationMs());
+            return new HookResult.Continue();
         }
 
         @Override
         public HookResult beforeModelCall(HookContexts.BeforeModelCallContext ctx) {
-            System.out.println("[HOOK] beforeModelCall: "
-                + ctx.messages().size() + " messages");
+            log.debug("[HOOK] beforeModelCall: {} messages", ctx.messages().size());
             return new HookResult.Continue();
         }
 
         @Override
         public HookResult afterModelCall(HookContexts.AfterModelCallContext ctx, String response) {
-            System.out.println("[HOOK] afterModelCall: "
-                + response.length() + " chars");
-            return new HookResult.Modify<>(response);
+            log.debug("[HOOK] afterModelCall: {} chars", response.length());
+            return new HookResult.Continue();
         }
 
         @Override
         public HookResult beforeToolCall(HookContexts.BeforeToolCallContext ctx) {
-            System.out.println("[HOOK] beforeToolCall: " + ctx.toolName());
+            log.debug("[HOOK] beforeToolCall: {}", ctx.toolName());
             return new HookResult.Continue();
         }
 
         @Override
         public HookResult afterToolCall(HookContexts.AfterToolCallContext ctx, String result) {
-            System.out.println("[HOOK] afterToolCall: " + ctx.toolName()
-                + " → " + result.length() + " chars");
-            return new HookResult.Modify<>(result);
+            log.debug("[HOOK] afterToolCall: {} → {} chars", ctx.toolName(), result.length());
+            return new HookResult.Continue();
         }
     }
 }
