@@ -11,6 +11,13 @@
 
     <name>Strands Agents SDK (Java 21)</name>
 
+    <scm>
+        <connection>scm:git:https://github.com/augmentia-de/strands-agents-java.git</connection>
+        <developerConnection>scm:git:git@github.com:augmentia-de/strands-agents-java.git</developerConnection>
+        <url>https://github.com/augmentia-de/strands-agents-java</url>
+        <tag>HEAD</tag>
+    </scm>
+
     <modules>
         <module>strands-agents</module>
         <module>strands-agents-quarkus</module>
