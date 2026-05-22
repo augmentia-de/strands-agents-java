@@ -45,12 +45,11 @@ public class HookRegistry {
             var result = wrap(() -> hook.beforeAgent(ctx), hook.name());
             switch (result) {
                 case HookResult.Modify<?> m -> currentPrompt = (String) m.value();
-                case HookResult.Cancel c -> { return result; }
+                case HookResult.Cancel _ -> { return result; }
                 default -> {}
             }
-            return new HookResult.Modify<>(currentPrompt);
         }
-        return new HookResult.Continue();
+        return new HookResult.Modify<>(currentPrompt);
     }
 
     public HookResult triggerAfterAgent(HookContexts.AfterAgentContext ctx, String response) {
@@ -58,14 +57,13 @@ public class HookRegistry {
         for (var hook : hooks) {
             final var input = current;
             var result = wrap(() -> hook.afterAgent(ctx, input), hook.name());
-            if (result instanceof HookResult.Modify<?> m) {
-                current = (String) m.value();
+            if (result instanceof HookResult.Modify<?>(Object value)) {
+                current = (String) value;
             } else if (!(result instanceof HookResult.Continue)) {
                 return result;
             }
-            return new HookResult.Modify<>(current);
         }
-        return new HookResult.Continue();
+        return new HookResult.Modify<>(current);
     }
 
     public HookResult triggerBeforeModelCall(HookContexts.BeforeModelCallContext ctx) {
@@ -80,12 +78,11 @@ public class HookRegistry {
                         currentTools = specs;
                     }
                 }
-                case HookResult.Cancel c -> { return result; }
+                case HookResult.Cancel _ -> { return result; }
                 default -> {}
             }
-            return new HookResult.Modify<>(currentTools);
         }
-        return new HookResult.Continue();
+        return new HookResult.Modify<>(currentTools);
     }
 
     public HookResult triggerAfterModelCall(HookContexts.AfterModelCallContext ctx, String response) {
@@ -95,13 +92,12 @@ public class HookRegistry {
             var result = wrap(() -> hook.afterModelCall(ctx, input), hook.name());
             switch (result) {
                 case HookResult.Modify<?> m -> current = (String) m.value();
-                case HookResult.Retry r -> { return result; }
-                case HookResult.Cancel c -> { return result; }
+                case HookResult.Retry _ -> { return result; }
+                case HookResult.Cancel _ -> { return result; }
                 default -> {}
             }
-            return new HookResult.Modify<>(current);
         }
-        return new HookResult.Continue();
+        return new HookResult.Modify<>(current);
     }
 
     public HookResult triggerBeforeToolCall(HookContexts.BeforeToolCallContext ctx) {
@@ -117,14 +113,13 @@ public class HookRegistry {
         for (var hook : hooks) {
             final var input = current;
             var r = wrap(() -> hook.afterToolCall(ctx, input), hook.name());
-            if (r instanceof HookResult.Modify<?> m) {
-                current = (String) m.value();
+            if (r instanceof HookResult.Modify<?>(Object value)) {
+                current = (String) value;
             } else if (!(r instanceof HookResult.Continue)) {
                 return r;
             }
-            return new HookResult.Modify<>(current);
         }
-        return new HookResult.Continue();
+        return new HookResult.Modify<>(current);
     }
 
     @FunctionalInterface

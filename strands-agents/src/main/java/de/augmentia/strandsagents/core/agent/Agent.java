@@ -630,9 +630,9 @@ public class Agent {
                     var afterTcResult = hookRegistry.triggerAfterToolCall(
                         new HookContexts.AfterToolCallContext(sid, req.name(), toolResult.result(), toolResult.isError()),
                         toolResult.result());
-                    var modifiedResult = afterTcResult instanceof HookResult.Modify<?> m
-                            ? (String) m.value() : toolResult.result();
-                    if (afterTcResult instanceof HookResult.Modify<?> m) {
+                    var modifiedResult = afterTcResult instanceof HookResult.Modify<?>(Object value)
+                            ? (String) value : toolResult.result();
+                    if (afterTcResult instanceof HookResult.Modify<?>) {
                         log.debug("afterToolCall '{}' — isError={}, modified={}",
                                 req.name(), toolResult.isError(), afterTcResult instanceof HookResult.Modify);
                     }
@@ -656,6 +656,7 @@ public class Agent {
 
                     var request = findRequest(aiMessage.toolExecutionRequests(), req.name());
                     if (request != null) {
+                        log.debug("Tool execution error — request={}", truncate(String.valueOf(request)));
                         chatMemory.add(ToolExecutionResultMessage.from(request, errorMessage));
                     }
                     fire(new ToolExecutionFinishedEvent(sid, Instant.now(), toolResult));
@@ -675,8 +676,8 @@ public class Agent {
         );
         var afterAgent = hookRegistry.triggerAfterAgent(
             new HookContexts.AfterAgentContext(sid, result), result.finalAnswer());
-        var finalAnswer = afterAgent instanceof HookResult.Modify<?> m
-            ? (String) m.value() : result.finalAnswer();
+        var finalAnswer = afterAgent instanceof HookResult.Modify<?>(Object value)
+            ? (String) value : result.finalAnswer();
         var modifiedResult = new AgentResult(sid, finalAnswer, result.generatedMessages(),
             result.metrics(), result.stopReason(), result.structuredOutput());
         fire(new AgentFinishedEvent(sid, Instant.now(), modifiedResult.finalAnswer()));

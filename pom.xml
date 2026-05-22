@@ -30,9 +30,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <langchain4j.version>1.12.2</langchain4j.version>
         <langchain4j-mcp.version>1.12.2-beta22</langchain4j-mcp.version>
-        <jackson.version>2.18.2</jackson.version>
-        <junit.version>5.10.5</junit.version>
-        <assertj.version>3.24.2</assertj.version>
+        <jackson.version>2.18.7</jackson.version>
+        <junit.version>5.13.4</junit.version>
+        <assertj.version>3.27.7</assertj.version>
         <slf4j.version>2.0.16</slf4j.version>
         <opentelemetry.version>1.44.1</opentelemetry.version>
         <micrometer.version>1.14.3</micrometer.version>
@@ -185,11 +185,31 @@
                 <version>2.4.240</version>
                 <scope>test</scope>
             </dependency>
-        <dependency>
-            <groupId>io.github.java-diff-utils</groupId>
-            <artifactId>java-diff-utils</artifactId>
-            <version>4.12</version>
-        </dependency>
+            <dependency>
+                <groupId>io.github.java-diff-utils</groupId>
+                <artifactId>java-diff-utils</artifactId>
+                <version>4.12</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.httpcomponents.client5</groupId>
+                <artifactId>httpclient5</artifactId>
+                <version>5.6.1</version>
+            </dependency>
+            <dependency>
+                <groupId>tools.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>3.1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>tools.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>3.1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>co.elastic.clients</groupId>
+                <artifactId>elasticsearch-java</artifactId>
+                <version>9.3.2</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
