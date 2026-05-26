@@ -31,7 +31,7 @@ docker run -d \
     -p 8084:8084 \
     -e OPENAI_API_KEY="${OPENAI_API_KEY}" \
     -e OPENAI_BASE_URL="${OPENAI_BASE_URL:-}" \
-    -e LLM_CHAT_MODEL="${LLM_CHAT_MODEL:-gpt-4o}" \
+    -e OPENAI_MODEL="${OPENAI_MODEL:-gpt-4o}" \
     -e QUARKUS_HTTP_PORT=8084 \
     -e STRANDS_SKILLS_DIR=/app/skills \
     -e STRANDS_AGENT_TOOLS=de.augmentia.strandsagents.core.tools.CalculatorTool \

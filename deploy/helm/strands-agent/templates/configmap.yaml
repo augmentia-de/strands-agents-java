@@ -9,7 +9,7 @@ data:
   QUARKUS_HTTP_PORT: {{ .Values.env.QUARKUS_HTTP_PORT | quote }}
   # LLM provider
   OPENAI_BASE_URL: {{ .Values.env.OPENAI_BASE_URL | quote }}
-  LLM_CHAT_MODEL: {{ .Values.env.LLM_CHAT_MODEL | quote }}
+  OPENAI_MODEL: {{ .Values.env.OPENAI_MODEL | quote }}
   LLM_TEMPERATURE: {{ .Values.env.LLM_TEMPERATURE | quote }}
   LLM_MAX_RETRIES: {{ .Values.env.LLM_MAX_RETRIES | quote }}
   # Strands Agent

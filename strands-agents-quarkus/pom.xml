@@ -11,20 +11,20 @@
     <artifactId>strands-agents-quarkus</artifactId>
 
     <properties>
-        <quarkus.platform.version>3.27.3.1</quarkus.platform.version>
+        <quarkus.platform.version>3.33.2</quarkus.platform.version>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>io.quarkus.platform</groupId>
-                <artifactId>quarkus-bom</artifactId>
-                <version>${quarkus.platform.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
+        <dependencyManagement>
+            <dependencies>
+                <dependency>
+                    <groupId>io.quarkus</groupId>
+                    <artifactId>quarkus-bom</artifactId>
+                    <version>${quarkus.platform.version}</version>
+                    <type>pom</type>
+                    <scope>import</scope>
+                </dependency>
+            </dependencies>
+        </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -88,7 +88,7 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>io.quarkus.platform</groupId>
+                <groupId>io.quarkus</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
                 <version>${quarkus.platform.version}</version>
                 <extensions>true</extensions>
@@ -110,6 +110,9 @@
                         <arg>--enable-preview</arg>
                         <arg>-parameters</arg>
                     </compilerArgs>
+                    <excludes>
+                        <exclude>**/SampleAgUiResource.java</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
             <plugin>

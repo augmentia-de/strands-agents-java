@@ -15,7 +15,7 @@ export STRANDS_LLM_LOG_ENABLED="${STRANDS_LLM_LOG_ENABLED:-true}"
 export STRANDS_LLM_LOG_PATH="${STRANDS_LLM_LOG_PATH:-$SCRIPT_DIR/logs/llm-calls.log}"
 
 echo ">>> Starte Main (OpenAI-kompatibel)"
-echo "    Model:       ${LLM_CHAT_MODEL:-gpt-4o-mini}"
+echo "    Model:       ${OPENAI_MODEL:-gpt-4o-mini}"
 echo "    Skills:      $STRANDS_SKILLS_DIR"
 echo "    Sessions:    $STRANDS_SESSION_DIR"
 echo ""

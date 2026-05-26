@@ -70,7 +70,7 @@ mvn test -pl strands-agents -Dtest=AgentMvpIT
 ### Programmatic API (standalone)
 
 ```java
-// 1. Create an LLM (reads OPENAI_API_KEY, LLM_CHAT_MODEL from env)
+// 1. Create an LLM (reads OPENAI_API_KEY, OPENAI_MODEL from env)
 ChatModel model = ModelFactory.createOpenAiFromEnv();
 
 // 2. Register tools
@@ -231,17 +231,20 @@ strands-agents-java (parent)
 
 ## Configuration
 
-| Environment variable | Property | Default | Description |
-|---------------------|----------|---------|-------------|
-| `OPENAI_API_KEY` | — | — | OpenAI API key |
-| `LLM_CHAT_MODEL` | — | `gpt-4o` | Model name |
-| `LLM_BASE_URL` | — | `https://api.openai.com` | API base URL |
-| `STRANDS_SKILLS_DIR` | `strands.agent.skills.dir` | `skills` | Skills directory |
-| `STRANDS_SESSION_DIR` | `strands.agent.session.dir` | `.sessions` | Session storage directory |
-| `STRANDS_LLM_LOG_ENABLED` | `strands.agent.llm-log.enabled` | `true` | Enable LLM call logging |
-| `STRANDS_LLM_LOG_PATH` | `strands.agent.llm-log.path` | `logs/llm-calls.log` | LLM log file path |
-| `STRANDS_AGENT_TOOLS` | `strands.agent.tools` | — | Comma-separated extra tool class names |
-| `STRANDS_MCP_URL` | `strands.agent.mcp.url` | `http://localhost:8888/mcp` | Default MCP server URL |
+| Environment variable      | Property                        | Default                     | Description                            |
+|---------------------------|---------------------------------|-----------------------------|----------------------------------------|
+| `OPENAI_API_KEY`          | —                               | —                           | OpenAI API key                         |
+| `OPENAI_MODEL`          | —                               | `gpt-4o`                    | Model name                             |
+| `LLM_BASE_URL`            | —                               | `https://api.openai.com`    | API base URL                           |
+| `STRANDS_SKILLS_DIR`      | `strands.agent.skills.dir`      | `skills`                    | Skills directory                       |
+| `STRANDS_SESSION_DIR`     | `strands.agent.session.dir`     | `.sessions`                 | Session storage directory              |
+| `STRANDS_LLM_LOG_ENABLED` | `strands.agent.llm-log.enabled` | `true`                      | Enable LLM call logging                |
+| `STRANDS_LLM_LOG_PATH`    | `strands.agent.llm-log.path`    | `logs/llm-calls.log`        | LLM log file path                      |
+| `STRANDS_AGENT_TOOLS`     | `strands.agent.tools`           | —                           | Comma-separated extra tool class names |
+| `STRANDS_MCP_URL`         | `strands.agent.mcp.url`         | `http://localhost:8888/mcp` | Default MCP server URL                 |
+| `VAULT_ADDR`              | --                              | `--`                        | HashiCorp Vault adress                 |
+| `VAULT_TOKEN`             | --                              | `--`                        | HashiCorp Vault token                  |
+
 
 ---
 

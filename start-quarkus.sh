@@ -27,20 +27,15 @@ Modes:
 
 EOF
 }
-
-curl -X POST http://localhost:8082/agentDemo \
-     -H "Content-Type: application/json" \
-     -d '{"message": "Hello Agent", "sessionId": "12345"}'
-
 cmd_dev() {
     echo ">>> Quarkus Dev Mode starten (Hot Reload)"
     echo "    Skills:      $STRANDS_SKILLS_DIR"
     echo "    Sessions:    $STRANDS_SESSION_DIR"
     echo "    LLM-Log:     $STRANDS_LLM_LOG_ENABLED"
-    echo "    Model:       ${LLM_CHAT_MODEL:-gpt-4o-mini}"
+    echo "    Model:       ${OPENAI_MODEL:-gpt-4o-mini}"
     echo ""
     cd "$SCRIPT_DIR"
-    mvn io.quarkus.platform:quarkus-maven-plugin:3.17.4:dev \
+    mvn io.quarkus.platform:quarkus-maven-plugin:3.27.3.1:dev \
         -pl strands-agents-quarkus -am
 }
 

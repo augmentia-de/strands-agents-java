@@ -65,6 +65,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+/**
+ * The core Agent class that orchestrates interactions between a LLM, tools, and plugins.
+ * <p>
+ * The Agent handles the main loop of LLM communication, including tool call processing,
+ * session management, conversation memory management, and plugin execution (guardrails, HITL).
+ * It supports both simple synchronous execution and more complex scenarios with resilience
+ * and state management.
+ * </p>
+ */
 public class Agent {
 
     private static final Logger log = LoggerFactory.getLogger(Agent.class);
@@ -107,31 +116,81 @@ public class Agent {
     private HookRegistry hookRegistry;
     private final ChatMemoryStore chatMemoryStore;
 
+    /**
+     * Constructs an Agent with only a chat model and default components.
+     *
+     * @param model the chat model to use for orchestration
+     */
     public Agent(ChatModel model) {
         this(model, new ToolRegistry(), new ToolExecutor(), null, null);
     }
 
+    /**
+     * Constructs an Agent with model, tool registry, and tool executor.
+     *
+     * @param model        the chat model to use
+     * @param toolRegistry the registry of available tools
+     * @param toolExecutor the executor for running tool calls
+     */
     public Agent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor) {
         this(model, toolRegistry, toolExecutor, null, null);
     }
 
+    /**
+     * Constructs an Agent with advanced conversation management.
+     *
+     * @param model               the chat model to use
+     * @param toolRegistry        the registry of available tools
+     * @param toolExecutor        the executor for running tool calls
+     * @param conversationManager manager for chat history and context window
+     */
     public Agent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                  ConversationManager conversationManager) {
         this(model, toolRegistry, toolExecutor, conversationManager, null);
     }
 
+    /**
+     * Constructs an Agent with session management.
+     *
+     * @param model               the chat model to use
+     * @param toolRegistry        the registry of available tools
+     * @param toolExecutor        the executor for running tool calls
+     * @param conversationManager manager for chat history and context window
+     * @param sessionManager      manager for persistent sessions
+     */
     public Agent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                  ConversationManager conversationManager, SessionManager sessionManager) {
         this(model, toolRegistry, toolExecutor, conversationManager, sessionManager,
             ResilienceConfig.DEFAULT);
     }
 
+    /**
+     * Constructs an Agent with resilience configuration.
+     *
+     * @param model               the chat model to use
+     * @param toolRegistry        the registry of available tools
+     * @param toolExecutor        the executor for running tool calls
+     * @param conversationManager manager for chat history and context window
+     * @param sessionManager      manager for persistent sessions
+     * @param resilienceConfig    configuration for retries and circuit breakers
+     */
     public Agent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                  ConversationManager conversationManager, SessionManager sessionManager,
                  ResilienceConfig resilienceConfig) {
         this(model, toolRegistry, toolExecutor, conversationManager, sessionManager, null, resilienceConfig);
     }
 
+    /**
+     * Full constructor for the Agent class.
+     *
+     * @param model               the chat model to use
+     * @param toolRegistry        the registry of available tools
+     * @param toolExecutor        the executor for running tool calls
+     * @param conversationManager manager for chat history and context window
+     * @param sessionManager      manager for persistent sessions
+     * @param chatMemoryStore     custom storage for chat memory
+     * @param resilienceConfig    configuration for retries and circuit breakers
+     */
     public Agent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                  ConversationManager conversationManager, SessionManager sessionManager,
                  ChatMemoryStore chatMemoryStore, ResilienceConfig resilienceConfig) {
@@ -265,21 +324,53 @@ public class Agent {
         pluginHooks.add(hook);
     }
 
+    /**
+     * Executes a prompt in the current default session.
+     *
+     * @param prompt the user input text
+     * @return the result of the agent execution
+     */
     public AgentResult execute(String prompt) {
         log.debug("execute() — prompt={}", truncate(prompt));
         return execute(prompt, Map.of());
     }
 
+    /**
+     * Executes a prompt with additional context variables.
+     *
+     * @param prompt           the user input text
+     * @param contextVariables map of variables for the execution context
+     * @return the result of the agent execution
+     */
     public AgentResult execute(String prompt, Map<String, Object> contextVariables) {
         log.debug("execute(prompt={}, contextVariables={})", truncate(prompt), contextVariables);
         return executeWithSession(sessionId, prompt, contextVariables, false);
     }
 
+    /**
+     * Executes a prompt within a specific session.
+     *
+     * @param sessionId unique identifier for the session
+     * @param prompt    the user input text
+     * @return the result of the agent execution
+     */
     public AgentResult execute(String sessionId, String prompt) {
         log.debug("execute(sessionId={}, prompt={})", sessionId, truncate(prompt));
         return execute(sessionId, prompt, Map.of());
     }
 
+    /**
+     * Full execution method with session ID, prompt, and context variables.
+     * <p>
+     * This is the main entry point for agent orchestration. It handles session loading,
+     * conversation history management, and the core reasoning loop.
+     * </p>
+     *
+     * @param sessionId        unique identifier for the session
+     * @param prompt           the user input text
+     * @param contextVariables map of variables for the execution context
+     * @return the result of the agent execution
+     */
     public AgentResult execute(String sessionId, String prompt, Map<String, Object> contextVariables) {
         log.debug("execute(sessionId={}, prompt={}, contextVariables={})", sessionId, truncate(prompt), contextVariables);
         return executeWithSession(sessionId, prompt, contextVariables, true);

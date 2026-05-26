@@ -8,18 +8,39 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.FinishReason;
 import dev.langchain4j.model.output.TokenUsage;
 
+/**
+ * A mock implementation of {@link ChatModel} for testing purposes.
+ * <p>
+ * This model simply echoes back the user's last message using a configurable template,
+ * without requiring an actual LLM backend.
+ * </p>
+ */
 public class MockChatModel implements ChatModel {
 
     private final String responseTemplate;
 
+    /**
+     * Constructs a default MockChatModel that prefixes responses with "Mock antwortet: ".
+     */
     public MockChatModel() {
         this("Mock antwortet: %s");
     }
 
+    /**
+     * Constructs a MockChatModel with a custom response template.
+     *
+     * @param responseTemplate a format string (e.g., "Hello %s") used to generate responses
+     */
     public MockChatModel(String responseTemplate) {
         this.responseTemplate = responseTemplate;
     }
 
+    /**
+     * Executes a chat request by echoing the last user message.
+     *
+     * @param request the chat request
+     * @return a chat response containing the formatted template
+     */
     @Override
     public ChatResponse chat(ChatRequest request) {
         var messages = request.messages();

@@ -11,20 +11,50 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 
+/**
+ * A bridge that adapts a {@link StreamingChatModel} to the {@link ChatModel} interface.
+ * <p>
+ * This class allows using streaming-capable models in places where a synchronous chat model
+ * is expected. It handles the asynchronous nature of streaming by waiting for the complete
+ * response while optionally forwarding incremental tokens to a consumer.
+ * </p>
+ */
 public class StreamingModelBridge implements ChatModel {
 
     private final StreamingChatModel streamingModel;
     private final Consumer<String> tokenConsumer;
 
+    /**
+     * Constructs a new StreamingModelBridge without a token consumer.
+     *
+     * @param streamingModel the underlying streaming chat model to use
+     */
     public StreamingModelBridge(StreamingChatModel streamingModel) {
         this(streamingModel, null);
     }
 
+    /**
+     * Constructs a new StreamingModelBridge with a consumer for incremental tokens.
+     *
+     * @param streamingModel the underlying streaming chat model to use
+     * @param tokenConsumer  a consumer that will receive each token as it is generated
+     */
     public StreamingModelBridge(StreamingChatModel streamingModel, Consumer<String> tokenConsumer) {
         this.streamingModel = streamingModel;
         this.tokenConsumer = tokenConsumer;
     }
 
+    /**
+     * Executes a chat request by bridging the streaming response to a synchronous result.
+     * <p>
+     * This method blocks until the full response is received from the streaming model
+     * or a timeout occurs (default 120 seconds).
+     * </p>
+     *
+     * @param request the chat request containing messages and configuration
+     * @return the complete chat response
+     * @throws RuntimeException if the request fails, times out, or is interrupted
+     */
     @Override
     public ChatResponse chat(ChatRequest request) {
         var future = new CompletableFuture<ChatResponse>();

@@ -5,6 +5,7 @@ import de.augmentia.strandsagents.core.agent.MockChatModel;
 import de.augmentia.strandsagents.core.agent.MockStreamingChatModel;
 import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.agent.StreamingAgent;
+import de.augmentia.strandsagents.core.config.LlmConfig;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.logging.FileLlmLogger;
 import de.augmentia.strandsagents.core.logging.LoggingChatModel;
@@ -15,6 +16,7 @@ import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailPlugin;
 import de.augmentia.strandsagents.core.plugin.hitl.HITLAuthority;
 import de.augmentia.strandsagents.core.plugin.hitl.HITLPlugin;
 import de.augmentia.strandsagents.core.plugin.hitl.HITLProvider;
+import de.augmentia.strandsagents.core.tools.ListToolsTool;
 import de.augmentia.strandsagents.core.tools.McpToolMethod;
 import de.augmentia.strandsagents.skills.*;
 import dev.langchain4j.mcp.client.DefaultMcpClient;
@@ -32,6 +34,7 @@ import dev.langchain4j.model.chat.StreamingChatModel;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,6 +59,9 @@ import de.augmentia.strandsagents.sessions.SessionManager;
 public class AgentService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentService.class);
+
+    @Inject
+    SecretService secretService;
 
     private ToolRegistry fullRegistry;
     private List<Skill> allSkills;
@@ -471,6 +477,11 @@ public class AgentService {
         return model;
     }
 
+    public dev.langchain4j.model.chat.StreamingChatModel getStreamingModel() {
+        ensureInitialized();
+        return findStreamingModel();
+    }
+
     public List<ToolInfo> listTools() {
         ensureInitialized();
         return fullRegistry.getToolNames().stream()
@@ -594,21 +605,23 @@ public class AgentService {
 
     private ChatModel createModel() {
         try {
-            return ModelFactory.createOpenAiFromEnv();
+            var apiKey = secretService.getOpenAiApiKey();
+            if (apiKey != null && !apiKey.isBlank()) {
+                return ModelFactory.createOpenAiFromEnv(apiKey);
+            }
         } catch (Exception e) {
-            var mock = new MockChatModel();
-            log.warn("OPENAI_API_KEY nicht gesetzt – nutze MockChatModel");
-            return mock;
+            log.debug("Model creation via secret service failed: {}", e.getMessage());
         }
+        var mock = new MockChatModel();
+        log.warn("OPENAI_API_KEY nicht gesetzt – nutze MockChatModel");
+        return mock;
     }
 
     private dev.langchain4j.model.chat.StreamingChatModel findStreamingModel() {
         try {
-            var apiKey = System.getenv("OPENAI_API_KEY");
+            var apiKey = secretService.getOpenAiApiKey();
             if (apiKey != null && !apiKey.isBlank()) {
-                return dev.langchain4j.model.openai.OpenAiStreamingChatModel.builder()
-                    .apiKey(apiKey)
-                    .build();
+                return ModelFactory.createOpenAiStreamingFromEnv(apiKey);
             }
         } catch (Exception e) {
         }
@@ -641,7 +654,9 @@ public class AgentService {
                 if (!cn.isEmpty()) builder.with(cn);
             }
         }
-        return builder.build();
+        var registry = builder.build();
+        registry.register(new ListToolsTool(registry));
+        return registry;
     }
 
     private List<Skill> loadSkills() {

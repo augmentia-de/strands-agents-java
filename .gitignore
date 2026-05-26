@@ -17,3 +17,9 @@ set_keys.sh
 /logs/
 /data/
 /strands-agents-quarkus/.sessions/
+/springapp/
+/docs2/
+/docs/
+/docker/hashicorp/vault-init.json
+/agent-agent-test/test-output/
+/agent-agent-test/tests/

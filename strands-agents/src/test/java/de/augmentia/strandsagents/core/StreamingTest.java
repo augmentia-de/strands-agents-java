@@ -12,6 +12,8 @@ import de.augmentia.strandsagents.core.tools.CalculatorTool;
 import java.util.ArrayList;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Flow;
+
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import org.junit.jupiter.api.Test;
 
 class StreamingTest {

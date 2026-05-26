@@ -21,13 +21,14 @@
         <module>strands-agents-quarkus</module>
         <module>strands-agents-examples</module>
         <module>strands-agenttest</module>
+        <module>strands-agents-mcp-server</module>
     </modules>
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <langchain4j.version>1.12.2</langchain4j.version>
-        <langchain4j-mcp.version>1.12.2-beta22</langchain4j-mcp.version>
+        <langchain4j.version>1.15.0</langchain4j.version>
+        <langchain4j-mcp.version>1.15.0-beta25</langchain4j-mcp.version>
         <jackson.version>2.18.7</jackson.version>
         <junit.version>5.13.4</junit.version>
         <assertj.version>3.27.7</assertj.version>
@@ -81,6 +82,11 @@
             <dependency>
                 <groupId>de.augmentia.strandsagents</groupId>
                 <artifactId>strands-agents-vault</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>de.augmentia.strandsagents</groupId>
+                <artifactId>strands-agents-mcp-server</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

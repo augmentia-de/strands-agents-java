@@ -3,14 +3,20 @@ package de.augmentia.strandsagents.core;
 import de.augmentia.strandsagents.core.model.tool.ToolExecutionResult;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.*;
 
 public class ToolExecutor {
 
     private static final ExecutorService VIRTUAL_EXECUTOR =
         Executors.newVirtualThreadPerTaskExecutor();
+    private static final Random RANDOM = new Random();
 
     private final long timeoutSeconds;
+    private final boolean randomFailureEnabled;
+    private final double timeoutProbability;
+    private final double exceptionProbability;
+    private final double invalidJsonProbability;
 
     public ToolExecutor() {
         this(30);
@@ -18,6 +24,23 @@ public class ToolExecutor {
 
     public ToolExecutor(long timeoutSeconds) {
         this.timeoutSeconds = timeoutSeconds;
+        this.randomFailureEnabled = Boolean.parseBoolean(System.getenv("RANDOM_TOOL_ERRORS_ENABLED"));
+
+        this.timeoutProbability = parseDoubleEnv("RANDOM_TOOL_TIMEOUT_PROBABILITY", 0.1);
+        this.exceptionProbability = parseDoubleEnv("RANDOM_TOOL_EXCEPTION_PROBABILITY", 0.1);
+        this.invalidJsonProbability = parseDoubleEnv("RANDOM_TOOL_INVALID_JSON_PROBABILITY", 0.1);
+    }
+
+    private double parseDoubleEnv(String envVarName, double defaultValue) {
+        String envValue = System.getenv(envVarName);
+        if (envValue != null && !envValue.isBlank()) {
+            try {
+                return Double.parseDouble(envValue);
+            } catch (NumberFormatException e) {
+                System.err.println("Warning: Invalid number format for environment variable " + envVarName + ". Using default value " + defaultValue);
+            }
+        }
+        return defaultValue;
     }
 
     public List<ToolExecutionResult> executeAll(
@@ -45,6 +68,25 @@ public class ToolExecutor {
 
     ToolExecutionResult executeSingle(ToolExecutionRequest request, ToolRegistry registry)
             throws Exception {
+
+        if (randomFailureEnabled) {
+            double rand = RANDOM.nextDouble(); // 0.0 to 1.0
+
+            if (rand < timeoutProbability) {
+                // Simulate timeout
+                System.out.println("Simulating timeout for tool: " + request.name());
+                Thread.sleep((timeoutSeconds + 1) * 1000); // Sleep longer than timeout
+                throw new RuntimeException("Simulated timeout for tool: " + request.name()); // This line will likely not be reached if future.get() catches it
+            } else if (rand < timeoutProbability + exceptionProbability) {
+                // Simulate exception
+                System.out.println("Simulating exception for tool: " + request.name());
+                throw new RuntimeException("Simulated random error during tool execution: " + request.name());
+            } else if (rand < timeoutProbability + exceptionProbability + invalidJsonProbability) {
+                // Simulate invalid JSON result
+                System.out.println("Simulating invalid JSON result for tool: " + request.name());
+                return new ToolExecutionResult(request.id(), request.name(), "{invalid json", false);
+            }
+        }
 
         var toolMethod = registry.get(request.name());
 

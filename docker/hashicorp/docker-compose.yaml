@@ -1,0 +1,22 @@
+services:
+  vault:
+    image: hashicorp/vault:1.18
+    container_name: strands-vault
+    entrypoint: ["vault"]
+    command: ["server", "-config=/vault/config/vault.json"]
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_ADDR: 'http://127.0.0.1:8200'
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - ./config:/vault/config
+      - ./file:/vault/file
+      - ./logs:/vault/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

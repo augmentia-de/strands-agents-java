@@ -53,7 +53,7 @@ public class ChatCLI {
             }
             model = ModelFactory.createOpenAiFromEnv();
             var baseUrl = System.getenv("OPENAI_BASE_URL");
-            var modelName = System.getenv("LLM_CHAT_MODEL");
+            var modelName = System.getenv("OPENAI_MODEL");
             System.out.println("=== Strands Chat (OpenAI) ===");
             if (baseUrl != null) System.out.println("  Base URL: " + baseUrl);
             if (modelName != null) System.out.println("  Model: " + modelName);

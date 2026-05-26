@@ -11,7 +11,7 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
-      - LLM_CHAT_MODEL=${LLM_CHAT_MODEL:-gpt-4o}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
       - QUARKUS_HTTP_PORT=8084
       - STRANDS_AGENT_TOOLS=de.augmentia.strandsagents.core.tools.CalculatorTool
       - STRANDS_SKILLS_DIR=/app/skills

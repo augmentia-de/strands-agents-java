@@ -14,7 +14,7 @@ public record LlmConfig(
         return new LlmConfig(
             System.getenv("OPENAI_API_KEY"),
             System.getenv("OPENAI_BASE_URL"),
-            System.getenv("LLM_CHAT_MODEL"),
+            System.getenv("OPENAI_MODEL"),
             parseDoubleOrNull(System.getenv("LLM_TEMPERATURE")),
             parseIntOrNull(System.getenv("LLM_MAX_RETRIES"))
         );
@@ -36,7 +36,7 @@ public record LlmConfig(
         return new LlmConfig(
             secrets.get("api_key"),
             secrets.getOrDefault("base_url", System.getenv("OPENAI_BASE_URL")),
-            secrets.getOrDefault("model", System.getenv("LLM_CHAT_MODEL")),
+            secrets.getOrDefault("model", System.getenv("OPENAI_MODEL")),
             parseDoubleOrNull(secrets.get("temperature")),
             parseIntOrNull(secrets.get("max_retries"))
         );
