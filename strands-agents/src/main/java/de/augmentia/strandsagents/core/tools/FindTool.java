@@ -3,6 +3,7 @@ package de.augmentia.strandsagents.core.tools;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -12,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 public class FindTool implements AgentTool<FindTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(FindTool.class);
+    private static final int MAX_OUTPUT_BYTES = 50_000;
 
     private static final Set<String> SKIP_DIRS = Set.of(
         ".git", "node_modules", "target", ".venv", ".idea",
@@ -84,21 +86,48 @@ public class FindTool implements AgentTool<FindTool.Params> {
         var matcher = FileSystems.getDefault().getPathMatcher("glob:" + params.pattern());
         var maxResults = params.maxResults() != null ? params.maxResults() : 100;
         var results = new ArrayList<String>();
+        var totalBytes = new int[1];
 
         try {
-            try (var stream = Files.walk(searchPath)) {
-                stream
-                    .filter(Files::isRegularFile)
-                    .filter(p -> !isSkipped(p, searchPath))
-                    .filter(p -> {
-                        var relPath = searchPath.relativize(p);
-                        return matcher.matches(relPath) || matcher.matches(p.getFileName());
-                    })
-                    .forEach(p -> {
-                        if (abortFlag.get() || results.size() >= maxResults) return;
-                        results.add(searchPath.relativize(p).toString());
-                    });
-            }
+            Files.walkFileTree(searchPath, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                    if (abortFlag.get() || results.size() >= maxResults || totalBytes[0] >= MAX_OUTPUT_BYTES) {
+                        return FileVisitResult.TERMINATE;
+                    }
+                    if (dir.equals(searchPath)) return FileVisitResult.CONTINUE;
+                    var fileName = dir.getFileName().toString();
+                    if (SKIP_DIRS.contains(fileName) || fileName.startsWith(".")) {
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    if (abortFlag.get() || results.size() >= maxResults || totalBytes[0] >= MAX_OUTPUT_BYTES) {
+                        return FileVisitResult.TERMINATE;
+                    }
+                    var fileName = file.getFileName().toString();
+                    if (SKIP_FILES.contains(fileName)) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                    var relPath = searchPath.relativize(file);
+                    if (matcher.matches(relPath) || matcher.matches(file.getFileName())) {
+                        results.add(relPath.toString());
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException exc) {
+                    if (exc instanceof AccessDeniedException) {
+                        log.warn("Skipping unreadable: {}", file);
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
         } catch (IOException e) {
             throw new RuntimeException("Search failed: " + e.getMessage());
         }
@@ -109,6 +138,8 @@ public class FindTool implements AgentTool<FindTool.Params> {
 
         if (results.size() >= maxResults) {
             output += "\n\n[Results truncated at " + maxResults + " matches.]";
+        } else if (totalBytes[0] >= MAX_OUTPUT_BYTES) {
+            output += "\n\n[Output truncated at " + MAX_OUTPUT_BYTES + " bytes.]";
         }
 
         log.debug("Tool: find DONE results={}", results.size());
@@ -117,23 +148,13 @@ public class FindTool implements AgentTool<FindTool.Params> {
             new FindDetails(results.size(), params.pattern()));
     }
 
-    private boolean isSkipped(Path path, Path root) {
-        var fileName = path.getFileName().toString();
-        if (SKIP_FILES.contains(fileName)) {
-            return true;
-        }
-        for (var parent : path) {
-            if (SKIP_DIRS.contains(parent.toString())) {
-                return true;
-            }
-        }
-        var relative = root.relativize(path).toString().replace(java.io.File.separatorChar, '/');
-        return relative.startsWith(".");
-    }
-
     private Path resolve(String path) {
         var p = Paths.get(path);
-        return p.isAbsolute() ? p : cwd.resolve(p).normalize();
+        var resolved = p.isAbsolute() ? p : cwd.resolve(p).normalize();
+        if (!resolved.startsWith(cwd)) {
+            throw new RuntimeException("Access denied: path outside working directory: " + path);
+        }
+        return resolved;
     }
 
     public record Params(String pattern, String path, Integer maxResults) {}

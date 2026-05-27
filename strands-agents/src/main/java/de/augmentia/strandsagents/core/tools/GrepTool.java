@@ -3,16 +3,17 @@ package de.augmentia.strandsagents.core.tools;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.regex.*;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class GrepTool implements AgentTool<GrepTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(GrepTool.class);
+    private static final int MAX_LINE_CHARS = 500;
 
     private static final Set<String> SKIP_DIRS = Set.of(
         ".git", "node_modules", "target", ".venv", ".idea",
@@ -109,36 +110,61 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
         var results = new ArrayList<String>();
 
         try {
-            try (var stream = Files.walk(searchPath)) {
-                var files = stream
-                    .filter(Files::isRegularFile)
-                    .filter(p -> !isSkipped(p, searchPath))
-                    .filter(p -> !isBinary(p))
-                    .filter(p -> includeMatcher == null
-                        || includeMatcher.matches(p.getFileName())
-                        || includeMatcher.matches(searchPath.relativize(p)))
-                    .toList();
-
-                for (var file : files) {
+            Files.walkFileTree(searchPath, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
                     if (abortFlag.get() || results.size() >= maxResults) {
-                        break;
+                        return FileVisitResult.TERMINATE;
                     }
-                    try {
-                        var lines = Files.readAllLines(file);
-                        for (int i = 0; i < lines.size(); i++) {
-                            if (results.size() >= maxResults) {
-                                break;
-                            }
-                            var line = lines.get(i);
+                    if (dir.equals(searchPath)) return FileVisitResult.CONTINUE;
+                    var fileName = dir.getFileName().toString();
+                    if (SKIP_DIRS.contains(fileName) || fileName.startsWith(".")) {
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    if (abortFlag.get() || results.size() >= maxResults) {
+                        return FileVisitResult.TERMINATE;
+                    }
+                    var fileName = file.getFileName().toString();
+                    if (isBinary(file)) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                    if (includeMatcher != null
+                        && !includeMatcher.matches(file.getFileName())
+                        && !includeMatcher.matches(searchPath.relativize(file))) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                    try (var lineStream = Files.lines(file)) {
+                        var lineNum = new int[1];
+                        lineStream.forEach(line -> {
+                            if (results.size() >= maxResults) return;
+                            lineNum[0]++;
                             if (pattern.matcher(line).find()) {
+                                var truncated = line.length() > MAX_LINE_CHARS
+                                    ? line.substring(0, MAX_LINE_CHARS) + "..."
+                                    : line;
                                 var relPath = searchPath.relativize(file);
-                                results.add(relPath + ":" + (i + 1) + ":" + line);
+                                results.add(relPath + ":" + lineNum[0] + ":" + truncated);
                             }
-                        }
+                        });
                     } catch (IOException ignored) {
                     }
+                    return FileVisitResult.CONTINUE;
                 }
-            }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException exc) {
+                    if (exc instanceof AccessDeniedException) {
+                        log.warn("Skipping unreadable: {}", file);
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
         } catch (IOException e) {
             throw new RuntimeException("Search failed: " + e.getMessage());
         }
@@ -157,16 +183,6 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
             new GrepDetails(results.size(), params.pattern()));
     }
 
-    private boolean isSkipped(Path path, Path root) {
-        for (var parent : path) {
-            if (SKIP_DIRS.contains(parent.toString())) {
-                return true;
-            }
-        }
-        var relative = root.relativize(path).toString().replace(java.io.File.separatorChar, '/');
-        return relative.startsWith(".");
-    }
-
     private boolean isBinary(Path path) {
         var name = path.getFileName().toString().toLowerCase();
         for (var ext : BINARY_EXTS) {
@@ -179,7 +195,11 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
 
     private Path resolve(String path) {
         var p = Paths.get(path);
-        return p.isAbsolute() ? p : cwd.resolve(p).normalize();
+        var resolved = p.isAbsolute() ? p : cwd.resolve(p).normalize();
+        if (!resolved.startsWith(cwd)) {
+            throw new RuntimeException("Access denied: path outside working directory: " + path);
+        }
+        return resolved;
     }
 
     public record Params(String pattern, String include, String path, Boolean caseSensitive, Integer maxResults) {}

@@ -64,6 +64,10 @@ public class McpEditTool {
 
     private Path resolve(String path) {
         var p = Paths.get(path);
-        return p.isAbsolute() ? p : cwd.resolve(p).normalize();
+        var resolved = p.isAbsolute() ? p : cwd.resolve(p).normalize();
+        if (!resolved.startsWith(cwd)) {
+            throw new RuntimeException("Access denied: path outside working directory: " + path);
+        }
+        return resolved;
     }
 }

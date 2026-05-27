@@ -4,6 +4,7 @@ import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import java.io.IOException;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 public class McpGrepTool {
     private static final Logger log = LoggerFactory.getLogger(McpGrepTool.class);
+    private static final int MAX_LINE_CHARS = 500;
     private static final Set<String> SKIP_DIRS = Set.of(
         ".git", "node_modules", "target", ".venv", ".idea",
         "__pycache__", ".mvn", ".gradle", "build", "dist",
@@ -52,27 +54,59 @@ public class McpGrepTool {
         var limit = maxResults != null ? maxResults : 50;
         var results = new ArrayList<String>();
 
-        try (var stream = Files.walk(searchPath)) {
-            var files = stream
-                .filter(Files::isRegularFile)
-                .filter(p -> !isSkipped(p, searchPath))
-                .filter(p -> !isBinary(p))
-                .filter(p -> includeMatcher == null
-                    || includeMatcher.matches(p.getFileName())
-                    || includeMatcher.matches(searchPath.relativize(p)))
-                .toList();
-
-            for (var file : files) {
-                if (results.size() >= limit) break;
-                try {
-                    var lines = Files.readAllLines(file);
-                    for (int i = 0; i < lines.size() && results.size() < limit; i++) {
-                        if (compiled.matcher(lines.get(i)).find()) {
-                            results.add(searchPath.relativize(file) + ":" + (i + 1) + ":" + lines.get(i));
-                        }
+        try {
+            Files.walkFileTree(searchPath, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                    if (results.size() >= limit) {
+                        return FileVisitResult.TERMINATE;
                     }
-                } catch (IOException ignored) {}
-            }
+                    if (dir.equals(searchPath)) return FileVisitResult.CONTINUE;
+                    var fileName = dir.getFileName().toString();
+                    if (SKIP_DIRS.contains(fileName) || fileName.startsWith(".")) {
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    if (results.size() >= limit) {
+                        return FileVisitResult.TERMINATE;
+                    }
+                    if (isBinary(file)) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                    if (includeMatcher != null
+                        && !includeMatcher.matches(file.getFileName())
+                        && !includeMatcher.matches(searchPath.relativize(file))) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                    try (var lineStream = Files.lines(file)) {
+                        var lineNum = new int[1];
+                        lineStream.forEach(line -> {
+                            if (results.size() >= limit) return;
+                            lineNum[0]++;
+                            if (compiled.matcher(line).find()) {
+                                var truncated = line.length() > MAX_LINE_CHARS
+                                    ? line.substring(0, MAX_LINE_CHARS) + "..."
+                                    : line;
+                                results.add(searchPath.relativize(file) + ":" + lineNum[0] + ":" + truncated);
+                            }
+                        });
+                    } catch (IOException ignored) {}
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException exc) {
+                    if (exc instanceof AccessDeniedException) {
+                        log.warn("Skipping unreadable: {}", file);
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
         } catch (IOException e) {
             throw new RuntimeException("Search failed: " + e.getMessage());
         }
@@ -87,13 +121,6 @@ public class McpGrepTool {
         return output;
     }
 
-    private boolean isSkipped(Path path, Path root) {
-        for (var p : path) {
-            if (SKIP_DIRS.contains(p.toString())) return true;
-        }
-        return root.relativize(path).toString().replace(java.io.File.separatorChar, '/').startsWith(".");
-    }
-
     private boolean isBinary(Path path) {
         var name = path.getFileName().toString().toLowerCase();
         return BINARY_EXTS.stream().anyMatch(name::endsWith);
@@ -101,6 +128,10 @@ public class McpGrepTool {
 
     private Path resolve(String path) {
         var p = Paths.get(path);
-        return p.isAbsolute() ? p : cwd.resolve(p).normalize();
+        var resolved = p.isAbsolute() ? p : cwd.resolve(p).normalize();
+        if (!resolved.startsWith(cwd)) {
+            throw new RuntimeException("Access denied: path outside working directory: " + path);
+        }
+        return resolved;
     }
 }

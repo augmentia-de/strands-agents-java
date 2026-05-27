@@ -4,6 +4,7 @@ import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import java.io.IOException;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 public class McpFindTool {
     private static final Logger log = LoggerFactory.getLogger(McpFindTool.class);
+    private static final int MAX_OUTPUT_BYTES = 50_000;
     private static final Set<String> SKIP_DIRS = Set.of(
         ".git", "node_modules", "target", ".venv", ".idea",
         "__pycache__", ".mvn", ".gradle", "build", "dist",
@@ -37,19 +39,48 @@ public class McpFindTool {
         var matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);
         var limit = maxResults != null ? maxResults : 100;
         var results = new ArrayList<String>();
+        var totalBytes = new int[1];
 
-        try (var stream = Files.walk(searchPath)) {
-            stream
-                .filter(Files::isRegularFile)
-                .filter(p -> !isSkipped(p, searchPath))
-                .filter(p -> {
-                    var rel = searchPath.relativize(p);
-                    return matcher.matches(rel) || matcher.matches(p.getFileName());
-                })
-                .forEach(p -> {
-                    if (results.size() >= limit) return;
-                    results.add(searchPath.relativize(p).toString());
-                });
+        try {
+            Files.walkFileTree(searchPath, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                    if (results.size() >= limit || totalBytes[0] >= MAX_OUTPUT_BYTES) {
+                        return FileVisitResult.TERMINATE;
+                    }
+                    if (dir.equals(searchPath)) return FileVisitResult.CONTINUE;
+                    var fileName = dir.getFileName().toString();
+                    if (SKIP_DIRS.contains(fileName) || fileName.startsWith(".")) {
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    if (results.size() >= limit || totalBytes[0] >= MAX_OUTPUT_BYTES) {
+                        return FileVisitResult.TERMINATE;
+                    }
+                    var fileName = file.getFileName().toString();
+                    if (SKIP_FILES.contains(fileName)) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                    var relPath = searchPath.relativize(file);
+                    if (matcher.matches(relPath) || matcher.matches(file.getFileName())) {
+                        results.add(relPath.toString());
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException exc) {
+                    if (exc instanceof AccessDeniedException) {
+                        log.warn("Skipping unreadable: {}", file);
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
         } catch (IOException e) {
             throw new RuntimeException("Search failed: " + e.getMessage());
         }
@@ -59,22 +90,19 @@ public class McpFindTool {
             : results.stream().sorted().collect(Collectors.joining("\n"));
         if (results.size() >= limit) {
             output += "\n\n[Results truncated at " + limit + " matches.]";
+        } else if (totalBytes[0] >= MAX_OUTPUT_BYTES) {
+            output += "\n\n[Output truncated at " + MAX_OUTPUT_BYTES + " bytes.]";
         }
         log.debug("find DONE results={}", results.size());
         return output;
     }
 
-    private boolean isSkipped(Path path, Path root) {
-        var fileName = path.getFileName().toString();
-        if (SKIP_FILES.contains(fileName)) return true;
-        for (var p : path) {
-            if (SKIP_DIRS.contains(p.toString())) return true;
-        }
-        return root.relativize(path).toString().replace(java.io.File.separatorChar, '/').startsWith(".");
-    }
-
     private Path resolve(String path) {
         var p = Paths.get(path);
-        return p.isAbsolute() ? p : cwd.resolve(p).normalize();
+        var resolved = p.isAbsolute() ? p : cwd.resolve(p).normalize();
+        if (!resolved.startsWith(cwd)) {
+            throw new RuntimeException("Access denied: path outside working directory: " + path);
+        }
+        return resolved;
     }
 }
