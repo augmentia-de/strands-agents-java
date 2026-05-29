@@ -2,6 +2,7 @@ package de.augmentia.strandsagents.core;
 
 import de.augmentia.strandsagents.core.model.tool.ToolExecutionResult;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.*;
@@ -47,18 +48,20 @@ public class ToolExecutor {
             List<ToolExecutionRequest> requests,
             ToolRegistry registry) throws Exception {
 
-        try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
-            List<StructuredTaskScope.Subtask<ToolExecutionResult>> subtasks = requests.stream()
-                .map(req -> scope.fork(() -> executeSingle(req, registry)))
-                .toList();
+        var futures = requests.stream()
+            .map(req -> VIRTUAL_EXECUTOR.submit(() -> executeSingle(req, registry)))
+            .toList();
 
-            scope.join();
-            scope.throwIfFailed();
-
-            return subtasks.stream()
-                .map(StructuredTaskScope.Subtask::get)
-                .toList();
+        var results = new ArrayList<ToolExecutionResult>();
+        for (var future : futures) {
+            try {
+                results.add(future.get(timeoutSeconds, TimeUnit.SECONDS));
+            } catch (TimeoutException e) {
+                future.cancel(true);
+                throw new RuntimeException("Tool execution timed out");
+            }
         }
+        return results;
     }
 
     public ToolExecutionResult execute(ToolExecutionRequest request, ToolRegistry registry)

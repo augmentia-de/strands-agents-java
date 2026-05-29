@@ -16,10 +16,9 @@ import java.net.URI;
 import java.nio.file.*;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-public class Main {
+public class Main_old {
 
     private static final Path OUTPUT_DIR = Path.of("test-output");
     private static final Path RUN_LOG = OUTPUT_DIR.resolve("run.log");
@@ -232,7 +231,7 @@ OUTPUT ONLY THE FIXED JAVA CODE. No markdown, no backticks, no explanation.
         Files.createDirectories(OUTPUT_DIR);
         logWriter = new PrintWriter(new FileWriter(RUN_LOG.toFile(), true), true);
         eventWriter = new PrintWriter(new FileWriter(EVENTS_LOG.toFile(), true), true);
-        Runtime.getRuntime().addShutdownHook(new Thread(Main::closeLogs));
+        Runtime.getRuntime().addShutdownHook(new Thread(Main_old::closeLogs));
 
         log("=== Strands Agent Test Generator gestartet ===");
 

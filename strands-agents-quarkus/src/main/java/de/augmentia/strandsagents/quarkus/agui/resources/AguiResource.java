@@ -28,55 +28,60 @@ public class AguiResource {
     @Path("/ag-ui")
     @Produces(MediaType.SERVER_SENT_EVENTS)
     public Response agUiChat(RunAgentInput input) {
-        return handleAgui(input);
+        return handleAgui(agentService, input);
     }
 
     @POST
     @Path("/agentic_chat/agui")
     @Produces(MediaType.SERVER_SENT_EVENTS)
     public Response agenticChat(RunAgentInput input) {
-        return handleAgui(input);
+        return handleAgui(agentService, input);
     }
 
     @POST
     @Path("/shared_state/agui")
     @Produces(MediaType.SERVER_SENT_EVENTS)
     public Response sharedState(RunAgentInput input) {
-        return handleAgui(input);
+        return handleAgui(agentService, input);
     }
 
     @POST
     @Path("/tool_based_generative_ui/agui")
     @Produces(MediaType.SERVER_SENT_EVENTS)
     public Response toolBasedGenerativeUi(RunAgentInput input) {
-        return handleAgui(input);
+        return handleAgui(agentService, input);
     }
 
     @POST
     @Path("/human_in_the_loop/agui")
     @Produces(MediaType.SERVER_SENT_EVENTS)
     public Response humanInTheLoop(RunAgentInput input) {
-        return handleAgui(input);
+        return handleAgui(agentService, input);
     }
 
     @POST
     @Path("/agentic_generative_ui/agui")
     @Produces(MediaType.SERVER_SENT_EVENTS)
     public Response agenticGenerativeUi(RunAgentInput input) {
-        return handleAgui(input);
+        return handleAgui(agentService, input);
     }
 
     @POST
     @Path("/sse/{agentId}")
     @Produces(MediaType.SERVER_SENT_EVENTS)
     public Response streamData(@PathParam("agentId") String agentId, RunAgentInput input) {
-        return handleAgui(input);
+        return handleAgui(agentService, input, agentId);
     }
 
-    private Response handleAgui(RunAgentInput input) {
+    private Response handleAgui(AgentService agentService, RunAgentInput input) {
+        return handleAgui(agentService, input, null);
+    }
+
+    private Response handleAgui(AgentService agentService, RunAgentInput input, String agentId) {
         if (input == null) input = new RunAgentInput();
         if (input.threadId == null || input.threadId.isBlank()) input.threadId = UUID.randomUUID().toString();
         if (input.runId == null || input.runId.isBlank()) input.runId = UUID.randomUUID().toString();
+        if (agentId != null && !agentId.isBlank()) input.threadId = agentId;
 
         var prompt = extractPrompt(input);
         var translator = new AguiTranslator(input.threadId, input.runId);

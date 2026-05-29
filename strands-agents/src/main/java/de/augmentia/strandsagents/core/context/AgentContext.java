@@ -4,7 +4,7 @@ import java.util.Map;
 
 public class AgentContext {
 
-    public static final ScopedValue<Map<String, Object>> SESSION = ScopedValue.newInstance();
+    public static final ThreadLocal<Map<String, Object>> SESSION = new ThreadLocal<>();
 
     private AgentContext() {}
 }

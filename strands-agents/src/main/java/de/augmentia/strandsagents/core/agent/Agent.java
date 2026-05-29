@@ -712,9 +712,18 @@ public class Agent {
                         toolResult = wrapWithRetry(() ->
                             toolExecutor.execute(req, toolRegistry));
                     } else {
-                        toolResult = ScopedValue.where(AgentContext.SESSION, contextVariables)
-                            .call(() -> wrapWithRetry(() ->
-                                toolExecutor.execute(req, toolRegistry)));
+                        var prevSession = AgentContext.SESSION.get();
+                        AgentContext.SESSION.set(contextVariables);
+                        try {
+                            toolResult = wrapWithRetry(() ->
+                                toolExecutor.execute(req, toolRegistry));
+                        } finally {
+                            if (prevSession != null) {
+                                AgentContext.SESSION.set(prevSession);
+                            } else {
+                                AgentContext.SESSION.remove();
+                            }
+                        }
                     }
 
                     // Hook: afterToolCall

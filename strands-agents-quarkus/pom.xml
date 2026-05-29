@@ -107,7 +107,6 @@
                 <configuration>
                     <release>21</release>
                     <compilerArgs>
-                        <arg>--enable-preview</arg>
                         <arg>-parameters</arg>
                     </compilerArgs>
                     <excludes>
@@ -118,7 +117,6 @@
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <argLine>--enable-preview</argLine>
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                     </systemPropertyVariables>

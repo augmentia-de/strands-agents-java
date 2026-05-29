@@ -6,7 +6,7 @@ import dev.langchain4j.agent.tool.Tool;
 public class SubAgentTool {
 
     public static final int MAX_RECURSION_DEPTH = 5;
-    private static final ScopedValue<Integer> RECURSION_DEPTH = ScopedValue.newInstance();
+    private static final ThreadLocal<Integer> RECURSION_DEPTH = new ThreadLocal<>();
 
     private final Agent subAgent;
     private final String toolName;
@@ -34,16 +34,24 @@ public class SubAgentTool {
 
     @Tool("Führt einen spezialisierten Sub-Agenten aus")
     public String execute(String prompt) {
-        int currentDepth = RECURSION_DEPTH.isBound() ? RECURSION_DEPTH.get() : 0;
+        Integer prevDepthVal = RECURSION_DEPTH.get();
+        int currentDepth = prevDepthVal != null ? prevDepthVal : 0;
         if (currentDepth >= MAX_RECURSION_DEPTH) {
             return "Fehler: Maximale Rekursionstiefe von " + MAX_RECURSION_DEPTH + " erreicht.";
         }
+        var prevDepth = RECURSION_DEPTH.get();
+        RECURSION_DEPTH.set(currentDepth + 1);
         try {
-            SubAgentResult a2aResult = ScopedValue.where(RECURSION_DEPTH, currentDepth + 1)
-                .call(() -> executor.call(subAgent, prompt, toolName));
+            SubAgentResult a2aResult = executor.call(subAgent, prompt, toolName);
             return a2aResult.result();
         } catch (Exception e) {
             return "Fehler im Sub-Agenten: " + e.getMessage();
+        } finally {
+            if (prevDepth != null) {
+                RECURSION_DEPTH.set(prevDepth);
+            } else {
+                RECURSION_DEPTH.remove();
+            }
         }
     }
 

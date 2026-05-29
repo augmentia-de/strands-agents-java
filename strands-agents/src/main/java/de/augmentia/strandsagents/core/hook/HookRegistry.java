@@ -45,7 +45,7 @@ public class HookRegistry {
             var result = wrap(() -> hook.beforeAgent(ctx), hook.name());
             switch (result) {
                 case HookResult.Modify<?> m -> currentPrompt = (String) m.value();
-                case HookResult.Cancel _ -> { return result; }
+                case HookResult.Cancel ignored -> { return result; }
                 default -> {}
             }
         }
@@ -78,7 +78,7 @@ public class HookRegistry {
                         currentTools = specs;
                     }
                 }
-                case HookResult.Cancel _ -> { return result; }
+                case HookResult.Cancel ignored -> { return result; }
                 default -> {}
             }
         }
@@ -92,8 +92,8 @@ public class HookRegistry {
             var result = wrap(() -> hook.afterModelCall(ctx, input), hook.name());
             switch (result) {
                 case HookResult.Modify<?> m -> current = (String) m.value();
-                case HookResult.Retry _ -> { return result; }
-                case HookResult.Cancel _ -> { return result; }
+                case HookResult.Retry ignored -> { return result; }
+                case HookResult.Cancel ignored -> { return result; }
                 default -> {}
             }
         }
