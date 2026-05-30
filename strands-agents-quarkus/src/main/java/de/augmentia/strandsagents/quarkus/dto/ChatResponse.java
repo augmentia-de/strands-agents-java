@@ -2,6 +2,7 @@ package de.augmentia.strandsagents.quarkus.dto;
 
 import de.augmentia.strandsagents.core.model.agent.StopReason;
 import java.util.List;
+import java.util.Map;
 
 public class ChatResponse {
     public String answer;
@@ -10,7 +11,18 @@ public class ChatResponse {
     public long durationMs;
     public int inputTokens;
     public int outputTokens;
-    public int toolCalls;
+    public int toolCallsCount;
+    public List<ToolCallInfo> toolCalls;
+    public boolean memoryUsed;
+    public List<String> memorySources;
     public List<String> phases;
     public String error;
+
+    public static class ToolCallInfo {
+        public String name;
+        public Map<String, Object> arguments;
+        public String result;
+        public long durationMs;
+        public boolean success;
+    }
 }

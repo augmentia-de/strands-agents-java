@@ -4,7 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.augmentia.strandsagents.core.agent.MockChatModel;
 import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.a2a.SubAgentTool;
+import de.augmentia.strandsagents.core.agent.subagent.SubAgentTool;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 class AgentToolTest {
@@ -14,9 +15,9 @@ class AgentToolTest {
         var subAgent = new Agent(new MockChatModel("Sub-Antwort: %s"));
         var tool = new SubAgentTool(subAgent, "recherche", "Recherchiert Informationen");
 
-        var result = tool.execute("Wie ist das Wetter?");
+        var result = tool.execute("id", new SubAgentTool.Params("Wie ist das Wetter?"), new AtomicBoolean(false), null);
 
-        assertThat(result).contains("Sub-Antwort");
+        assertThat(result.content()).anyMatch(c -> c.toString().contains("Sub-Antwort"));
     }
 
     @Test
@@ -24,19 +25,8 @@ class AgentToolTest {
         var inner = new Agent(new MockChatModel("Inner: %s"));
         var tool = new SubAgentTool(inner, "nested");
 
-        // Simulate deep recursion by calling tool directly many times
-        // AgentTool increments depth via ScopedValue internally
-        String result = tool.execute("Ebene 1");
-        assertThat(result).doesNotContain("Rekursionstiefe");
-    }
-
-    @Test
-    void shouldHaveToolAnnotation() throws Exception {
-        var subAgent = new Agent(new MockChatModel());
-        var tool = new SubAgentTool(subAgent, "helper", "Hilfs-Agent");
-
-        var method = SubAgentTool.class.getMethod("execute", String.class);
-        assertThat(method.isAnnotationPresent(dev.langchain4j.agent.tool.Tool.class)).isTrue();
+        var result = tool.execute("id", new SubAgentTool.Params("Ebene 1"), new AtomicBoolean(false), null);
+        assertThat(result.content()).noneMatch(c -> c.toString().contains("Rekursionstiefe"));
     }
 
     @Test
@@ -47,6 +37,6 @@ class AgentToolTest {
         var registry = new ToolRegistry();
         registry.register(tool);
 
-        assertThat(registry.getToolNames()).contains("execute");
+        assertThat(registry.getToolNames()).contains("recherche");
     }
 }

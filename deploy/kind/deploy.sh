@@ -39,8 +39,8 @@ fi
 
 # ---- 3. Docker-Image bauen ----
 echo ""
-echo ">>> [3/6] Docker-Image bauen ..."
-docker build -f "${SCRIPT_DIR}/docker/Dockerfile" -t strands-agent:latest "${SCRIPT_DIR}"
+echo ">>> [3/6] Docker-Image bauen (Native) ..."
+docker build -f "${SCRIPT_DIR}/strands-agents-quarkus/src/main/docker/Dockerfile.native" -t strands-agent:latest "${SCRIPT_DIR}"
 echo "  ✅ Image gebaut"
 
 # ---- 4. Image in kind laden ----

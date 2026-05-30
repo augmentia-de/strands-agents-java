@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.a2a.SubAgentTool;
+import de.augmentia.strandsagents.core.agent.subagent.SubAgentTool;
 import de.augmentia.strandsagents.core.config.AgentConfig;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.model.agent.AgentResult;

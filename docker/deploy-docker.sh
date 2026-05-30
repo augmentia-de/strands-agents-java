@@ -16,8 +16,8 @@ if [ -z "${OPENAI_API_KEY:-}" ]; then
 fi
 
 # ---- Image bauen ----
-echo ">>> Docker-Image bauen ..."
-docker build -f "$PROJECT_DIR/docker/Dockerfile" -t strands-agent:latest "$PROJECT_DIR"
+echo ">>> Docker-Image bauen (JVM) ..."
+docker build -f "$PROJECT_DIR/strands-agents-quarkus/src/main/docker/Dockerfile.jvm" -t strands-agent:latest "$PROJECT_DIR"
 
 # ---- Sicherstellen, dass die data/- und skills/-Verzeichnisse existieren ----
 mkdir -p "$PROJECT_DIR/data"

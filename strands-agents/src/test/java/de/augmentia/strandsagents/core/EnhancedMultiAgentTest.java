@@ -4,12 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import de.augmentia.strandsagents.core.agent.MockChatModel;
 import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.a2a.SubAgentExecutor;
-import de.augmentia.strandsagents.core.agent.a2a.SubAgentTool;
+import de.augmentia.strandsagents.core.agent.subagent.SubAgentExecutor;
+import de.augmentia.strandsagents.core.agent.subagent.SubAgentTool;
 
 import de.augmentia.strandsagents.core.agent.routing.LlmRouter;
 import de.augmentia.strandsagents.core.agent.swarm.SwarmOrchestrator;
@@ -153,8 +154,8 @@ class EnhancedMultiAgentTest {
         var executor = new SubAgentExecutor();
         var tool = new SubAgentTool(subAgent, "recherche", "Recherchiert", executor);
 
-        var result = tool.execute("Thema");
-        assertThat(result).contains("Sub");
+        var result = tool.execute("id", new SubAgentTool.Params("Thema"), new AtomicBoolean(false), null);
+        assertThat(result.content()).anyMatch(c -> c.toString().contains("Sub"));
     }
 
     @Test
@@ -163,16 +164,16 @@ class EnhancedMultiAgentTest {
         var executor = new SubAgentExecutor(60, 1, Map.of("traceId", "trace-xyz"));
         var tool = new SubAgentTool(subAgent, "helper", "Hilft", executor);
 
-        var result = tool.execute("Bitte helfen");
-        assertThat(result).contains("Sub");
+        var result = tool.execute("id", new SubAgentTool.Params("Bitte helfen"), new AtomicBoolean(false), null);
+        assertThat(result.content()).anyMatch(c -> c.toString().contains("Sub"));
     }
 
     @Test
     void agentToolShouldStillRespectRecursionDepth() {
         var inner = new Agent(new MockChatModel("Inner: %s"));
         var tool = new SubAgentTool(inner, "nested");
-        var result = tool.execute("Ebene 1");
-        assertThat(result).doesNotContain("Rekursionstiefe");
+        var result = tool.execute("id", new SubAgentTool.Params("Ebene 1"), new AtomicBoolean(false), null);
+        assertThat(result.content()).noneMatch(c -> c.toString().contains("Rekursionstiefe"));
     }
 
     // --- SwarmOrchestrator with LlmRouter Tests ---

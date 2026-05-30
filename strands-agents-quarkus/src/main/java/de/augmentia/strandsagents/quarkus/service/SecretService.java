@@ -12,6 +12,7 @@ public class SecretService {
 
     private static final Logger log = LoggerFactory.getLogger(SecretService.class);
 
+    private volatile String runtimeApiKey;
     private VaultSecretProvider vault;
 
     @PostConstruct
@@ -31,7 +32,20 @@ public class SecretService {
         }
     }
 
+    public void setRuntimeApiKey(String key) {
+        this.runtimeApiKey = key;
+    }
+
+    public void clearRuntimeApiKey() {
+        this.runtimeApiKey = null;
+    }
+
+    public boolean isRuntimeKeyActive() {
+        return runtimeApiKey != null;
+    }
+
     public String getOpenAiApiKey() {
+        if (runtimeApiKey != null) return runtimeApiKey;
         if (vault != null) {
             try {
                 return vault.getSecret("openai", "api_key");

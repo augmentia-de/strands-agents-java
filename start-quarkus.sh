@@ -35,7 +35,8 @@ cmd_dev() {
     echo "    Model:       ${OPENAI_MODEL:-gpt-4o-mini}"
     echo ""
     cd "$SCRIPT_DIR"
-    mvn io.quarkus.platform:quarkus-maven-plugin:3.27.3.1:dev \
+    QUARKUS_VERSION=$(grep -oP '<quarkus\.platform\.version>\K[^<]+' strands-agents-quarkus/pom.xml)
+    mvn "io.quarkus:quarkus-maven-plugin:${QUARKUS_VERSION}:dev" \
         -pl strands-agents-quarkus -am
 }
 

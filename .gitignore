@@ -23,3 +23,6 @@ set_keys.sh
 /docker/hashicorp/vault-init.json
 /agent-agent-test/test-output/
 /agent-agent-test/tests/
+
+# Cloud deployment credentials
+deploy/cloud/scripts/set_cloud_credentials.sh

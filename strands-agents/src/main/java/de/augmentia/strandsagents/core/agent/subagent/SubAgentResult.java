@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.core.agent.a2a;
+package de.augmentia.strandsagents.core.agent.subagent;
 
 import java.util.Map;
 

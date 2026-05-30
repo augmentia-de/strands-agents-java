@@ -44,6 +44,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import de.augmentia.strandsagents.core.model.event.ToolExecutionStartedEvent;
+import de.augmentia.strandsagents.core.model.event.ToolExecutionFinishedEvent;
 import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailResult;
 import de.augmentia.strandsagents.core.resilience.CircuitBreakerConfig;
 import de.augmentia.strandsagents.core.resilience.ResilienceConfig;
@@ -54,6 +56,8 @@ import de.augmentia.strandsagents.core.tools.ReadTool;
 import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.core.conversation.ConversationManager;
 import de.augmentia.strandsagents.sessions.SessionManager;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ApplicationScoped
 public class AgentService {
@@ -94,6 +98,39 @@ public class AgentService {
             if (mcpClient != null) try { mcpClient.close(); } catch (Exception ignored) {}
         }
     }
+
+    static class ToolCallCapture {
+        final String toolName;
+        final String arguments;
+        final long startedAt;
+        String result;
+        boolean isError;
+
+        ToolCallCapture(String toolName, String arguments) {
+            this.toolName = toolName;
+            this.arguments = arguments;
+            this.startedAt = System.nanoTime();
+        }
+
+        long durationMs() { return (System.nanoTime() - startedAt) / 1_000_000; }
+
+        ChatResponse.ToolCallInfo toInfo(ObjectMapper om) {
+            var info = new ChatResponse.ToolCallInfo();
+            info.name = toolName;
+            info.durationMs = durationMs();
+            info.success = !isError;
+            info.result = result != null ? result.length() > 500 ? result.substring(0, 500) + "..." : result : "";
+            try {
+                info.arguments = om.readValue(arguments, new TypeReference<Map<String, Object>>() {});
+            } catch (Exception e) {
+                info.arguments = Map.of("raw", arguments);
+            }
+            return info;
+        }
+    }
+
+    private static final ObjectMapper TOOL_CALL_MAPPER = new ObjectMapper()
+        .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     @PostConstruct
     void init() {
@@ -219,7 +256,7 @@ public class AgentService {
         resp.answer = "Agent initialisiert";
         resp.sessionId = sessionId;
         resp.durationMs = durationMs;
-        resp.toolCalls = selectedTools.size();
+        resp.toolCallsCount = selectedTools.size();
         return resp;
     }
 
@@ -241,6 +278,7 @@ public class AgentService {
             null, sessionManager, null, plugins);
 
         var phases = new CopyOnWriteArrayList<String>();
+        var toolCallMap = new ConcurrentHashMap<String, ToolCallCapture>();
         if (req.sessionId == null) {
             req.sessionId = UUID.randomUUID().toString();
         }
@@ -248,21 +286,22 @@ public class AgentService {
         agent.setEventListener(event -> {
             if (event instanceof AgentStateChangedEvent sce) {
                 phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
+            } else if (event instanceof ToolExecutionStartedEvent te) {
+                var tc = te.toolCall();
+                toolCallMap.put(tc.id(), new ToolCallCapture(tc.toolName(), tc.arguments()));
+            } else if (event instanceof ToolExecutionFinishedEvent te) {
+                var existing = toolCallMap.get(te.result().toolCallId());
+                if (existing != null) {
+                    existing.result = te.result().result();
+                    existing.isError = te.result().isError();
+                }
             }
         });
 
         var result = agent.execute(req.sessionId, req.prompt, Map.of());
         var durationMs = (System.nanoTime() - start) / 1_000_000;
 
-        var resp = new ChatResponse();
-        resp.answer = result.finalAnswer();
-        resp.sessionId = result.sessionId();
-        resp.stopReason = result.stopReason();
-        resp.durationMs = durationMs;
-        resp.inputTokens = result.metrics().inputTokens();
-        resp.outputTokens = result.metrics().outputTokens();
-        resp.toolCalls = result.metrics().toolCallsCount();
-        resp.phases = List.copyOf(phases);
+        var resp = buildChatResponse(result, durationMs, phases, toolCallMap);
         return resp;
     }
 
@@ -273,18 +312,30 @@ public class AgentService {
             req.sessionId = UUID.randomUUID().toString();
         }
 
-        var result = session.agent().execute(req.sessionId, req.prompt, Map.of());
+        var toolCallMap = new ConcurrentHashMap<String, ToolCallCapture>();
+        var currentPhases = session.phases();
+        currentPhases.clear();
+
+        var agent = session.agent();
+        agent.setEventListener(event -> {
+            if (event instanceof AgentStateChangedEvent sce) {
+                currentPhases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
+            } else if (event instanceof ToolExecutionStartedEvent te) {
+                var tc = te.toolCall();
+                toolCallMap.put(tc.id(), new ToolCallCapture(tc.toolName(), tc.arguments()));
+            } else if (event instanceof ToolExecutionFinishedEvent te) {
+                var existing = toolCallMap.get(te.result().toolCallId());
+                if (existing != null) {
+                    existing.result = te.result().result();
+                    existing.isError = te.result().isError();
+                }
+            }
+        });
+
+        var result = agent.execute(req.sessionId, req.prompt, Map.of());
         var durationMs = (System.nanoTime() - start) / 1_000_000;
 
-        var resp = new ChatResponse();
-        resp.answer = result.finalAnswer();
-        resp.sessionId = result.sessionId();
-        resp.stopReason = result.stopReason();
-        resp.durationMs = durationMs;
-        resp.inputTokens = result.metrics().inputTokens();
-        resp.outputTokens = result.metrics().outputTokens();
-        resp.toolCalls = result.metrics().toolCallsCount();
-        resp.phases = List.copyOf(session.phases());
+        var resp = buildChatResponse(result, durationMs, currentPhases, toolCallMap);
         return resp;
     }
 
@@ -297,6 +348,7 @@ public class AgentService {
         var session = req.sessionId != null ? initializedAgents.get(req.sessionId) : null;
         if (session != null) {
             var phases = new CopyOnWriteArrayList<String>();
+            var toolCallMap = new ConcurrentHashMap<String, ToolCallCapture>();
             var sModel = session.streamingModel();
             StreamingAgent sAgent;
             if (sModel != null) {
@@ -313,20 +365,21 @@ public class AgentService {
             sAgent.setEventListener(event -> {
                 if (event instanceof AgentStateChangedEvent sce) {
                     phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
+                } else if (event instanceof ToolExecutionStartedEvent te) {
+                    var tc = te.toolCall();
+                    toolCallMap.put(tc.id(), new ToolCallCapture(tc.toolName(), tc.arguments()));
+                } else if (event instanceof ToolExecutionFinishedEvent te) {
+                    var existing = toolCallMap.get(te.result().toolCallId());
+                    if (existing != null) {
+                        existing.result = te.result().result();
+                        existing.isError = te.result().isError();
+                    }
                 }
             });
             var result = sAgent.executeStreaming(req.prompt, onToken);
             var durationMs = (System.nanoTime() - start) / 1_000_000;
             if (onPhases != null) onPhases.accept(List.copyOf(phases));
-            var resp = new ChatResponse();
-            resp.answer = result.finalAnswer();
-            resp.sessionId = result.sessionId();
-            resp.stopReason = result.stopReason();
-            resp.durationMs = durationMs;
-            resp.inputTokens = result.metrics().inputTokens();
-            resp.outputTokens = result.metrics().outputTokens();
-            resp.toolCalls = result.metrics().toolCallsCount();
-            resp.phases = List.copyOf(phases);
+            var resp = buildChatResponse(result, durationMs, phases, toolCallMap);
             if (onComplete != null) onComplete.accept(resp);
             return;
         }
@@ -348,6 +401,7 @@ public class AgentService {
         }
 
         var phases = new CopyOnWriteArrayList<String>();
+        var toolCallMap = new ConcurrentHashMap<String, ToolCallCapture>();
         if (req.sessionId == null) {
             req.sessionId = UUID.randomUUID().toString();
         }
@@ -355,6 +409,15 @@ public class AgentService {
         agent.setEventListener(event -> {
             if (event instanceof AgentStateChangedEvent sce) {
                 phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
+            } else if (event instanceof ToolExecutionStartedEvent te) {
+                var tc = te.toolCall();
+                toolCallMap.put(tc.id(), new ToolCallCapture(tc.toolName(), tc.arguments()));
+            } else if (event instanceof ToolExecutionFinishedEvent te) {
+                var existing = toolCallMap.get(te.result().toolCallId());
+                if (existing != null) {
+                    existing.result = te.result().result();
+                    existing.isError = te.result().isError();
+                }
             }
         });
 
@@ -363,15 +426,7 @@ public class AgentService {
 
         if (onPhases != null) onPhases.accept(List.copyOf(phases));
 
-        var resp = new ChatResponse();
-        resp.answer = result.finalAnswer();
-        resp.sessionId = result.sessionId();
-        resp.stopReason = result.stopReason();
-        resp.durationMs = durationMs;
-        resp.inputTokens = result.metrics().inputTokens();
-        resp.outputTokens = result.metrics().outputTokens();
-        resp.toolCalls = result.metrics().toolCallsCount();
-        resp.phases = List.copyOf(phases);
+        var resp = buildChatResponse(result, durationMs, phases, toolCallMap);
         if (onComplete != null) onComplete.accept(resp);
     }
 
@@ -446,6 +501,15 @@ public class AgentService {
         var result = agent.execute(req.prompt);
         var durationMs = (System.nanoTime() - start) / 1_000_000;
 
+        var resp = buildChatResponse(result, durationMs, new CopyOnWriteArrayList<>(), new ConcurrentHashMap<>());
+        return resp;
+    }
+
+    private ChatResponse buildChatResponse(
+            de.augmentia.strandsagents.core.model.agent.AgentResult result,
+            long durationMs,
+            List<String> phases,
+            ConcurrentHashMap<String, ToolCallCapture> toolCallMap) {
         var resp = new ChatResponse();
         resp.answer = result.finalAnswer();
         resp.sessionId = result.sessionId();
@@ -453,7 +517,13 @@ public class AgentService {
         resp.durationMs = durationMs;
         resp.inputTokens = result.metrics().inputTokens();
         resp.outputTokens = result.metrics().outputTokens();
-        resp.toolCalls = result.metrics().toolCallsCount();
+        resp.toolCallsCount = result.metrics().toolCallsCount();
+        resp.phases = List.copyOf(phases);
+        resp.toolCalls = toolCallMap.values().stream()
+            .map(tc -> tc.toInfo(TOOL_CALL_MAPPER))
+            .toList();
+        resp.memoryUsed = result.metrics().inputTokens() > 0 && result.metrics().toolCallsCount() > 0;
+        resp.memorySources = List.of();
         return resp;
     }
 
@@ -542,7 +612,8 @@ public class AgentService {
                 })
                 .toList();
         } catch (Exception e) {
-            throw new RuntimeException("MCP discovery fehlgeschlagen: " + e.getMessage(), e);
+            log.warn("MCP-Verbindung fehlgeschlagen: " + e.getMessage());
+            return List.of();
         }
     }
 
@@ -601,6 +672,24 @@ public class AgentService {
         plugins.add(new HITLPlugin(hitlProvider, HITLAuthority.AUTO));
         plugins.add(new GuardrailPlugin(List.of(), List.of()));
         return plugins;
+    }
+
+    public boolean isRuntimeKeyActive() {
+        return secretService.isRuntimeKeyActive();
+    }
+
+    public synchronized void activateModel(String apiKey) {
+        secretService.setRuntimeApiKey(apiKey);
+        ensureInitialized();
+        this.model = createModel();
+        log.info("API-Key aktiviert – Model neu erstellt");
+    }
+
+    public synchronized void deactivateModel() {
+        secretService.clearRuntimeApiKey();
+        ensureInitialized();
+        this.model = createModel();
+        log.info("API-Key deaktiviert – MockChatModel aktiv");
     }
 
     private ChatModel createModel() {

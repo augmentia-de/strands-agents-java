@@ -465,6 +465,7 @@ public class Agent {
             return result;
         }
 
+        prompt = prompt.trim();
         chatMemory.add(UserMessage.from(prompt));
 
         for (int iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
@@ -505,7 +506,7 @@ public class Agent {
             for (var hook : pluginHooks) {
                 hook.accept(sb);
             }
-            systemPrompt = sb.toString();
+            systemPrompt = sb.toString().trim();
 
             var toolSpecs = structuredForceActive
                 ? List.<dev.langchain4j.agent.tool.ToolSpecification>of()

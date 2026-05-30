@@ -7,6 +7,7 @@ import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
@@ -23,6 +24,7 @@ public class StreamingModelBridge implements ChatModel {
 
     private final StreamingChatModel streamingModel;
     private final Consumer<String> tokenConsumer;
+    private static final long DEFAULT_TIMEOUT_SECONDS = 120;
 
     /**
      * Constructs a new StreamingModelBridge without a token consumer.
@@ -40,6 +42,9 @@ public class StreamingModelBridge implements ChatModel {
      * @param tokenConsumer  a consumer that will receive each token as it is generated
      */
     public StreamingModelBridge(StreamingChatModel streamingModel, Consumer<String> tokenConsumer) {
+        if (streamingModel == null) {
+            throw new IllegalArgumentException("streamingModel cannot be null");
+        }
         this.streamingModel = streamingModel;
         this.tokenConsumer = tokenConsumer;
     }
@@ -60,18 +65,17 @@ public class StreamingModelBridge implements ChatModel {
         var future = new CompletableFuture<ChatResponse>();
 
         streamingModel.chat(request, new StreamingChatResponseHandler() {
-            private final StringBuilder partialResponse = new StringBuilder();
-
             @Override
             public void onPartialResponse(String token) {
-                partialResponse.append(token);
-                if (tokenConsumer != null) {
+                // If you ever need to log tokens or pipe them to a UI, this handles it cleanly
+                if (tokenConsumer != null && token != null) {
                     tokenConsumer.accept(token);
                 }
             }
 
             @Override
             public void onCompleteResponse(ChatResponse response) {
+                // The response parameter passed here already contains the fully assembled text/tokens
                 future.complete(response);
             }
 
@@ -82,12 +86,19 @@ public class StreamingModelBridge implements ChatModel {
         });
 
         try {
-            return future.get(120, TimeUnit.SECONDS);
+            return future.get(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
-            throw new RuntimeException("Streaming timeout", e);
-        } catch (Exception e) {
-            if (e instanceof RuntimeException re) throw re;
-            throw new RuntimeException("Streaming chat failed", e);
+            throw new RuntimeException("Streaming request timed out after " + DEFAULT_TIMEOUT_SECONDS + " seconds", e);
+        } catch (InterruptedException e) {
+            // CRITICAL: Restore the interrupted status so upstream workers/thread-pools know to halt
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Streaming request was interrupted", e);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException re) {
+                throw re;
+            }
+            throw new RuntimeException("Streaming chat failed", cause != null ? cause : e);
         }
     }
 }

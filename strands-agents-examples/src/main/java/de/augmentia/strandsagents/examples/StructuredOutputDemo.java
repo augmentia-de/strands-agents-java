@@ -2,6 +2,9 @@ package de.augmentia.strandsagents.examples;
 
 import java.time.Instant;
 
+import de.augmentia.strandsagents.core.ToolExecutor;
+import de.augmentia.strandsagents.core.ToolRegistry;
+import de.augmentia.strandsagents.core.agent.StreamingAgent;
 import de.augmentia.strandsagents.core.config.AgentConfig;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.model.agent.AgentResult;
@@ -9,6 +12,7 @@ import de.augmentia.strandsagents.core.model.agent.AgentResult;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import dev.langchain4j.model.chat.ChatModel;
 
 public class StructuredOutputDemo {
 
@@ -29,7 +33,7 @@ public class StructuredOutputDemo {
         String name,
         int age,
         String email,
-        Instant registeredAt,
+        java.time.LocalDate registeredAt,
         Address address
     ) {}
 
@@ -99,8 +103,8 @@ public class StructuredOutputDemo {
         }
 
         demoStaticRecord();
-        demoDynamicSchema();
-        demoShoppingCart();
+        //demoDynamicSchema();
+        //demoShoppingCart();
     }
 
     // --- Static Mode ---
@@ -108,10 +112,10 @@ public class StructuredOutputDemo {
     static void demoStaticRecord() {
         System.out.println("=== STATIC Mode: Nested Records ===");
 
-        var agent = AgentConfig.builder()
-            .structuredOutputModel(Customer.class)
-            .build()
-            .createAgent(ModelFactory.createOpenAiFromEnv());
+        var agent = new StreamingAgent(ModelFactory.createOpenAiStreamingFromEnv(null),
+                null, new ToolExecutor(), null, null, null);
+        agent.setStructuredOutputModel(Customer.class);
+        agent.setToolRegistry(new ToolRegistry());
 
         var result = agent.execute(
             "Extrahiere den Kunden: Max Mustermann, 25 Jahre, max@test.de, " +

@@ -2,7 +2,7 @@ services:
   strands-agent:
     build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: strands-agents-quarkus/src/main/docker/Dockerfile.jvm
     image: strands-agent:latest
     extra_hosts:
       - "host.docker.internal:host-gateway"

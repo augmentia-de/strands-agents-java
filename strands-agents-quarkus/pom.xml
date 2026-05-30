@@ -12,19 +12,20 @@
 
     <properties>
         <quarkus.platform.version>3.33.2</quarkus.platform.version>
+        <quarkus-langchain4j.version>1.10.0</quarkus-langchain4j.version>
     </properties>
 
-        <dependencyManagement>
-            <dependencies>
-                <dependency>
-                    <groupId>io.quarkus</groupId>
-                    <artifactId>quarkus-bom</artifactId>
-                    <version>${quarkus.platform.version}</version>
-                    <type>pom</type>
-                    <scope>import</scope>
-                </dependency>
-            </dependencies>
-        </dependencyManagement>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.quarkus</groupId>
+                <artifactId>quarkus-bom</artifactId>
+                <version>${quarkus.platform.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -32,16 +33,17 @@
             <artifactId>strands-agents</artifactId>
         </dependency>
         <dependency>
-            <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-open-ai</artifactId>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-openai</artifactId>
+            <version>${quarkus-langchain4j.version}</version>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-resteasy-jackson</artifactId>
+            <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-resteasy-qute</artifactId>
+            <artifactId>quarkus-rest-qute</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -124,4 +126,39 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>native</id>
+            <activation>
+                <property>
+                    <name>native</name>
+                </property>
+            </activation>
+            <properties>
+                <quarkus.native.enabled>true</quarkus.native.enabled>
+                <quarkus.package.type>native</quarkus.package.type>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/SampleAgUiResource.java</exclude>
+                                <exclude>**/quarkus/a2a/**</exclude>
+                            </excludes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+            <dependencies>
+                <dependency>
+                    <groupId>org.a2aproject.sdk</groupId>
+                    <artifactId>a2a-java-sdk-reference-jsonrpc</artifactId>
+                    <scope>provided</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>

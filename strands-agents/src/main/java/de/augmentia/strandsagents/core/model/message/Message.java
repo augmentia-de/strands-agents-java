@@ -1,10 +1,12 @@
 package de.augmentia.strandsagents.core.model.message;
 
+import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import java.time.Instant;
 import java.util.Map;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "_type")
+@JsonTypeInfo(use = JsonTypeInfo.Id.CUSTOM, property = "_type")
+@JsonTypeIdResolver(MessageTypeIdResolver.class)
 public sealed interface Message
     permits UserMessage, AssistantMessage, SystemMessage, ToolMessage {
 

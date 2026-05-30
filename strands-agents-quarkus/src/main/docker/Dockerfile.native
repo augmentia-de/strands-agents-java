@@ -1,0 +1,41 @@
+# ==== Stage 1: Build JARs ====
+FROM maven:3.9-eclipse-temurin-21 AS build
+USER root
+RUN mkdir -p /project
+WORKDIR /project
+
+COPY pom.xml .
+COPY strands-agents/pom.xml strands-agents/pom.xml
+COPY strands-agents/src strands-agents/src
+COPY strands-agents-quarkus/pom.xml strands-agents-quarkus/pom.xml
+COPY strands-agents-quarkus/src strands-agents-quarkus/src
+# Dummy modules — parent POM deklariert sie, aber sie werden für quarkus nicht gebraucht
+RUN mkdir -p strands-agents-examples strands-agenttest strands-agents-mcp-server && \
+    for d in strands-agents-examples strands-agenttest strands-agents-mcp-server; do \
+      printf '<project><modelVersion>4.0.0</modelVersion><parent><groupId>de.augmentia.strandsagents</groupId><artifactId>strands-agents-java</artifactId><version>0.1.1-SNAPSHOT</version></parent><artifactId>%s</artifactId></project>' "$d" > "$d/pom.xml"; \
+    done
+RUN mvn install -DskipTests -q -pl strands-agents-quarkus -am
+
+# ==== Stage 2: Native build with Mandrel ====
+FROM quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-25 AS native
+USER root
+COPY --from=build /usr/share/maven /usr/share/maven
+RUN ln -s /usr/share/maven/bin/mvn /usr/local/bin/mvn
+ENV HOME=/root
+COPY --from=build /root/.m2/repository /root/.m2/repository
+COPY --from=build /project /project
+WORKDIR /project
+RUN mvn package -Pnative -DskipTests -pl strands-agents-quarkus \
+    -Dquarkus.native.container-build=false
+
+# ==== Stage 3: Minimal Runtime ====
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+WORKDIR /work/
+RUN chown 1001:1001 /work \
+    && chmod "g+rwX" /work
+COPY --from=native /project/strands-agents-quarkus/target/*-runner /work/application
+COPY skills/ /work/skills/
+EXPOSE 8082
+USER 1001
+ENV QUARKUS_HTTP_HOST=0.0.0.0
+CMD ["./application"]

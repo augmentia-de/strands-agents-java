@@ -5,13 +5,17 @@ import de.augmentia.strandsagents.quarkus.dto.ChatRequest;
 import de.augmentia.strandsagents.quarkus.dto.ChatResponse;
 import de.augmentia.strandsagents.quarkus.dto.ToolInfo;
 import de.augmentia.strandsagents.quarkus.service.AgentService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.smallrye.common.annotation.Blocking;
+import io.smallrye.mutiny.Multi;
+import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 @Path("/api")
 @Produces(MediaType.APPLICATION_JSON)
@@ -20,6 +24,9 @@ public class ChatResource {
 
     @Inject
     AgentService agentService;
+
+    @Inject
+    ObjectMapper nativeJackson;
 
     @POST
     @Path("/chat")
@@ -34,52 +41,55 @@ public class ChatResource {
 
     @POST
     @Path("/chat/stream")
-    @Produces(MediaType.SERVER_SENT_EVENTS)
-    public Response chatStream(ChatRequest req) {
+    @Produces(MediaType.SERVER_SENT_EVENTS) // Quarkus automatically wraps Multi into SSE chunk formatting
+    @Blocking // Offloads long-running LLM stream connection from the reactive IO loop
+    public Multi<? extends Object> chatStream(ChatRequest req) {
         if (req.prompt == null || req.prompt.isBlank()) {
-            return Response.ok("data: {\"error\":\"prompt leer\"}\n\n").build();
+            return Multi.createFrom().item("{\"error\":\"prompt leer\"}");
         }
 
-        var output = new StringBuilder();
-        var phasesRef = new CopyOnWriteArrayList<List<String>>();
-
-        var thread = new Thread(() -> {
-            agentService.chatSse(req,
-                token -> {
-                    synchronized (output) {
-                        output.append("data: ").append(toJson("token", token)).append("\n\n");
-                    }
-                },
-                phases -> {
-                    synchronized (output) {
-                        output.append("data: ").append(toJson("phases", phases.toString())).append("\n\n");
-                    }
-                },
-                result -> {
-                    synchronized (output) {
-                        output.append("data: ").append(toJson("result", serializeResult(result))).append("\n\n");
-                        output.append("data: [DONE]\n\n");
-                    }
-                }
-            );
-        });
-        thread.start();
-
-        return Response.ok(new java.io.InputStream() {
-            private int pos = 0;
-
-            @Override
-            public int read() {
-                while (true) {
-                    synchronized (output) {
-                        if (pos < output.length()) {
-                            return output.charAt(pos++);
+        return Multi.createFrom().<String>emitter(emitter -> {
+            try {
+                agentService.chatSse(req,
+                        token -> {
+                            if (token != null) {
+                                try {
+                                    emitter.emit(nativeJackson.writeValueAsString(Map.of("token", token)));
+                                } catch (Exception e) {
+                                    // skip malformed token
+                                }
+                            }
+                        },
+                        phases -> {
+                            if (phases != null) {
+                                try {
+                                    emitter.emit(nativeJackson.writeValueAsString(Map.of("phases", phases)));
+                                } catch (Exception e) {
+                                    // skip malformed phases
+                                }
+                            }
+                        },
+                        result -> {
+                            if (result != null) {
+                                try {
+                                    emitter.emit(nativeJackson.writeValueAsString(Map.of("result", result)));
+                                } catch (Exception e) {
+                                    // skip malformed result
+                                }
+                            }
+                            emitter.emit("[DONE]");
+                            emitter.complete();
                         }
-                    }
-                    try { Thread.sleep(50); } catch (InterruptedException e) { return -1; }
+                );
+            } catch (Exception e) {
+                try {
+                    emitter.emit(nativeJackson.writeValueAsString(Map.of("error", e.getMessage())));
+                } catch (Exception ex) {
+                    // skip
                 }
+                emitter.fail(e);
             }
-        }, MediaType.SERVER_SENT_EVENTS).build();
+        }).runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 
     @POST
@@ -110,18 +120,11 @@ public class ChatResource {
         return Response.ok(Map.of("released", sessionId)).build();
     }
 
-    private String toJson(String key, String value) {
-        return "{\"" + key + "\":\"" + value.replace("\"", "\\\"").replace("\n", "\\n") + "\"}";
-    }
-
     private String serializeResult(ChatResponse r) {
-        return "{\"answer\":\"" + r.answer.replace("\"", "\\\"").replace("\n", "\\n")
-            + "\",\"sessionId\":\"" + r.sessionId
-            + "\",\"stopReason\":\"" + r.stopReason
-            + "\",\"durationMs\":" + r.durationMs
-            + ",\"inputTokens\":" + r.inputTokens
-            + ",\"outputTokens\":" + r.outputTokens
-            + ",\"toolCalls\":" + r.toolCalls
-            + "}";
+        try {
+            return nativeJackson.writeValueAsString(Map.of("result", r));
+        } catch (Exception e) {
+            return "{\"error\":\"serialization failed\"}";
+        }
     }
 }

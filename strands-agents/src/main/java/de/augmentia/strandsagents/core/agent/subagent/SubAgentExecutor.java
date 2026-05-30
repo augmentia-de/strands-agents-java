@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.core.agent.a2a;
+package de.augmentia.strandsagents.core.agent.subagent;
 
 import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.model.agent.AgentResult;

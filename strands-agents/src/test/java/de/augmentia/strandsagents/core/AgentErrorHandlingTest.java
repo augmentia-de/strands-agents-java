@@ -2,24 +2,52 @@ package de.augmentia.strandsagents.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.model.agent.StopReason;
-import dev.langchain4j.agent.tool.Tool;
+import de.augmentia.strandsagents.core.tools.AgentTool;
+import de.augmentia.strandsagents.core.tools.ToolResult;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
 class AgentErrorHandlingTest {
 
-    static class ExceptionTool {
-        @Tool("Throws an exception")
-        public String fail(String msg) {
-            throw new RuntimeException("KABOOM: " + msg);
+    static class ExceptionTool implements AgentTool<ExceptionTool.Params> {
+        @Override
+        public String name() { return "fail"; }
+        @Override
+        public String description() { return "Throws an exception"; }
+        @Override
+        public Class<Params> parameterType() { return Params.class; }
+        @Override
+        public ObjectNode parameterSchema() {
+            var factory = JsonNodeFactory.instance;
+            var schema = factory.objectNode();
+            schema.put("type", "object");
+            var props = factory.objectNode();
+            var msgProp = factory.objectNode();
+            msgProp.put("type", "string");
+            msgProp.put("description", "The message");
+            props.set("msg", msgProp);
+            schema.set("properties", props);
+            var required = factory.arrayNode();
+            required.add("msg");
+            schema.set("required", required);
+            return schema;
         }
+        @Override
+        public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
+            throw new RuntimeException("KABOOM: " + params.msg());
+        }
+        public record Params(String msg) {}
     }
 
     static class ErrorHandlingMockModel implements ChatModel {

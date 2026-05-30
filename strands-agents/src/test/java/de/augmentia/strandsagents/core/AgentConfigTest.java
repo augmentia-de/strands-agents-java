@@ -2,11 +2,29 @@ package de.augmentia.strandsagents.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import de.augmentia.strandsagents.core.config.AgentConfig;
 import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.core.tools.AgentTool;
+import de.augmentia.strandsagents.core.tools.ToolResult;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 class AgentConfigTest {
+
+    private static AgentTool<?> testTool(String name) {
+        return new AgentTool<Object>() {
+            @Override public String name()  { return name; }
+            @Override public String description() { return name; }
+            @Override public Class<Object> parameterType() { return Object.class; }
+            @Override public com.fasterxml.jackson.databind.node.ObjectNode parameterSchema() {
+                return JsonNodeFactory.instance.objectNode();
+            }
+            @Override public ToolResult execute(String id, Object p, AtomicBoolean a, java.util.function.Consumer<ToolResult> u) {
+                return ToolResult.success("ok");
+            }
+        };
+    }
 
     @Test
     void shouldBuildWithDefaults() {
@@ -21,10 +39,9 @@ class AgentConfigTest {
 
     @Test
     void shouldBuildWithCustomValues() {
-        var tools = ToolRegistry.builder()
-            .standard()
-            .include("bash", "read")
-            .build();
+        var tools = new ToolRegistry();
+        tools.register(testTool("bash"));
+        tools.register(testTool("read"));
         var config = AgentConfig.builder()
             .name("recherche-agent")
             .modelName("openai/gpt-4o")
