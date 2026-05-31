@@ -59,6 +59,10 @@ import de.augmentia.strandsagents.sessions.SessionManager;
 public class AgentService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentService.class);
+    private static final String TOOLS_PLACEHOLDER = "{{tools}}";
+    private static final String SKILLS_PLACEHOLDER = "{{skills}}";
+    static final String DEFAULT_SYSTEM_PROMPT = "You are a helpful general agent. "
+        + "Use the selected tools and skills when they are relevant, and explain important results clearly.";
 
     @Inject
     SecretService secretService;
@@ -88,7 +92,8 @@ public class AgentService {
         ToolRegistry registry,
         McpClient mcpClient,
         List<String> phases,
-        StreamingChatModel streamingModel
+        StreamingChatModel streamingModel,
+        String systemPrompt
     ) {
         void close() {
             if (mcpClient != null) try { mcpClient.close(); } catch (Exception ignored) {}
@@ -189,15 +194,6 @@ public class AgentService {
 
         var modelToUse = wrapModel(model);
         var streamingModel = findStreamingModel();
-        var agent = new Agent(modelToUse, selectedTools, new ToolExecutor(),
-            null, sessionManager, null, plugins);
-
-        var phases = new CopyOnWriteArrayList<String>();
-        agent.setEventListener(event -> {
-            if (event instanceof AgentStateChangedEvent sce) {
-                phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
-            }
-        });
 
         McpClient mcpClient = null;
         var mcpUrl = req.mcpUrl != null && !req.mcpUrl.isBlank() ? req.mcpUrl : defaultMcpUrl;
@@ -211,7 +207,19 @@ public class AgentService {
             }
         }
 
-        initializedAgents.put(sessionId, new InitializedSession(agent, selectedTools, mcpClient, phases, streamingModel));
+        var systemPrompt = buildSystemPrompt(req.systemPrompt, selectedTools, selectedSkills);
+        var agent = new Agent(modelToUse, selectedTools, new ToolExecutor(),
+            null, sessionManager, null, plugins);
+        agent.setSystemPrompt(systemPrompt);
+
+        var phases = new CopyOnWriteArrayList<String>();
+        agent.setEventListener(event -> {
+            if (event instanceof AgentStateChangedEvent sce) {
+                phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
+            }
+        });
+
+        initializedAgents.put(sessionId, new InitializedSession(agent, selectedTools, mcpClient, phases, streamingModel, systemPrompt));
 
         var durationMs = (System.nanoTime() - start) / 1_000_000;
 
@@ -239,6 +247,7 @@ public class AgentService {
 
         var agent = new Agent(modelToUse, activeTools, new ToolExecutor(),
             null, sessionManager, null, plugins);
+        agent.setSystemPrompt(buildSystemPrompt(req.systemPrompt, activeTools, activeSkills));
 
         var phases = new CopyOnWriteArrayList<String>();
         if (req.sessionId == null) {
@@ -307,6 +316,7 @@ public class AgentService {
                     new MockStreamingChatModel(),
                     session.registry(), new ToolExecutor());
             }
+            sAgent.setSystemPrompt(session.systemPrompt());
             if (req.sessionId == null) {
                 req.sessionId = UUID.randomUUID().toString();
             }
@@ -346,6 +356,7 @@ public class AgentService {
                 new MockStreamingChatModel(),
                 activeTools, new ToolExecutor());
         }
+        agent.setSystemPrompt(buildSystemPrompt(req.systemPrompt, activeTools, activeSkills));
 
         var phases = new CopyOnWriteArrayList<String>();
         if (req.sessionId == null) {
@@ -380,8 +391,10 @@ public class AgentService {
         var selectedTools = fullRegistry.withOnly(new HashSet<>(fullRegistry.getToolNames()));
         var modelToUse = wrapModel(model);
         var plugins = buildPlugins(allSkills, initialSkills);
-        return new Agent(modelToUse, selectedTools, new ToolExecutor(),
+        var agent = new Agent(modelToUse, selectedTools, new ToolExecutor(),
             null, sessionManager, null, plugins);
+        agent.setSystemPrompt(buildSystemPrompt(null, selectedTools, allSkills));
+        return agent;
     }
 
     public void releaseSession(String sessionId) {
@@ -584,6 +597,60 @@ public class AgentService {
         return allSkills.stream()
             .filter(s -> selected.contains(s.name()))
             .toList();
+    }
+
+    static String buildSystemPrompt(String requestedPrompt, ToolRegistry selectedTools, List<Skill> selectedSkills) {
+        var basePrompt = requestedPrompt != null && !requestedPrompt.isBlank()
+            ? requestedPrompt.strip()
+            : DEFAULT_SYSTEM_PROMPT;
+        var toolSection = describeTools(selectedTools);
+        var skillSection = describeSkills(selectedSkills);
+        var hasToolsPlaceholder = basePrompt.contains(TOOLS_PLACEHOLDER);
+        var hasSkillsPlaceholder = basePrompt.contains(SKILLS_PLACEHOLDER);
+
+        var prompt = basePrompt
+            .replace(TOOLS_PLACEHOLDER, toolSection)
+            .replace(SKILLS_PLACEHOLDER, skillSection);
+
+        var appended = new StringBuilder(prompt);
+        if (!hasToolsPlaceholder) {
+            appended.append("\n\nSelected tools:\n").append(toolSection);
+        }
+        if (!hasSkillsPlaceholder) {
+            appended.append("\n\nSelected skills:\n").append(skillSection);
+        }
+        return appended.toString();
+    }
+
+    private static String describeTools(ToolRegistry selectedTools) {
+        if (selectedTools == null || selectedTools.size() == 0) {
+            return "- No tools selected.";
+        }
+        return selectedTools.getToolNames().stream()
+            .sorted()
+            .map(name -> {
+                try {
+                    var description = selectedTools.get(name).spec().description();
+                    return "- " + name + formatDescription(description);
+                } catch (Exception e) {
+                    return "- " + name;
+                }
+            })
+            .collect(java.util.stream.Collectors.joining("\n"));
+    }
+
+    private static String describeSkills(List<Skill> selectedSkills) {
+        if (selectedSkills == null || selectedSkills.isEmpty()) {
+            return "- No skills selected.";
+        }
+        return selectedSkills.stream()
+            .sorted(Comparator.comparing(Skill::name))
+            .map(skill -> "- " + skill.name() + formatDescription(skill.description()))
+            .collect(java.util.stream.Collectors.joining("\n"));
+    }
+
+    private static String formatDescription(String description) {
+        return description != null && !description.isBlank() ? ": " + description.strip() : "";
     }
 
     private List<Plugin> buildPlugins(List<Skill> skills, List<String> initialSkills) {
