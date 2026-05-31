@@ -1,66 +1,44 @@
 package de.augmentia.strandsagents.core.tools;
 
-
-import de.augmentia.strandsagents.core.plugin.guardrail.ApprovalResult;
-import de.augmentia.strandsagents.core.plugin.hitl.HITLProvider;
+import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.CheckpointService;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.Scanner;
-
-/**
- * Tool that allows the agent to explicitly hand off control to a human user.
- * This mirrors the 'handoff_to_user.py' tool from the Python SDK.
- * 
- * It can be used to:
- * 1. Ask for clarification
- * 2. Get approval for critical actions
- * 3. Request missing information
- */
 public class HumanInTheLoopTool {
 
-    private final HITLProvider provider;
+    private static final Logger log = LoggerFactory.getLogger(HumanInTheLoopTool.class);
 
-    /**
-     * Creates a new HITL tool using the provided provider.
-     * @param provider The provider to use for human interaction.
-     */
-    public HumanInTheLoopTool(HITLProvider provider) {
-        this.provider = provider != null ? provider : new ConsoleHITLProvider();
-    }
+    private final CheckpointService checkpointService;
 
-    /**
-     * Default constructor using a console-based provider.
-     */
-    public HumanInTheLoopTool() {
-        this(new ConsoleHITLProvider());
+    public HumanInTheLoopTool(CheckpointService checkpointService) {
+        this.checkpointService = checkpointService != null ? checkpointService : new CheckpointService();
     }
 
     @Tool("Asks the human user for input, clarification, or approval to proceed.")
     public String askUser(@P("The message or question to display to the user") String message) {
-        // Log the handoff request
-        System.out.println("\n🤝 [AGENT REQUESTING HUMAN INTERVENTION]");
-        System.out.println("Message: " + message);
-        
-        // Delegate to the provider to get the actual human response
-        ApprovalResult result = provider.requestApproval("handoff_to_user", message);
-        String response = result.feedback();
-        
-        System.out.println("👤 [USER RESPONSE RECEIVED]: " + response + "\n");
-        return response;
-    }
+        var sessionId = de.augmentia.strandsagents.core.context.AgentContext.SESSION.get();
+        var sid = sessionId != null
+            ? String.valueOf(sessionId.get("sessionId"))
+            : "unknown";
+        var cp = checkpointService.createCheckpoint(sid, "askUser", message);
+        log.info("HITL checkpoint created: {} — waiting for user input", cp.id());
 
-    /**
-     * A simple console-based implementation of a HITLProvider.
-     */
-    public static class ConsoleHITLProvider implements HITLProvider {
-        private final Scanner scanner = new Scanner(System.in);
-
-        @Override
-        public ApprovalResult requestApproval(String action, String context) {
-            System.out.print("> ");
-            String input = scanner.nextLine();
-            return new ApprovalResult(action, true, input, java.time.Instant.now());
+        try {
+            var resolved = checkpointService.await(cp);
+            if (resolved.status() == de.augmentia.strandsagents.core.plugin.hitl.checkpoint.Checkpoint.Status.APPROVED) {
+                var response = resolved.feedback() != null ? resolved.feedback() : "";
+                log.info("HITL checkpoint {} — user responded: {}", cp.id(), response);
+                return response;
+            } else {
+                var reason = resolved.feedback() != null ? resolved.feedback() : "No response";
+                log.info("HITL checkpoint {} — rejected: {}", cp.id(), reason);
+                return "[User declined to respond: " + reason + "]";
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "[HITL interrupted]";
         }
     }
 }

@@ -5,7 +5,7 @@ import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.tools.CalculatorTool;
-import de.augmentia.strandsagents.core.tools.TimeTool;
+import de.augmentia.strandsagents.core.tools.local.TimeTool;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;

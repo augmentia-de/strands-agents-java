@@ -103,11 +103,61 @@ public class ChatResource {
     @POST
     @Path("/mcp/discover")
     public List<ToolInfo> discoverMcpTools(Map<String, String> body) {
+        var server = body != null ? body.get("server") : null;
+        if (server == null || server.isBlank()) {
+            return List.of();
+        }
+        return agentService.discoverMcpTools(server);
+    }
+
+    @POST
+    @Path("/mcp/connect")
+    public List<ToolInfo> connectMcpUrl(Map<String, String> body) {
         var url = body != null ? body.get("url") : null;
         if (url == null || url.isBlank()) {
             return List.of();
         }
-        return agentService.discoverMcpTools(url);
+        var name = body != null ? body.get("name") : null;
+        return agentService.connectMcpUrl(url, name);
+    }
+
+    @GET
+    @Path("/mcp/servers")
+    public List<Map<String, String>> listMcpServers() {
+        return agentService.getMcpServers();
+    }
+
+    @POST
+    @Path("/checkpoints/{id}/approve")
+    public Response approveCheckpoint(@PathParam("id") String id, Map<String, String> body) {
+        var feedback = body != null ? body.get("feedback") : null;
+        var ok = agentService.getCheckpointService().approve(id, feedback);
+        if (!ok) {
+            return Response.status(Response.Status.NOT_FOUND)
+                .entity(Map.of("error", "Checkpoint not found or not pending")).build();
+        }
+        return Response.ok(Map.of("status", "approved", "checkpointId", id)).build();
+    }
+
+    @POST
+    @Path("/checkpoints/{id}/reject")
+    public Response rejectCheckpoint(@PathParam("id") String id, Map<String, String> body) {
+        var feedback = body != null ? body.get("feedback") : null;
+        var ok = agentService.getCheckpointService().reject(id, feedback);
+        if (!ok) {
+            return Response.status(Response.Status.NOT_FOUND)
+                .entity(Map.of("error", "Checkpoint not found or not pending")).build();
+        }
+        return Response.ok(Map.of("status", "rejected", "checkpointId", id)).build();
+    }
+
+    @GET
+    @Path("/checkpoints/pending")
+    public Response getPendingCheckpoints(@QueryParam("sessionId") String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            return Response.ok(agentService.getCheckpointService().getPendingCheckpoints("")).build();
+        }
+        return Response.ok(agentService.getCheckpointService().getPendingCheckpoints(sessionId)).build();
     }
 
     @POST

@@ -19,9 +19,9 @@ import de.augmentia.strandsagents.core.plugin.hitl.HITLPlugin;
 import de.augmentia.strandsagents.core.resilience.CircuitBreakerConfig;
 import de.augmentia.strandsagents.core.resilience.ResilienceConfig;
 import de.augmentia.strandsagents.core.resilience.RetryConfig;
-import de.augmentia.strandsagents.core.tools.BashTool;
+import de.augmentia.strandsagents.core.tools.local.BashTool;
 import de.augmentia.strandsagents.core.tools.HumanInTheLoopTool;
-import de.augmentia.strandsagents.core.tools.ReadTool;
+import de.augmentia.strandsagents.core.tools.local.ReadTool;
 import de.augmentia.strandsagents.sessions.FileSessionManager;
 import dev.langchain4j.model.chat.ChatModel;
 

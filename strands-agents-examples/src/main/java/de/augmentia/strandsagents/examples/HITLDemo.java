@@ -9,11 +9,8 @@ import de.augmentia.strandsagents.core.hook.HookRegistry;
 import de.augmentia.strandsagents.core.model.agent.AgentResult;
 import de.augmentia.strandsagents.core.plugin.hitl.HITLAuthority;
 import de.augmentia.strandsagents.core.plugin.hitl.HITLHook;
-import de.augmentia.strandsagents.core.tools.BashTool;
-import de.augmentia.strandsagents.core.tools.ReadTool;
 import dev.langchain4j.model.chat.ChatModel;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Scanner;
 

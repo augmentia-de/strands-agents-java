@@ -20,10 +20,8 @@ env:
   STRANDS_SESSION_DIR: "/app/.sessions"
   STRANDS_LLM_LOG_ENABLED: "true"
   STRANDS_LLM_LOG_PATH: "/app/logs/llm-calls.log"
-  STRANDS_MCP_URL: "http://mcp-server:3000/mcp"
-  STRANDS_MCP_INGEST: "false"
   STRANDS_SKILLS_SEARCH: "false"
-  MCP_SERVER_URL: "http://mcp-server:3000/mcp"
+  # MCP config: mount config/MCP_SERVER_CONFIG.json to /app/config/MCP_SERVER_CONFIG.json
   # ---- Vault (optional) ----
   VAULT_ADDR: ""
   VAULT_TOKEN: ""

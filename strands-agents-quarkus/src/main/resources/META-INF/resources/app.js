@@ -3,7 +3,11 @@ var state = {
   currentTools: [],
   currentSkills: [],
   currentMcpTools: [],
-  fetchedMcpTools: [],
+  mcpServers: [],
+  mcpServersTools: {},
+  mcpServersOpen: {},
+  mcpCustomTools: [],
+  mcpCustomUrls: {},
   isInitialized: false,
   streamingMsg: null,
   messages: [],
@@ -207,10 +211,11 @@ function showApiKeyError(msg) {
 async function checkApiKeyStatus() {
   try {
     var resp = await fetch('/api/admin/status');
-    if (!resp.ok) return;
+    if (!resp.ok) return false;
     var data = await resp.json();
     renderApiKeyState(data.stored, data.active);
-  } catch (err) {}
+    return true;
+  } catch (err) { return false; }
 }
 
 async function setupApiKey() {
@@ -283,57 +288,135 @@ function setInitialized(val) {
 }
 
 /* ── MCP ── */
-function renderMcpTools(tools) {
-  var list = document.getElementById('mcp-tools-list');
-  if (!tools || tools.length === 0) {
-    list.innerHTML = '<p class="empty">Keine MCP Tools gefunden</p>';
-    return;
-  }
-  list.innerHTML = '';
-  for (var i = 0; i < tools.length; i++) {
-    var t = tools[i];
-    var label = document.createElement('label');
-    label.className = 'chip-select chip-mcp';
-    var cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.name = 'mcp-tool';
-    cb.value = t.name;
-    cb.addEventListener('change', updateMcpTools);
-    var span = document.createElement('span');
-    span.textContent = t.name + (t.description ? ': ' + t.description.substring(0, 60) : '');
-    span.title = t.name + ': ' + t.description;
-    label.appendChild(cb);
-    label.appendChild(span);
-    list.appendChild(label);
+function mcpToolCheckboxHtml(name, description) {
+  var desc = description ? ': ' + description.substring(0, 60) : '';
+  return '<label class="chip-select chip-mcp">' +
+    '<input type="checkbox" name="mcp-tool" value="' + escapeHtml(name) + '" onchange="updateMcpTools()">' +
+    '<span title="' + escapeHtml(name) + ': ' + escapeHtml(description || '') + '">' + escapeHtml(name) + desc + '</span>' +
+    '</label>';
+}
+
+async function fetchMcpServers() {
+  try {
+    var resp = await fetch('/api/mcp/servers');
+    if (!resp.ok) return;
+    state.mcpServers = await resp.json();
+    renderMcpServers();
+  } catch (err) {
+    console.error('Fehler beim Laden der MCP-Server:', err);
   }
 }
 
-async function fetchMcpTools() {
-  var url = document.getElementById('mcp-url').value.trim();
-  if (!url) return;
-  var status = document.getElementById('mcp-status');
-  status.textContent = '\u23f3 Entdecke MCP Tools...';
-  status.className = 'status-pending';
+function renderMcpServers() {
+  var container = document.getElementById('mcp-servers-list');
+  container.innerHTML = '';
+  for (var i = 0; i < state.mcpServers.length; i++) {
+    var s = state.mcpServers[i];
+    var isOpen = !!state.mcpServersOpen[s.name];
+    var safeId = s.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+    var item = document.createElement('div');
+    item.className = 'mcp-server-item';
+    item.innerHTML =
+      '<label class="mcp-server-label">' +
+        '<input type="checkbox" data-server="' + escapeHtml(s.name) + '"' + (isOpen ? ' checked' : '') + '>' +
+        '<span>' + escapeHtml(s.name) + '</span>' +
+        '<span class="mcp-server-type">' + escapeHtml(s.type) + '</span>' +
+      '</label>' +
+      '<div class="mcp-server-tools' + (isOpen ? ' open' : '') + '" id="mcp-tools-' + safeId + '">' +
+        (isOpen && state.mcpServersTools[s.name] ? renderToolChips(state.mcpServersTools[s.name]) : '<p class="empty">Server ausw\u00e4hlen, um Tools zu laden</p>') +
+      '</div>';
+    var cb = item.querySelector('input[type="checkbox"]');
+    cb.addEventListener('change', function(srv) {
+      return function() { toggleMcpServer(srv, this.checked); };
+    }(s.name));
+    container.appendChild(item);
+  }
+}
+
+function renderToolChips(tools) {
+  if (!tools || tools.length === 0) return '<p class="empty">Keine Tools gefunden</p>';
+  var html = '';
+  for (var i = 0; i < tools.length; i++) {
+    html += mcpToolCheckboxHtml(tools[i].name, tools[i].description);
+  }
+  return html;
+}
+
+async function toggleMcpServer(serverName, checked) {
+  state.mcpServersOpen[serverName] = checked;
+  if (!checked) {
+    // Deselect all tools from this server
+    state.mcpServersTools[serverName] = [];
+    var toolsDiv = document.getElementById('mcp-tools-' + serverName.replace(/[^a-zA-Z0-9_-]/g, '_'));
+    if (toolsDiv) { toolsDiv.classList.remove('open'); toolsDiv.innerHTML = '<p class="empty">Server ausw\u00e4hlen, um Tools zu laden</p>'; }
+    updateMcpTools();
+    return;
+  }
+  var toolsDiv = document.getElementById('mcp-tools-' + serverName.replace(/[^a-zA-Z0-9_-]/g, '_'));
+  if (toolsDiv) toolsDiv.innerHTML = '<p class="status-pending" style="font-size:12px">\u23f3 Lade Tools...</p>';
   try {
     var resp = await fetch('/api/mcp/discover', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: url })
+      body: JSON.stringify({ server: serverName })
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     var tools = await resp.json();
-    state.fetchedMcpTools = tools;
-    renderMcpTools(tools);
-    state.currentMcpTools = [];
-    status.textContent = '\u2705 ' + tools.length + ' MCP Tools entdeckt';
-    status.className = 'status-ready';
-    document.getElementById('mcp-count').textContent = tools.length + ' Tools verf\u00fcgbar, keine ausgew\u00e4hlt';
+    state.mcpServersTools[serverName] = tools;
+    if (toolsDiv) {
+      toolsDiv.classList.add('open');
+      toolsDiv.innerHTML = renderToolChips(tools);
+    }
   } catch (err) {
-    status.textContent = '\u274c Fehler: ' + err.message;
-    status.className = 'status-error';
-    state.fetchedMcpTools = [];
-    renderMcpTools([]);
+    if (toolsDiv) toolsDiv.innerHTML = '<p class="status-error" style="font-size:12px">\u274c ' + escapeHtml(err.message) + '</p>';
   }
+}
+
+async function connectMcpServer() {
+  var input = document.getElementById('mcp-custom-url');
+  var url = input.value.trim();
+  if (!url) return;
+  var statusEl = document.getElementById('mcp-status');
+  statusEl.textContent = '\u23f3 Verbinde...';
+  statusEl.className = 'status-pending';
+  try {
+    var customName = 'custom_' + url.replace(/[^a-zA-Z0-9]/g, '_');
+    var resp = await fetch('/api/mcp/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: url, name: customName })
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var tools = await resp.json();
+    if (!tools || tools.length === 0) {
+      statusEl.textContent = '\u274c Keine Tools gefunden';
+      statusEl.className = 'status-error';
+      return;
+    }
+    // Add custom server entry
+    state.mcpCustomTools = tools;
+    state.mcpServers.push({ name: customName, type: 'http (custom)' });
+    state.mcpServersOpen[customName] = true;
+    state.mcpServersTools[customName] = tools;
+    state.mcpCustomUrls[customName] = url;
+    renderMcpServers();
+    // Re-open the newly added server's tools
+    var toolsDiv = document.getElementById('mcp-tools-' + customName.replace(/[^a-zA-Z0-9_-]/g, '_'));
+    if (toolsDiv) {
+      toolsDiv.classList.add('open');
+      toolsDiv.innerHTML = renderToolChips(tools);
+    }
+    statusEl.textContent = '\u2705 ' + tools.length + ' Tools von ' + url;
+    statusEl.className = 'status-ready';
+    input.value = '';
+  } catch (err) {
+    statusEl.textContent = '\u274c Fehler: ' + err.message;
+    statusEl.className = 'status-error';
+  }
+}
+
+function updateMcpTools() {
+  state.currentMcpTools = Array.from(document.querySelectorAll('input[name="mcp-tool"]:checked')).map(function(cb) { return cb.value; });
 }
 
 /* ── Sessions ── */
@@ -416,6 +499,19 @@ async function initAgent() {
   document.getElementById('init-status').textContent = '\u23f3 Initialisiere...';
   addMessage('system', 'Initialisiere Agent mit aktuellen Tools/Skills/MCP-Tools...');
 
+  // Build mcpServers list from open servers with selected tools
+  var mcpServers = [];
+  for (var srvName in state.mcpServersOpen) {
+    if (!state.mcpServersOpen[srvName]) continue;
+    var srvAllTools = state.mcpServersTools[srvName] || [];
+    var srvPrefixedNames = srvAllTools.map(function(t) { return t.name; });
+    var selectedSrvTools = state.currentMcpTools.filter(function(t) {
+      return srvPrefixedNames.indexOf(t) !== -1;
+    });
+    var url = state.mcpCustomUrls[srvName] || undefined;
+    mcpServers.push({ serverName: srvName, tools: selectedSrvTools.length > 0 ? selectedSrvTools : undefined, url: url });
+  }
+
   try {
     var resp = await fetch('/api/agent/init', {
       method: 'POST',
@@ -423,12 +519,12 @@ async function initAgent() {
       body: JSON.stringify({
         tools: state.currentTools.length > 0 ? state.currentTools : undefined,
         skills: state.currentSkills.length > 0 ? state.currentSkills : undefined,
-        mcpUrl: document.getElementById('mcp-url').value.trim() || undefined,
-        mcpTools: state.currentMcpTools.length > 0 ? state.currentMcpTools : undefined,
+        mcpServerName: mcpServers.length === 1 ? mcpServers[0].serverName : undefined,
+        mcpTools: mcpServers.length === 1 && mcpServers[0].tools ? mcpServers[0].tools : undefined,
+        mcpServers: mcpServers.length > 0 ? mcpServers : undefined,
         skillSearchEnabled: document.getElementById('skill-search-enabled').checked,
         mcpIngestEnabled: document.getElementById('mcp-ingest-enabled').checked,
-        capabilityDirs: document.getElementById('cap-dirs').value.trim() || undefined,
-        capabilityMcp: document.getElementById('cap-mcp').value.trim() || undefined
+        capabilityDirs: document.getElementById('cap-dirs').value.trim() || undefined
       })
     });
 
@@ -582,13 +678,27 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(function() {});
 }
 
+/* ── Panel Toggle ── */
+function togglePanel(id) {
+  var list = document.getElementById(id + '-list');
+  if (list) list.style.display = list.style.display === 'none' ? 'flex' : 'none';
+}
+
 /* ── Init ── */
 window.onload = function() {
   state.currentTools = getSelected('tool');
   state.currentSkills = getSelected('skill');
   setInitialized(false);
 
-  checkApiKeyStatus();
+  // Alle Panels standardmäßig geschlossen; API-Key-Panel öffnen wenn nicht angemeldet
+  checkApiKeyStatus().then(function() {
+    var setup = document.getElementById('apikey-setup');
+    var activate = document.getElementById('apikey-activate');
+    var active = document.getElementById('apikey-active');
+    if ((setup && setup.style.display !== 'none') || (activate && activate.style.display !== 'none')) {
+      togglePanel('apikey');
+    }
+  });
   loadSessions();
 
   document.getElementById('setup-btn').addEventListener('click', setupApiKey);
@@ -597,7 +707,7 @@ window.onload = function() {
   document.getElementById('init-btn').addEventListener('click', initAgent);
   document.getElementById('send-btn').addEventListener('click', sendMessage);
   document.getElementById('new-session-btn').addEventListener('click', newSession);
-  document.getElementById('mcp-refresh-btn').addEventListener('click', fetchMcpTools);
+  document.getElementById('mcp-connect-btn').addEventListener('click', connectMcpServer);
   document.getElementById('menu-btn').addEventListener('click', toggleDrawer);
   document.getElementById('drawer-overlay').addEventListener('click', closeDrawer);
 
@@ -614,8 +724,7 @@ window.onload = function() {
   document.querySelectorAll('[data-toggle]').forEach(function(el) {
     el.addEventListener('click', function() {
       var id = this.getAttribute('data-toggle');
-      var list = document.getElementById(id + '-list');
-      list.style.display = list.style.display === 'none' ? 'flex' : 'none';
+      togglePanel(id);
     });
   });
 
@@ -626,5 +735,5 @@ window.onload = function() {
     cb.addEventListener('change', updateSkills);
   });
 
-  fetchMcpTools();
+  fetchMcpServers();
 };

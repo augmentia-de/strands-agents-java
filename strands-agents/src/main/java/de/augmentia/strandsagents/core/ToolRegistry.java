@@ -3,6 +3,7 @@ package de.augmentia.strandsagents.core;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.augmentia.strandsagents.core.tools.*;
+import de.augmentia.strandsagents.core.tools.local.*;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.agent.tool.ToolSpecifications;
@@ -233,7 +234,7 @@ public class ToolRegistry {
         private final List<String> classNames = new ArrayList<>();
         private Set<String> includes = null;
         private Set<String> excludes = null;
-        private Path cwd = Path.of("").toAbsolutePath();
+        private Path workspace = Path.of("").toAbsolutePath();
 
         public Builder with(AgentTool<?> tool) {
             agentTools.add(tool);
@@ -251,8 +252,15 @@ public class ToolRegistry {
         }
 
         public Builder standard() {
-            var wd = cwd;
-            agentTools.add(new BashTool(wd));
+            return standard(false);
+        }
+
+        public Builder standard(boolean includeBash) {
+            var wd = workspace;
+            if (includeBash) {
+                agentTools.add(new BashTool(wd));
+            }
+            agentTools.add(new DockerRunTool(wd));
             agentTools.add(new ReadTool(wd));
             agentTools.add(new WriteTool(wd));
             agentTools.add(new EditTool(wd));
@@ -276,9 +284,13 @@ public class ToolRegistry {
             return this;
         }
 
-        public Builder cwd(Path cwd) {
-            this.cwd = cwd;
+        public Builder workspace(Path workspace) {
+            this.workspace = workspace;
             return this;
+        }
+
+        public Builder cwd(Path cwd) {
+            return workspace(cwd);
         }
 
         public ToolRegistry build() {

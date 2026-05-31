@@ -52,20 +52,27 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .tool-list { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 0; }
 .empty { font-size: 12px; color: #666; padding: 8px 0; }
 
-/* ── MCP ── */
-.mcp-config { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
-.mcp-config label { font-size: 12px; color: #a0a0c0; }
+/* ── MCP Server List ── */
+.mcp-servers { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
+.mcp-server-item { border: 1px solid #0f3460; border-radius: 8px; overflow: hidden; }
+.mcp-server-label { display: flex; align-items: center; gap: 8px; padding: 8px 10px; cursor: pointer; font-size: 13px; color: #e0e0e0; min-height: 40px; user-select: none; }
+.mcp-server-label:hover { background: #0f3460; }
+.mcp-server-label input[type="checkbox"] { accent-color: #e94560; width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+.mcp-server-type { font-size: 11px; color: #888; margin-left: auto; }
+.mcp-server-tools { display: none; padding: 6px 10px 10px 26px; border-top: 1px solid #0f3460; }
+.mcp-server-tools.open { display: flex; flex-wrap: wrap; gap: 4px; }
+.mcp-custom { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.mcp-custom label { font-size: 12px; color: #a0a0c0; }
 .mcp-url-row { display: flex; gap: 6px; }
 .mcp-url-row input { flex: 1; background: #0f3460; border: 1px solid #1a4a7a; color: #e0e0e0; padding: 8px 10px; border-radius: 6px; font-size: 13px; font-family: monospace; min-height: 40px; }
 .mcp-url-row input:focus { outline: none; border-color: #e94560; }
-.mcp-url-row button { background: #0f3460; color: #a0a0c0; padding: 8px 12px; font-size: 12px; white-space: nowrap; min-height: 40px; }
+.mcp-url-row button { background: #0f3460; color: #a0a0c0; padding: 8px 12px; font-size: 12px; white-space: nowrap; min-height: 40px; cursor: pointer; border: none; border-radius: 6px; }
 .mcp-url-row button:hover { background: #1a4a7a; color: #e0e0e0; }
 #mcp-status { font-size: 11px; margin: 2px 0; }
 .status-pending { color: #ffa500; }
 .status-ready { color: #4caf50; }
 .status-error { color: #e94560; }
 .status-inactive { color: #e94560; }
-#mcp-count { font-size: 11px; color: #888; margin: 2px 0; }
 
 /* ── API Key ── */
 .apikey-config { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
@@ -261,9 +268,13 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   <aside id="sidebar">
     <h2>Strands Agent</h2>
 
+    <p style="font-size:12px;margin-bottom:6px;">
+      <a href="/keys" style="color:#e94560;text-decoration:none;">&#128273; Key Vault verwalten</a>
+    </p>
+
     <section id="apikey-section">
       <h3 data-toggle="apikey">API-Key &#9662;</h3>
-      <div id="apikey-list">
+      <div id="apikey-list" style="display:none">
         <div id="apikey-setup" class="apikey-config" style="display:none">
           <label for="setup-api-key">API-Key</label>
           <input type="password" id="setup-api-key" placeholder="sk-...">
@@ -286,25 +297,22 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
     <section id="mcp-section">
       <h3 data-toggle="mcp">MCP Server &#9662;</h3>
-      <div id="mcp-list">
-        <div class="mcp-config">
-          <label for="mcp-url">Server URL</label>
+      <div id="mcp-list" style="display:none">
+        <div id="mcp-servers-list" class="mcp-servers"></div>
+        <div id="mcp-custom" class="mcp-custom">
+          <label>Benutzerdefinierter MCP Server</label>
           <div class="mcp-url-row">
-            <input type="text" id="mcp-url" value="http://localhost:8888/mcp" placeholder="http://localhost:8888/mcp">
-            <button id="mcp-refresh-btn">Entdecken</button>
+            <input type="text" id="mcp-custom-url" placeholder="http://localhost:3001/mcp" spellcheck="false">
+            <button id="mcp-connect-btn">Connect</button>
           </div>
-          <p id="mcp-status" class="status-pending">&#x23f3; Wird ermittelt...</p>
-          <p id="mcp-count"></p>
         </div>
-        <div id="mcp-tools-list" class="tool-list">
-          <p class="empty">MCP Tools werden geladen...</p>
-        </div>
+        <p id="mcp-status"></p>
       </div>
     </section>
 
     <section id="tools-section">
       <h3 data-toggle="tools">Tools &#9662;</h3>
-      <div id="tools-list" class="tool-list">
+      <div id="tools-list" class="tool-list" style="display:none">
         {#if hasTools}
           {#for tool in tools}
             <label class="chip-select">
@@ -320,7 +328,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
     <section id="skills-section">
       <h3 data-toggle="skills">Skills &#9662;</h3>
-      <div id="skills-list" class="tool-list">
+      <div id="skills-list" class="tool-list" style="display:none">
         {#if hasSkills}
           {#for skill in skills}
             <label class="chip-select">
@@ -361,10 +369,6 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
         <div class="mode-config">
           <label for="cap-dirs">Skill-Verzeichnisse (komma-getrennt)</label>
           <input type="text" id="cap-dirs" placeholder="z.B. skills,extra-skills">
-        </div>
-        <div class="mode-config">
-          <label for="cap-mcp">MCP-Server Definitionen (name:url, komma-getrennt)</label>
-          <input type="text" id="cap-mcp" placeholder="z.B. files:http://localhost:9999/mcp">
         </div>
         <p class="mode-hint">Sub-Agent analysiert Aufgaben und empfiehlt passende Capabilities</p>
       </div>

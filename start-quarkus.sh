@@ -3,10 +3,15 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# ---- API-Keys laden ----
+# ---- Config (env/Modell, aber NICHT den API-Key) ----
 if [ -f "$SCRIPT_DIR/set_keys.sh" ]; then
     source "$SCRIPT_DIR/set_keys.sh"
+    # API-Key nur aus PBE – env-Variable entfernen
+    unset OPENAI_API_KEY
 fi
+
+# ---- PBE-Key-Vault (wie native Docker) ----
+export JSTRANDS_KEY_PATH="${JSTRANDS_KEY_PATH:-$SCRIPT_DIR/config/api-key.enc}"
 
 # ---- Config (Überschreibbar via env) ----
 export STRANDS_SKILLS_DIR="${STRANDS_SKILLS_DIR:-$SCRIPT_DIR/skills}"
@@ -33,6 +38,10 @@ cmd_dev() {
     echo "    Sessions:    $STRANDS_SESSION_DIR"
     echo "    LLM-Log:     $STRANDS_LLM_LOG_ENABLED"
     echo "    Model:       ${OPENAI_MODEL:-gpt-4o-mini}"
+    echo "    PBE-Vault:   $JSTRANDS_KEY_PATH"
+    echo ""
+    echo "   ⚠ API-Key wird nur aus PBE-Vault geladen (kein env)."
+    echo "     → http://localhost:8082/keys  (Key Vault)"
     echo ""
     cd "$SCRIPT_DIR"
     QUARKUS_VERSION=$(grep -oP '<quarkus\.platform\.version>\K[^<]+' strands-agents-quarkus/pom.xml)
@@ -42,6 +51,11 @@ cmd_dev() {
 
 cmd_prod() {
     echo ">>> Produktions-Build + Start"
+    echo "    PBE-Vault:   $JSTRANDS_KEY_PATH"
+    echo ""
+    echo "   ⚠ API-Key wird nur aus PBE-Vault geladen (kein env)."
+    echo "     → http://localhost:8082/keys  (Key Vault)"
+    echo ""
     cd "$SCRIPT_DIR"
     mvn clean package -DskipTests -pl strands-agents-quarkus -am
     java --enable-preview \

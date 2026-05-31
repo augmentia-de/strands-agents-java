@@ -7,15 +7,6 @@ if [ -f "$SCRIPT_DIR/set_keys.sh" ]; then
     source "$SCRIPT_DIR/set_keys.sh"
 fi
 
-# ---- MCP Server (optional) ----
-# MCP_SERVER_COMMAND startet einen MCP-Server via Stdio.
-# Beispiele (npm-Pakete von https://github.com/modelcontextprotocol/servers):
-#   export MCP_SERVER_COMMAND="npx -y @modelcontextprotocol/server-filesystem /tmp"
-#   export MCP_SERVER_COMMAND="npx -y @modelcontextprotocol/server-memory"
-#   export MCP_SERVER_COMMAND="npx -y @modelcontextprotocol/server-everything"
-# MCP_SERVER_URL verbindet zu einem MCP-Server via HTTP/SSE
-# export MCP_SERVER_URL="http://localhost:3000/mcp"
-
 PROJECT="Strands Agents SDK (Java 21)"
 JAVA_VERSION="21"
 

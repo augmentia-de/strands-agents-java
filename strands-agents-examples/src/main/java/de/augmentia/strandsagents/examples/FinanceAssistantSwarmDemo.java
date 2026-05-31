@@ -7,7 +7,6 @@ import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.agent.swarm.SwarmOrchestrator;
 import de.augmentia.strandsagents.core.config.AgentConfig;
 import de.augmentia.strandsagents.core.config.ModelFactory;
-import de.augmentia.strandsagents.core.tools.WebSearchTool;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.model.chat.ChatModel;

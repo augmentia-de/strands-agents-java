@@ -25,8 +25,8 @@ import de.augmentia.strandsagents.core.plugin.PluginRegistry;
 import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailException;
 import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailPlugin;
 import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailResult;
-import de.augmentia.strandsagents.core.plugin.hitl.HITLAuthority;
 import de.augmentia.strandsagents.core.plugin.hitl.HITLPlugin;
+import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.CheckpointService;
 import de.augmentia.strandsagents.core.resilience.*;
 import de.augmentia.strandsagents.core.structured.StructuredOutputConfig;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
@@ -109,6 +109,7 @@ public class Agent {
     private final List<Consumer<StringBuilder>> pluginHooks = new ArrayList<>();
     private GuardrailPlugin guardrailPlugin;
     private HITLPlugin hitlPlugin;
+    private CheckpointService checkpointService;
     private volatile AgentPhase phase = AgentPhase.IDLE;
     private final ReentrantLock pauseLock = new ReentrantLock();
     private final Condition pauseCondition = pauseLock.newCondition();
@@ -658,34 +659,6 @@ public class Agent {
                 return result;
             }
 
-            // HITL before tool execution
-            if (hitlPlugin != null && hitlPlugin.authority() == HITLAuthority.CONFIRM) {
-                phase = AgentPhase.WAITING_FOR_HUMAN;
-                fire(new AgentStateChangedEvent(sid, Instant.now(),
-                    AgentPhase.EXECUTING, AgentPhase.WAITING_FOR_HUMAN,
-                    prompt, iteration, 0));
-                var approval = hitlPlugin.provider().requestApproval(
-                    "tool-execution",
-                    "Tool-Calls: " + aiMessage.toolExecutionRequests().stream()
-                        .map(ToolExecutionRequest::name).toList());
-                log.debug("HITL approval — approved={}, feedback='{}'",
-                    approval.approved(), approval.feedback());
-                if (!approval.approved()) {
-                    phase = AgentPhase.FAILED;
-                    var durationMs = (System.nanoTime() - start) / 1_000_000;
-                    var result = new AgentResult(
-                        sid,
-                        "HITL abgelehnt: " + approval.feedback(),
-                        ChatMessageConverter.toDomainMessages(chatMemory.messages()),
-                        new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
-                        StopReason.INTERRUPTED
-                    );
-                    fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
-                    return result;
-                }
-                phase = AgentPhase.EXECUTING;
-            }
-
             toolCallCount += aiMessage.toolExecutionRequests().size();
 
             // Execute tools one by one with before/after hooks
@@ -826,12 +799,17 @@ public class Agent {
                 );
             }
             case ESCALATE -> {
-                if (hitlPlugin != null) {
-                    var approval = hitlPlugin.provider().requestApproval(
-                        "guardrail-block",
-                        "Guardrail: " + guardResult.reason());
-                    if (approval.approved()) {
-                        yield null; // continue execution
+                if (checkpointService != null) {
+                    var cp = checkpointService.createCheckpoint(sessionId, "guardrail", guardResult.reason());
+                    phase = AgentPhase.WAITING_FOR_HUMAN;
+                    try {
+                        var resolved = checkpointService.await(cp);
+                        if (resolved.status() == de.augmentia.strandsagents.core.plugin.hitl.checkpoint.Checkpoint.Status.APPROVED) {
+                            phase = AgentPhase.EXECUTING;
+                            yield null; // continue execution
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                     }
                 }
                 phase = AgentPhase.FAILED;
@@ -1003,6 +981,10 @@ public class Agent {
 
     public AgentPhase getPhase() {
         return phase;
+    }
+
+    public void setCheckpointService(CheckpointService checkpointService) {
+        this.checkpointService = checkpointService;
     }
 
     public void pauseExecution() {

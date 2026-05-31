@@ -140,7 +140,8 @@ public class FileSessionManager implements SessionManager {
     private static ObjectMapper createMapper() {
         var mapper = new ObjectMapper()
             .registerModule(new JavaTimeModule())
-            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+            .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
 
         return mapper;
     }

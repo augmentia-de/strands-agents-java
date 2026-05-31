@@ -1,8 +1,8 @@
 package de.augmentia.strandsagents.skills;
 
 import dev.langchain4j.mcp.client.DefaultMcpClient;
-import dev.langchain4j.mcp.client.transport.http.StreamableHttpMcpTransport;
-import dev.langchain4j.mcp.client.transport.stdio.StdioMcpTransport;
+import dev.langchain4j.mcp.client.McpClient;
+import dev.langchain4j.mcp.client.transport.http.HttpMcpTransport;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -21,6 +21,13 @@ public class CapabilityRegistry {
     public List<Path> skillDirectories() { return skillDirectories; }
     public List<McpServerConfig> mcpServers() { return mcpServers; }
 
+    public McpServerConfig getServer(String name) {
+        if (name == null) return null;
+        return mcpServers.stream()
+            .filter(s -> name.equals(s.name()))
+            .findFirst().orElse(null);
+    }
+
     public List<Capability> discoverAll() {
         var results = new ArrayList<Capability>();
         for (var dir : skillDirectories) {
@@ -37,8 +44,7 @@ public class CapabilityRegistry {
         }
         for (var mcp : mcpServers) {
             try {
-                var transport = mcp.toTransport();
-                var client = DefaultMcpClient.builder().transport(transport).build();
+                var client = mcp.toDirectClient();
                 var tools = client.listTools();
                 for (var spec : tools) {
                     results.add(new Capability(spec.name(),
@@ -70,20 +76,23 @@ public class CapabilityRegistry {
     public record Capability(String name, String description, String source, CapabilityType type) {}
     public enum CapabilityType { SKILL, MCP_TOOL }
 
-    public record McpServerConfig(String name, String command, List<String> args, String url) {
+    public record McpServerConfig(String name, String url) {
         public McpServerConfig {
-            if (command == null && url == null)
-                throw new IllegalArgumentException("command or url required for MCP server " + name);
+            if (url == null || url.isBlank())
+                throw new IllegalArgumentException("url required for MCP server " + name);
         }
 
-        dev.langchain4j.mcp.client.transport.McpTransport toTransport() {
-            if (url != null) {
-                return StreamableHttpMcpTransport.builder().url(url).build();
-            }
-            var cmd = new ArrayList<String>();
-            cmd.add(command);
-            if (args != null) cmd.addAll(args);
-            return StdioMcpTransport.builder().command(cmd).build();
+        public dev.langchain4j.mcp.client.transport.McpTransport toTransport() {
+            return HttpMcpTransport.builder().sseUrl(url).build();
+        }
+
+        public McpClient toDirectClient() {
+            return DefaultMcpClient.builder()
+                .transport(toTransport())
+                .clientName("strands-agent")
+                .clientVersion("1.0")
+                .protocolVersion("2024-11-05")
+                .build();
         }
     }
 
@@ -92,12 +101,8 @@ public class CapabilityRegistry {
         private final List<McpServerConfig> mcpServers = new ArrayList<>();
 
         public Builder skillDir(Path dir) { skillDirectories.add(dir); return this; }
-        public Builder mcpServer(String name, String command, List<String> args) {
-            mcpServers.add(new McpServerConfig(name, command, args, null));
-            return this;
-        }
         public Builder mcpServer(String name, String url) {
-            mcpServers.add(new McpServerConfig(name, null, null, url));
+            mcpServers.add(new McpServerConfig(name, url));
             return this;
         }
         public Builder mcpServer(McpServerConfig config) {

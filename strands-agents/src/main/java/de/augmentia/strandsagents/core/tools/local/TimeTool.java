@@ -1,6 +1,5 @@
-package de.augmentia.strandsagents.core.tools;
+package de.augmentia.strandsagents.core.tools.local;
 
-import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;

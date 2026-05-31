@@ -1,9 +1,13 @@
 package de.augmentia.strandsagents.quarkus.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import javax.crypto.*;
 import javax.crypto.spec.*;
@@ -11,11 +15,7 @@ import java.security.*;
 
 public class ApiKeyVault {
 
-    private static Path storagePath() {
-        var env = System.getenv("JSTRANDS_KEY_PATH");
-        if (env != null && !env.isBlank()) return Path.of(env);
-        return Path.of("api-key.enc");
-    }
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String ALGORITHM = "AES/GCM/NoPadding";
     private static final int GCM_IV_LENGTH = 12;
     private static final int GCM_TAG_LENGTH = 128;
@@ -24,14 +24,23 @@ public class ApiKeyVault {
     private static final int ITERATIONS = 100_000;
     private static final String KEY_ALGO = "PBKDF2WithHmacSHA256";
 
+    private static Path storagePath() {
+        var env = System.getenv("JSTRANDS_KEY_PATH");
+        if (env != null && !env.isBlank()) return Path.of(env);
+        return Path.of("api-key.enc");
+    }
+
     public static boolean isStored() {
         return Files.exists(storagePath());
     }
 
     public static void store(String apiKey, String password) throws Exception {
-        if (isStored()) {
-            throw new IllegalStateException("Es liegt bereits ein verschlüsselter API-Key vor. Nutze /api/admin/activate.");
-        }
+        store(Map.of("OPENAI_API_KEY", apiKey), password);
+    }
+
+    public static void store(Map<String, String> entries, String password) throws Exception {
+        var json = MAPPER.writeValueAsString(entries);
+
         var salt = new byte[SALT_LENGTH];
         new SecureRandom().nextBytes(salt);
         var key = deriveKey(password, salt);
@@ -42,8 +51,7 @@ public class ApiKeyVault {
         var cipher = Cipher.getInstance(ALGORITHM);
         cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
 
-        var plaintext = apiKey.getBytes(StandardCharsets.UTF_8);
-        var ciphertext = cipher.doFinal(plaintext);
+        var ciphertext = cipher.doFinal(json.getBytes(StandardCharsets.UTF_8));
 
         var path = storagePath();
         var parent = path.getParent();
@@ -57,8 +65,17 @@ public class ApiKeyVault {
     }
 
     public static String load(String password) throws Exception {
+        var map = loadMap(password);
+        var val = map.get("OPENAI_API_KEY");
+        if (val == null) {
+            throw new IllegalStateException("Kein OPENAI_API_KEY im Vault gefunden");
+        }
+        return val;
+    }
+
+    public static Map<String, String> loadMap(String password) throws Exception {
         if (!isStored()) {
-            throw new FileNotFoundException("Kein verschlüsselter API-Key gefunden unter " + storagePath());
+            throw new FileNotFoundException("Keine verschlüsselte Datei gefunden unter " + storagePath());
         }
         var bytes = Files.readAllBytes(storagePath());
         if (bytes.length < SALT_LENGTH + GCM_IV_LENGTH) {
@@ -78,7 +95,15 @@ public class ApiKeyVault {
         cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
 
         var plaintext = cipher.doFinal(ciphertext);
-        return new String(plaintext, StandardCharsets.UTF_8);
+        var json = new String(plaintext, StandardCharsets.UTF_8);
+
+        try {
+            return new LinkedHashMap<>(MAPPER.readValue(json, new TypeReference<Map<String, String>>() {}));
+        } catch (Exception e) {
+            var result = new LinkedHashMap<String, String>();
+            result.put("OPENAI_API_KEY", json);
+            return result;
+        }
     }
 
     private static SecretKey deriveKey(String password, byte[] salt) throws Exception {

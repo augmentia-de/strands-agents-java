@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.core.tools;
+package de.augmentia.strandsagents.core.tools.local;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
@@ -6,6 +6,10 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+
+import de.augmentia.strandsagents.core.tools.AgentTool;
+import de.augmentia.strandsagents.core.tools.TextContent;
+import de.augmentia.strandsagents.core.tools.ToolResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -154,12 +158,17 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
     }
 
     private Path resolve(String path) {
-        var p = Paths.get(path);
-        var resolved = p.isAbsolute() ? p : cwd.resolve(p).normalize();
-        if (!resolved.startsWith(cwd)) {
+        try {
+            var p = Paths.get(path);
+            var resolved = (p.isAbsolute() ? p : cwd.resolve(p)).normalize().toAbsolutePath();
+            var canonical = cwd.toRealPath();
+            if (!resolved.startsWith(canonical)) {
+                throw new RuntimeException("Access denied: path outside working directory: " + path);
+            }
+            return resolved;
+        } catch (IOException e) {
             throw new RuntimeException("Access denied: path outside working directory: " + path);
         }
-        return resolved;
     }
 
     public record Params(String path, Integer offset, Integer limit, Integer line_start, Integer line_end) {}

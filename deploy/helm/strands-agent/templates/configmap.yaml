@@ -18,10 +18,7 @@ data:
   STRANDS_SESSION_DIR: {{ .Values.env.STRANDS_SESSION_DIR | quote }}
   STRANDS_LLM_LOG_ENABLED: {{ .Values.env.STRANDS_LLM_LOG_ENABLED | quote }}
   STRANDS_LLM_LOG_PATH: {{ .Values.env.STRANDS_LLM_LOG_PATH | quote }}
-  STRANDS_MCP_URL: {{ .Values.env.STRANDS_MCP_URL | quote }}
-  STRANDS_MCP_INGEST: {{ .Values.env.STRANDS_MCP_INGEST | quote }}
   STRANDS_SKILLS_SEARCH: {{ .Values.env.STRANDS_SKILLS_SEARCH | quote }}
-  MCP_SERVER_URL: {{ .Values.env.MCP_SERVER_URL | quote }}
   {{- if .Values.vault.enabled }}
   VAULT_ADDR: {{ .Values.env.VAULT_ADDR | quote }}
   VAULT_MOUNT_PATH: {{ .Values.env.VAULT_MOUNT_PATH | quote }}

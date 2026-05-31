@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.core.tools;
+package de.augmentia.strandsagents.core.tools.local;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.BufferedReader;
@@ -9,6 +9,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+
+import de.augmentia.strandsagents.core.tools.AgentTool;
+import de.augmentia.strandsagents.core.tools.TextContent;
+import de.augmentia.strandsagents.core.tools.ToolResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

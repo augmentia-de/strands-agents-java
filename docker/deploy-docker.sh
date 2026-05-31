@@ -35,9 +35,9 @@ docker run -d \
     -e QUARKUS_HTTP_PORT=8084 \
     -e STRANDS_SKILLS_DIR=/app/skills \
     -e STRANDS_AGENT_TOOLS=de.augmentia.strandsagents.core.tools.CalculatorTool \
-    -e STRANDS_MCP_URL="${STRANDS_MCP_URL:-}" \
     -v "$PROJECT_DIR/data:/app/data" \
     -v "$PROJECT_DIR/skills:/app/skills" \
+    -v "$PROJECT_DIR/config/MCP_SERVER_CONFIG.json:/app/config/MCP_SERVER_CONFIG.json:ro" \
     strands-agent:latest
 
 echo ""

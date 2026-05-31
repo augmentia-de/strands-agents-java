@@ -5,26 +5,24 @@ import de.augmentia.strandsagents.core.agent.MockChatModel;
 import de.augmentia.strandsagents.core.agent.MockStreamingChatModel;
 import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.agent.StreamingAgent;
-import de.augmentia.strandsagents.core.config.LlmConfig;
 import de.augmentia.strandsagents.core.config.ModelFactory;
 import de.augmentia.strandsagents.core.logging.FileLlmLogger;
 import de.augmentia.strandsagents.core.logging.LoggingChatModel;
 import de.augmentia.strandsagents.core.model.event.AgentStateChangedEvent;
 import de.augmentia.strandsagents.core.plugin.Plugin;
-import de.augmentia.strandsagents.core.plugin.guardrail.ApprovalResult;
 import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailPlugin;
-import de.augmentia.strandsagents.core.plugin.hitl.HITLAuthority;
-import de.augmentia.strandsagents.core.plugin.hitl.HITLPlugin;
-import de.augmentia.strandsagents.core.plugin.hitl.HITLProvider;
+import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.CheckpointHook;
+import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.CheckpointService;
+import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.ConsoleChannel;
+import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.SSEChannel;
 import de.augmentia.strandsagents.core.tools.ListToolsTool;
 import de.augmentia.strandsagents.core.tools.McpToolMethod;
 import de.augmentia.strandsagents.skills.*;
-import dev.langchain4j.mcp.client.DefaultMcpClient;
 import dev.langchain4j.mcp.client.McpClient;
-import dev.langchain4j.mcp.client.transport.http.StreamableHttpMcpTransport;
 import de.augmentia.strandsagents.quarkus.dto.AgentInitRequest;
 import de.augmentia.strandsagents.quarkus.dto.ChatRequest;
 import de.augmentia.strandsagents.quarkus.dto.ChatResponse;
+import de.augmentia.strandsagents.quarkus.dto.McpServerSelection;
 import de.augmentia.strandsagents.quarkus.dto.SkillInfo;
 import de.augmentia.strandsagents.quarkus.dto.ToolInfo;
 import de.augmentia.strandsagents.sessions.FileSessionManager;
@@ -35,7 +33,6 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -50,9 +47,10 @@ import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailResult;
 import de.augmentia.strandsagents.core.resilience.CircuitBreakerConfig;
 import de.augmentia.strandsagents.core.resilience.ResilienceConfig;
 import de.augmentia.strandsagents.core.resilience.RetryConfig;
-import de.augmentia.strandsagents.core.tools.BashTool;
+import de.augmentia.strandsagents.core.tools.local.HttpTool;
+import de.augmentia.strandsagents.core.tools.local.BashTool;
 import de.augmentia.strandsagents.core.tools.HumanInTheLoopTool;
-import de.augmentia.strandsagents.core.tools.ReadTool;
+import de.augmentia.strandsagents.core.tools.local.ReadTool;
 import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.core.conversation.ConversationManager;
 import de.augmentia.strandsagents.sessions.SessionManager;
@@ -83,19 +81,24 @@ public class AgentService {
     private boolean skillSearchEnabled;
     private boolean mcpIngestEnabled;
     private CapabilityRegistry capabilityRegistry;
-    private String defaultMcpUrl;
+    private CheckpointService checkpointService;
+    private SSEChannel sseChannel;
 
     private final ConcurrentHashMap<String, InitializedSession> initializedAgents = new ConcurrentHashMap<>();
 
     private record InitializedSession(
         Agent agent,
         ToolRegistry registry,
-        McpClient mcpClient,
+        List<McpClient> mcpClients,
         List<String> phases,
         StreamingChatModel streamingModel
     ) {
         void close() {
-            if (mcpClient != null) try { mcpClient.close(); } catch (Exception ignored) {}
+            if (mcpClients != null) {
+                for (var c : mcpClients) {
+                    try { c.close(); } catch (Exception ignored) {}
+                }
+            }
         }
     }
 
@@ -142,8 +145,6 @@ public class AgentService {
             System.getenv().getOrDefault("STRANDS_LLM_LOG_ENABLED", "true")));
         this.llmLogPathProp = System.getProperty("strands.agent.llm-log.path",
             System.getenv().getOrDefault("STRANDS_LLM_LOG_PATH", "logs/llm-calls.log"));
-        this.defaultMcpUrl = System.getProperty("strands.agent.mcp.url",
-            System.getenv().getOrDefault("STRANDS_MCP_URL", "http://localhost:8888/mcp"));
         this.skillsDir = Path.of(skillsDirProp);
         this.sessionDir = Path.of(sessionDirProp);
 
@@ -178,6 +179,11 @@ public class AgentService {
         this.sessionManager = createSessionManager();
         this.logDir = Path.of(llmLogPathProp).getParent();
 
+        this.checkpointService = new CheckpointService(System.getenv("STRANDS_AGENT_HITL_TOOLS"), 120_000);
+        this.checkpointService.registerChannel(new ConsoleChannel());
+        this.sseChannel = new SSEChannel();
+        this.checkpointService.registerChannel(sseChannel);
+
         if (mcpIngestEnabled) {
             fullRegistry.register(new McpIngestTool(fullRegistry));
         }
@@ -196,7 +202,7 @@ public class AgentService {
 
         var selectedTools = req.tools != null && !req.tools.isEmpty()
             ? fullRegistry.withOnly(new HashSet<>(req.tools))
-            : fullRegistry.withOnly(new HashSet<>(fullRegistry.getToolNames()));
+            : fullRegistry.withOnly(new HashSet<>());
 
         // Mode 2: add MCP ingest tool per-session
         boolean effectiveMcpIngest = req.mcpIngestEnabled != null ? req.mcpIngestEnabled : this.mcpIngestEnabled;
@@ -207,9 +213,7 @@ public class AgentService {
         // Mode 3: add capability search tool per-session
         var effectiveCapDirs = req.capabilityDirs != null ? req.capabilityDirs
             : System.getProperty("strands.agent.capabilities.dirs", "");
-        var effectiveCapMcp = req.capabilityMcp != null ? req.capabilityMcp
-            : System.getProperty("strands.agent.capabilities.mcp", "");
-        var sessionCapRegistry = buildCapabilityRegistry(effectiveCapDirs, effectiveCapMcp);
+        var sessionCapRegistry = buildCapabilityRegistry(effectiveCapDirs, "");
         if (sessionCapRegistry != null && this.capabilityRegistry == null) {
             selectedTools.register(ToolRegistry.createMethod(
                 new CapabilitySearchTool(sessionCapRegistry, model)));
@@ -229,6 +233,14 @@ public class AgentService {
         var agent = new Agent(modelToUse, selectedTools, new ToolExecutor(),
             null, sessionManager, null, plugins);
 
+        var cpService = new CheckpointService(System.getenv("STRANDS_AGENT_HITL_TOOLS"), 120_000);
+        cpService.registerChannel(new ConsoleChannel());
+        if (sseChannel != null) cpService.registerChannel(sseChannel);
+        var cpHook = new CheckpointHook(cpService);
+        agent.setCheckpointService(cpService);
+        agent.addHook(cpHook);
+        cpHook.setAgent(agent);
+
         var phases = new CopyOnWriteArrayList<String>();
         agent.setEventListener(event -> {
             if (event instanceof AgentStateChangedEvent sce) {
@@ -236,19 +248,37 @@ public class AgentService {
             }
         });
 
-        McpClient mcpClient = null;
-        var mcpUrl = req.mcpUrl != null && !req.mcpUrl.isBlank() ? req.mcpUrl : defaultMcpUrl;
-        var selectedMcpToolNames = req.mcpTools != null && !req.mcpTools.isEmpty()
-            ? new HashSet<>(req.mcpTools) : null;
-        if (mcpUrl != null && !mcpUrl.isBlank()) {
-            try {
-                mcpClient = connectMcp(mcpUrl, selectedTools, selectedMcpToolNames);
-            } catch (Exception e) {
-                log.warn("MCP-Verbindung fehlgeschlagen: {}", e.getMessage());
+        var mcpClients = new ArrayList<McpClient>();
+        // Multi-server: iterate over mcpServers list
+        if (req.mcpServers != null && !req.mcpServers.isEmpty()) {
+            for (var sel : req.mcpServers) {
+                var config = resolveServerConfig(sel);
+                if (config == null) continue;
+                var selectedMcpToolNames = sel.tools != null && !sel.tools.isEmpty()
+                    ? new HashSet<>(sel.tools) : null;
+                try {
+                    var client = connectMcp(config, selectedTools, selectedMcpToolNames);
+                    mcpClients.add(client);
+                } catch (Exception e) {
+                    log.warn("MCP-Verbindung fehlgeschlagen ({}): {}", sel.serverName, e.getMessage());
+                }
+            }
+        } else {
+            // Fallback: single server via legacy fields
+            var selectedMcpToolNames = req.mcpTools != null && !req.mcpTools.isEmpty()
+                ? new HashSet<>(req.mcpTools) : null;
+            var mcpServerConfig = capabilityRegistry != null && req.mcpServerName != null && !req.mcpServerName.isBlank()
+                ? capabilityRegistry.getServer(req.mcpServerName) : null;
+            if (mcpServerConfig != null) {
+                try {
+                    mcpClients.add(connectMcp(mcpServerConfig, selectedTools, selectedMcpToolNames));
+                } catch (Exception e) {
+                    log.warn("MCP-Verbindung fehlgeschlagen: {}", e.getMessage());
+                }
             }
         }
 
-        initializedAgents.put(sessionId, new InitializedSession(agent, selectedTools, mcpClient, phases, streamingModel));
+        initializedAgents.put(sessionId, new InitializedSession(agent, selectedTools, mcpClients, phases, streamingModel));
 
         var durationMs = (System.nanoTime() - start) / 1_000_000;
 
@@ -362,6 +392,11 @@ public class AgentService {
             if (req.sessionId == null) {
                 req.sessionId = UUID.randomUUID().toString();
             }
+            if (sseChannel != null) {
+                var sid = req.sessionId;
+                sseChannel.register(sid, msg -> onToken.accept(
+                    "{\"type\":\"checkpoint\",\"data\":" + msg + "}"));
+            }
             sAgent.setEventListener(event -> {
                 if (event instanceof AgentStateChangedEvent sce) {
                     phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
@@ -381,6 +416,7 @@ public class AgentService {
             if (onPhases != null) onPhases.accept(List.copyOf(phases));
             var resp = buildChatResponse(result, durationMs, phases, toolCallMap);
             if (onComplete != null) onComplete.accept(resp);
+            if (sseChannel != null) sseChannel.unregister(req.sessionId);
             return;
         }
 
@@ -406,6 +442,11 @@ public class AgentService {
             req.sessionId = UUID.randomUUID().toString();
         }
 
+        if (sseChannel != null) {
+            sseChannel.register(req.sessionId, msg -> onToken.accept(
+                "{\"type\":\"checkpoint\",\"data\":" + msg + "}"));
+        }
+
         agent.setEventListener(event -> {
             if (event instanceof AgentStateChangedEvent sce) {
                 phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
@@ -422,6 +463,9 @@ public class AgentService {
         });
 
         var result = agent.executeStreaming(req.prompt, onToken);
+        if (sseChannel != null) {
+            sseChannel.unregister(req.sessionId);
+        }
         var durationMs = (System.nanoTime() - start) / 1_000_000;
 
         if (onPhases != null) onPhases.accept(List.copyOf(phases));
@@ -450,39 +494,40 @@ public class AgentService {
         // 1. ChatModel
         ChatModel model = createModel(); // Reusing the service's model creation logic
 
-        // 2. ToolRegistry
+        // 2. CheckpointService
+        CheckpointService cpService = new CheckpointService(
+            System.getenv("STRANDS_AGENT_HITL_TOOLS"), 120_000);
+        cpService.registerChannel(new ConsoleChannel());
+        var cpHook = new CheckpointHook(cpService);
+
+        // 3. ToolRegistry
         ToolRegistry toolRegistry = new ToolRegistry();
         toolRegistry.register(new BashTool(Path.of("")));
         toolRegistry.register(new ReadTool(Path.of("")));
-        toolRegistry.register(new HumanInTheLoopTool());
+        toolRegistry.register(new HumanInTheLoopTool(cpService));
 
-        // 3. ToolExecutor
+        // 4. ToolExecutor
         ToolExecutor toolExecutor = new ToolExecutor();
 
-        // 4. ConversationManager
+        // 5. ConversationManager
         ConversationManager conversationManager = new SlidingWindowConversationManager(10);
 
-        // 5. SessionManager
+        // 6. SessionManager
         SessionManager sessionManager = new FileSessionManager(Path.of("logs/sessions"));
 
-        // 6. ResilienceConfig
+        // 7. ResilienceConfig
         ResilienceConfig resilienceConfig = new ResilienceConfig(
             new RetryConfig(3, 1000, 2.0),
             new CircuitBreakerConfig(0.5f, 10L, 30L)
         );
 
-        // 7. Plugins
+        // 8. Plugins
         GuardrailPlugin guardrails = new GuardrailPlugin(
             List.of((messages, context) -> GuardrailResult.ok()),
             List.of((messages, context) -> GuardrailResult.ok())
         );
 
-        HITLPlugin hitl = new HITLPlugin(
-            (action, context) -> ApprovalResult.approved(action),
-            HITLAuthority.CONFIRM
-        );
-
-        List<Plugin> plugins = List.of(guardrails, hitl);
+        List<Plugin> plugins = List.of(guardrails);
 
         Agent agent = new Agent(
             model,
@@ -493,6 +538,10 @@ public class AgentService {
             resilienceConfig,
             plugins
         );
+
+        agent.setCheckpointService(cpService);
+        agent.addHook(cpHook);
+        cpHook.setAgent(agent);
 
         agent.setSystemPrompt("You are a highly capable and secure assistant. " +
                 "Always verify actions with the user when using tools.");
@@ -583,25 +632,47 @@ public class AgentService {
             .toList();
     }
 
-    private static String mcpPrefix(String mcpUrl) {
-        try {
-            var uri = new URI(mcpUrl);
-            var host = uri.getHost();
-            var port = uri.getPort();
-            return "mcp_" + (host != null ? host : "unknown") + (port > 0 ? "_" + port : "");
-        } catch (Exception e) {
-            return "mcp_" + Math.abs(mcpUrl.hashCode()) % 10000;
-        }
+    private static String mcpPrefix(CapabilityRegistry.McpServerConfig config) {
+        return "mcp_" + config.name().replaceAll("[^a-zA-Z0-9]", "_");
     }
 
-    public List<ToolInfo> discoverMcpTools(String mcpUrl) {
+    public List<Map<String, String>> getMcpServers() {
+        if (capabilityRegistry == null) return List.of();
+        return capabilityRegistry.mcpServers().stream()
+            .map(s -> Map.of("name", s.name(), "type", s.url() != null ? "http" : "stdio"))
+            .toList();
+    }
+
+    public List<ToolInfo> discoverMcpTools(String serverName) {
+        if (capabilityRegistry == null) return List.of();
+        var config = capabilityRegistry.getServer(serverName);
+        if (config == null) return List.of();
+        return discoverToolsFromConfig(config);
+    }
+
+    public List<ToolInfo> connectMcpUrl(String url, String serverName) {
+        var name = (serverName != null && !serverName.isBlank()) ? serverName : "custom";
+        var config = new CapabilityRegistry.McpServerConfig(name, url);
+        return discoverToolsFromConfig(config);
+    }
+
+    private CapabilityRegistry.McpServerConfig resolveServerConfig(McpServerSelection sel) {
+        if (sel.url != null && !sel.url.isBlank()) {
+            var name = (sel.serverName != null && !sel.serverName.isBlank()) ? sel.serverName : "custom";
+            return new CapabilityRegistry.McpServerConfig(name, sel.url);
+        }
+        if (capabilityRegistry != null && sel.serverName != null && !sel.serverName.isBlank()) {
+            return capabilityRegistry.getServer(sel.serverName);
+        }
+        return null;
+    }
+
+    private List<ToolInfo> discoverToolsFromConfig(CapabilityRegistry.McpServerConfig config) {
         try {
-            var transport = StreamableHttpMcpTransport.builder()
-                .url(mcpUrl).logRequests(true).logResponses(true).build();
-            var client = DefaultMcpClient.builder().transport(transport).build();
+            var client = config.toDirectClient();
             var tools = client.listTools();
             client.close();
-            var prefix = mcpPrefix(mcpUrl);
+            var prefix = mcpPrefix(config);
             return tools.stream()
                 .map(spec -> {
                     var info = new ToolInfo();
@@ -617,12 +688,10 @@ public class AgentService {
         }
     }
 
-    private McpClient connectMcp(String mcpUrl, ToolRegistry registry, Set<String> selectedTools) throws Exception {
-        var transport = StreamableHttpMcpTransport.builder()
-            .url(mcpUrl).logRequests(true).logResponses(true).build();
-        var client = DefaultMcpClient.builder().transport(transport).build();
+    private McpClient connectMcp(CapabilityRegistry.McpServerConfig config, ToolRegistry registry, Set<String> selectedTools) throws Exception {
+        var client = config.toDirectClient();
         var tools = client.listTools();
-        var prefix = mcpPrefix(mcpUrl);
+        var prefix = mcpPrefix(config);
         int registered = 0;
         for (var spec : tools) {
             var prefixedName = prefix + "_" + spec.name();
@@ -633,10 +702,10 @@ public class AgentService {
                 .parameters(spec.parameters())
                 .build();
             registry.register(prefixedName, prefixedSpec,
-                new McpToolMethod(client, mcpUrl, spec.name(), prefixedSpec));
+                new McpToolMethod(client, config.name(), spec.name(), prefixedSpec));
             registered++;
         }
-        log.info("MCP verbunden: {} ({}/{} Tools registriert)", mcpUrl, registered, tools.size());
+        log.info("MCP verbunden: {} ({}/{} Tools registriert)", config.name(), registered, tools.size());
         return client;
     }
 
@@ -668,14 +737,20 @@ public class AgentService {
             skillsPlugin.setSkillSearchEnabled(skillSearchEnabled);
             plugins.add(skillsPlugin);
         }
-        var hitlProvider = (HITLProvider) (action, context) -> ApprovalResult.approved(action);
-        plugins.add(new HITLPlugin(hitlProvider, HITLAuthority.AUTO));
         plugins.add(new GuardrailPlugin(List.of(), List.of()));
         return plugins;
     }
 
     public boolean isRuntimeKeyActive() {
         return secretService.isRuntimeKeyActive();
+    }
+
+    public CheckpointService getCheckpointService() {
+        return checkpointService;
+    }
+
+    public SSEChannel getSseChannel() {
+        return sseChannel;
     }
 
     public synchronized void activateModel(String apiKey) {
@@ -732,11 +807,26 @@ public class AgentService {
     }
 
     private ToolRegistry createFullRegistry() {
+        var workspaceProp = System.getProperty("strands.agent.workspace",
+            System.getenv().getOrDefault("STRANDS_AGENT_WORKSPACE", ""));
+        var workspace = workspaceProp.isBlank() ? Path.of("").toAbsolutePath()
+            : Path.of(workspaceProp).toAbsolutePath();
+
+        var bashAllowed = Boolean.parseBoolean(System.getProperty("strands.agent.bash.allow",
+            System.getenv().getOrDefault("STRANDS_AGENT_BASH_ALLOW", "false")));
+
+        var blockHttpPrivate = !Boolean.parseBoolean(System.getProperty("strands.agent.http.allow-private",
+            System.getenv().getOrDefault("STRANDS_AGENT_HTTP_ALLOW_PRIVATE", "false")));
+
         var extraTools = System.getProperty("strands.agent.tools",
             System.getenv().getOrDefault("STRANDS_AGENT_TOOLS", ""));
+
         var builder = ToolRegistry.builder()
-            .standard()
-            .cwd(Path.of("").toAbsolutePath());
+            .standard(bashAllowed)
+            .workspace(workspace);
+
+        builder.with(new HttpTool(blockHttpPrivate));
+
         if (!extraTools.isBlank()) {
             for (var cn : extraTools.split(",")) {
                 cn = cn.strip();
@@ -762,18 +852,16 @@ public class AgentService {
     }
 
     private CapabilityRegistry buildCapabilityRegistry() {
+        var configPath = System.getProperty("strands.agent.mcp.config",
+            System.getenv().getOrDefault("STRANDS_MCP_CONFIG", "config/MCP_SERVER_CONFIG.json"));
+        var mcpServers = McpServerConfigLoader.load(Path.of(configPath));
+
         var dirsProp = System.getProperty("strands.agent.capabilities.dirs",
             System.getenv().getOrDefault("STRANDS_CAPABILITIES_DIRS", ""));
-        var mcpProp = System.getProperty("strands.agent.capabilities.mcp",
-            System.getenv().getOrDefault("STRANDS_CAPABILITIES_MCP", ""));
-        return buildCapabilityRegistry(dirsProp, mcpProp);
-    }
-
-    private CapabilityRegistry buildCapabilityRegistry(String dirsProp, String mcpProp) {
-        if ((dirsProp == null || dirsProp.isBlank()) && (mcpProp == null || mcpProp.isBlank())) return null;
-
         var builder = CapabilityRegistry.builder();
-
+        for (var s : mcpServers) {
+            builder.mcpServer(s);
+        }
         if (dirsProp != null && !dirsProp.isBlank()) {
             for (var d : dirsProp.split(",")) {
                 var dir = Path.of(d.strip());
@@ -782,29 +870,20 @@ public class AgentService {
                 }
             }
         }
+        return mcpServers.isEmpty() && (dirsProp == null || dirsProp.isBlank()) ? null : builder.build();
+    }
 
-        if (mcpProp != null && !mcpProp.isBlank()) {
-            for (var entry : mcpProp.split(",")) {
-                var parts = entry.strip().split(":", 3);
-                if (parts.length >= 2) {
-                    var name = parts[0].strip();
-                    var typeOrUrl = parts[1].strip();
-                    if (parts.length == 2) {
-                        builder.mcpServer(name, typeOrUrl);
-                    } else if ("stdio".equals(typeOrUrl)) {
-                        var args = parts[2].strip().split(" ");
-                        var command = args[0];
-                        var rest = args.length > 1
-                            ? List.of(java.util.Arrays.copyOfRange(args, 1, args.length))
-                            : List.<String>of();
-                        builder.mcpServer(new CapabilityRegistry.McpServerConfig(name, command, rest, null));
-                    } else {
-                        builder.mcpServer(name, typeOrUrl);
-                    }
+    private CapabilityRegistry buildCapabilityRegistry(String dirsProp, String mcpProp) {
+        if ((dirsProp == null || dirsProp.isBlank()) && (mcpProp == null || mcpProp.isBlank())) return null;
+        var builder = CapabilityRegistry.builder();
+        if (dirsProp != null && !dirsProp.isBlank()) {
+            for (var d : dirsProp.split(",")) {
+                var dir = Path.of(d.strip());
+                if (Files.isDirectory(dir)) {
+                    builder.skillDir(dir);
                 }
             }
         }
-
         return builder.build();
     }
 

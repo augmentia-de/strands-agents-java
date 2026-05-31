@@ -8,22 +8,18 @@ import de.augmentia.strandsagents.core.tools.McpToolMethod;
 import de.augmentia.strandsagents.core.tools.ToolResult;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.mcp.client.DefaultMcpClient;
-import dev.langchain4j.mcp.client.transport.http.StreamableHttpMcpTransport;
-import dev.langchain4j.mcp.client.transport.stdio.StdioMcpTransport;
+import dev.langchain4j.mcp.client.transport.http.HttpMcpTransport;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 public record McpIngestTool(ToolRegistry toolRegistry)
     implements AgentTool<McpIngestTool.Params> {
 
-    public record Params(String serverName, String command, List<String> args, String url) {
+    public record Params(String serverName, String url) {
         public Params {
-            if (command == null && url == null)
-                throw new IllegalArgumentException("command+args or url required");
-            if (command != null && url != null)
-                throw new IllegalArgumentException("Only one of command or url allowed");
+            if (url == null || url.isBlank())
+                throw new IllegalArgumentException("url required for MCP server");
         }
     }
 
@@ -32,8 +28,8 @@ public record McpIngestTool(ToolRegistry toolRegistry)
 
     @Override
     public String description() {
-        return "Connect to an MCP server and register its tools dynamically. "
-            + "Provide command+args for stdio transport, or url for SSE transport. "
+        return "Connect to an MCP server via SSE and register its tools dynamically. "
+            + "Provide the SSE endpoint URL. "
             + "Once connected, the server's tools become available with the prefix 'mcp_<serverName>_'.";
     }
 
@@ -52,25 +48,15 @@ public record McpIngestTool(ToolRegistry toolRegistry)
         nameProp.put("description", "Name for this MCP server connection");
         props.set("serverName", nameProp);
 
-        var cmdProp = factory.objectNode();
-        cmdProp.put("type", "string");
-        cmdProp.put("description", "Command for stdio transport (e.g. npx)");
-        props.set("command", cmdProp);
-
-        var argsProp = factory.objectNode();
-        argsProp.put("type", "array");
-        argsProp.put("description", "Arguments for stdio command");
-        argsProp.set("items", factory.objectNode().put("type", "string"));
-        props.set("args", argsProp);
-
         var urlProp = factory.objectNode();
         urlProp.put("type", "string");
-        urlProp.put("description", "URL for SSE transport (e.g. http://localhost:8080/mcp)");
+        urlProp.put("description", "SSE endpoint URL (e.g. http://localhost:3000/sse)");
         props.set("url", urlProp);
 
         schema.set("properties", props);
         var required = factory.arrayNode();
         required.add("serverName");
+        required.add("url");
         schema.set("required", required);
         return schema;
     }
@@ -78,10 +64,13 @@ public record McpIngestTool(ToolRegistry toolRegistry)
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         try {
-            var transport = params.url() != null
-                ? StreamableHttpMcpTransport.builder().url(params.url()).build()
-                : StdioMcpTransport.builder().command(buildCommand(params)).build();
-            var client = DefaultMcpClient.builder().transport(transport).build();
+            var transport = HttpMcpTransport.builder().sseUrl(params.url()).build();
+            var client = DefaultMcpClient.builder()
+                .transport(transport)
+                .clientName("strands-agent")
+                .clientVersion("1.0")
+                .protocolVersion("2024-11-05")
+                .build();
             var tools = client.listTools();
 
             var registered = new ArrayList<String>();
@@ -109,12 +98,5 @@ public record McpIngestTool(ToolRegistry toolRegistry)
         } catch (Exception e) {
             return ToolResult.error("Failed to connect MCP server '" + params.serverName() + "': " + e.getMessage());
         }
-    }
-
-    private List<String> buildCommand(Params params) {
-        var cmd = new ArrayList<String>();
-        cmd.add(params.command());
-        if (params.args() != null) cmd.addAll(params.args());
-        return cmd;
     }
 }

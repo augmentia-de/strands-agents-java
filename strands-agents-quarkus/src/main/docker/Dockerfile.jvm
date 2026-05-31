@@ -13,11 +13,10 @@ RUN mkdir -p strands-agents-examples strands-agenttest strands-agents-mcp-server
 RUN mvn install -DskipTests -q -pl strands-agents-quarkus -am
 
 FROM eclipse-temurin:21-jre
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates docker.io && rm -rf /var/lib/apt/lists/*
 WORKDIR /work
 COPY --from=build /project/strands-agents-quarkus/target/quarkus-app/ /work/
 COPY skills/ /work/skills/
 EXPOSE 8082
-USER 1001
 ENV QUARKUS_HTTP_HOST=0.0.0.0
 CMD ["java", "-jar", "quarkus-run.jar"]

@@ -241,7 +241,7 @@ strands-agents-java (parent)
 | `STRANDS_LLM_LOG_ENABLED` | `strands.agent.llm-log.enabled` | `true`                      | Enable LLM call logging                |
 | `STRANDS_LLM_LOG_PATH`    | `strands.agent.llm-log.path`    | `logs/llm-calls.log`        | LLM log file path                      |
 | `STRANDS_AGENT_TOOLS`     | `strands.agent.tools`           | —                           | Comma-separated extra tool class names |
-| `STRANDS_MCP_URL`         | `strands.agent.mcp.url`         | `http://localhost:8888/mcp` | Default MCP server URL                 |
+| `STRANDS_MCP_CONFIG`      | `strands.agent.mcp.config`      | `config/MCP_SERVER_CONFIG.json` | Path to MCP server config JSON    |
 | `VAULT_ADDR`              | --                              | `--`                        | HashiCorp Vault adress                 |
 | `VAULT_TOKEN`             | --                              | `--`                        | HashiCorp Vault token                  |
 
