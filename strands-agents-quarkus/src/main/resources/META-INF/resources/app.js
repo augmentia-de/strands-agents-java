@@ -124,6 +124,7 @@ async function initAgent() {
         skills: currentSkills.length > 0 ? currentSkills : undefined,
         mcpUrl: document.getElementById('mcp-url').value.trim() || undefined,
         mcpTools: currentMcpTools.length > 0 ? currentMcpTools : undefined,
+        systemPrompt: document.getElementById('system-prompt').value.trim() || undefined,
         skillSearchEnabled: document.getElementById('skill-search-enabled').checked,
         mcpIngestEnabled: document.getElementById('mcp-ingest-enabled').checked,
         capabilityDirs: document.getElementById('cap-dirs').value.trim() || undefined,

@@ -8,6 +8,7 @@ public class AgentInitRequest {
     public List<String> initialSkills;
     public String mcpUrl;
     public List<String> mcpTools;
+    public String systemPrompt;
     // Mode 2: dynamic discovery
     public Boolean skillSearchEnabled;
     public Boolean mcpIngestEnabled;

@@ -7,4 +7,5 @@ public class ChatRequest {
     public String sessionId;
     public List<String> tools;
     public List<String> skills;
+    public String systemPrompt;
 }
