@@ -12,6 +12,7 @@ import de.augmentia.strandsagents.core.model.agent.StopReason;
 import de.augmentia.strandsagents.core.model.event.AgentStateChangedEvent;
 import de.augmentia.strandsagents.core.plugin.Plugin;
 import de.augmentia.strandsagents.core.resilience.ResilienceConfig;
+import de.augmentia.strandsagents.core.workflow.StepStatus;
 import dev.langchain4j.model.chat.ChatModel;
 import java.time.Duration;
 import java.time.Instant;
@@ -23,6 +24,7 @@ public class PlanningAgent extends Agent {
     private static final int MAX_EXECUTION_ITERATIONS = 50;
 
     private final Planner planner;
+    private final CheckpointStore checkpointStore;
     private AgentPhase phase = AgentPhase.IDLE;
     private int iterationCount = 0;
     private int revisionCount = 0;
@@ -31,18 +33,21 @@ public class PlanningAgent extends Agent {
     public PlanningAgent(ChatModel model, Planner planner) {
         super(model);
         this.planner = planner;
+        this.checkpointStore = null;
     }
 
     public PlanningAgent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                          Planner planner) {
         super(model, toolRegistry, toolExecutor);
         this.planner = planner;
+        this.checkpointStore = null;
     }
 
     public PlanningAgent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                          ConversationManager conversationManager, Planner planner) {
         super(model, toolRegistry, toolExecutor, conversationManager);
         this.planner = planner;
+        this.checkpointStore = null;
     }
 
     public PlanningAgent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
@@ -50,6 +55,7 @@ public class PlanningAgent extends Agent {
                          ResilienceConfig resilienceConfig, Planner planner) {
         super(model, toolRegistry, toolExecutor, conversationManager, sessionManager, resilienceConfig);
         this.planner = planner;
+        this.checkpointStore = null;
     }
 
     public PlanningAgent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
@@ -57,6 +63,16 @@ public class PlanningAgent extends Agent {
                          ResilienceConfig resilienceConfig, List<Plugin> plugins, Planner planner) {
         super(model, toolRegistry, toolExecutor, conversationManager, sessionManager, resilienceConfig, plugins);
         this.planner = planner;
+        this.checkpointStore = null;
+    }
+
+    public PlanningAgent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
+                         ConversationManager conversationManager, SessionManager sessionManager,
+                         ResilienceConfig resilienceConfig, List<Plugin> plugins,
+                         Planner planner, CheckpointStore checkpointStore) {
+        super(model, toolRegistry, toolExecutor, conversationManager, sessionManager, resilienceConfig, plugins);
+        this.planner = planner;
+        this.checkpointStore = checkpointStore;
     }
 
     @Override
@@ -94,6 +110,10 @@ public class PlanningAgent extends Agent {
                 var step = plan.current();
                 if (step != null) {
                     updatedContext.put(step.id() + ".output", stepResult.output());
+                    if (checkpointStore != null) {
+                        checkpointStore.saveStepStatus(getSessionId(), step.id(),
+                            StepStatus.COMPLETED, stepResult.output());
+                    }
                 }
                 plan = plan.withSharedContext(updatedContext).advanceStep();
             } else {
@@ -149,6 +169,54 @@ public class PlanningAgent extends Agent {
             new ExecutionMetrics(elapsed.toMillis(), 0, 0, iterationCount),
             complete ? StopReason.COMPLETED : StopReason.ERROR
         );
+    }
+
+    /**
+     * Setzt ab letztem completed Step fort.
+     * Überspringt alle bereits COMPLETED Steps.
+     * Erfordert nicht-null CheckpointStore.
+     */
+    public AgentResult resumeSession(String sessionId, String goal) {
+        if (checkpointStore == null) {
+            return executePlanned(goal);
+        }
+
+        var availableTools = getToolRegistry().getToolNames().stream().toList();
+        var plan = planner.createPlan(goal, availableTools);
+        var resumed = false;
+
+        for (int i = 0; i < plan.steps().size(); i++) {
+            var step = plan.steps().get(i);
+            var status = checkpointStore.loadStepStatus(sessionId, step.id());
+
+            if (status.isPresent() && status.get() == StepStatus.COMPLETED) {
+                resumed = true;
+                continue;
+            }
+
+            if (!resumed && status.isPresent() && status.get() == StepStatus.IN_PROGRESS) {
+                checkpointStore.saveStepStatus(sessionId, step.id(), StepStatus.PENDING, "");
+            }
+
+            var stepResult = planner.executeStep(plan, i, getToolExecutor(), getToolRegistry());
+
+            if (stepResult.success()) {
+                var updatedContext = new java.util.HashMap<>(plan.sharedContext());
+                if (stepResult.artifacts() != null) {
+                    updatedContext.putAll(stepResult.artifacts());
+                }
+                updatedContext.put(step.id() + ".output", stepResult.output());
+                plan = plan.withSharedContext(updatedContext).advanceStep();
+                checkpointStore.saveStepStatus(sessionId, step.id(), StepStatus.COMPLETED, stepResult.output());
+            } else {
+                checkpointStore.saveStepStatus(sessionId, step.id(), StepStatus.FAILED, stepResult.error());
+                return new AgentResult(sessionId,
+                    "Resume fehlgeschlagen bei Step " + step.id() + ": " + stepResult.error(),
+                    List.of(), null, StopReason.ERROR);
+            }
+        }
+
+        return new AgentResult(sessionId, buildFinalOutput(plan), List.of(), null, StopReason.COMPLETED);
     }
 
     public AgentPhase getPhase() {

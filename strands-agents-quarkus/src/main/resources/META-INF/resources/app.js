@@ -1,5 +1,5 @@
 var state = {
-  sessionId: crypto.randomUUID(),
+  sessionId: generateUUID(),
   currentTools: [],
   currentSkills: [],
   currentMcpTools: [],
@@ -15,6 +15,19 @@ var state = {
 };
 
 document.getElementById('session-id').textContent = state.sessionId.slice(0, 8) + '...';
+
+
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Fallback for non-secure HTTP contexts
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0,
+        v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
 /* ── Utility ── */
 function escapeHtml(s) {
@@ -483,7 +496,7 @@ function newSession() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionId: state.sessionId })
   }).catch(function() {});
-  state.sessionId = crypto.randomUUID();
+  state.sessionId = generateUUID();
   state.messages = [];
   document.getElementById('session-id').textContent = state.sessionId.slice(0, 8) + '...';
   document.getElementById('messages').innerHTML =
@@ -522,6 +535,7 @@ async function initAgent() {
         mcpServerName: mcpServers.length === 1 ? mcpServers[0].serverName : undefined,
         mcpTools: mcpServers.length === 1 && mcpServers[0].tools ? mcpServers[0].tools : undefined,
         mcpServers: mcpServers.length > 0 ? mcpServers : undefined,
+        systemPrompt: document.getElementById('system-prompt').value.trim(),
         skillSearchEnabled: document.getElementById('skill-search-enabled').checked,
         mcpIngestEnabled: document.getElementById('mcp-ingest-enabled').checked,
         capabilityDirs: document.getElementById('cap-dirs').value.trim() || undefined

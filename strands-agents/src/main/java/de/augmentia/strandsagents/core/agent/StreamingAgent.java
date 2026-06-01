@@ -138,6 +138,23 @@ public class StreamingAgent extends Agent {
     }
 
     /**
+     * Executes a prompt within a specific session and streams tokens.
+     *
+     * @param sessionId    unique identifier for the session
+     * @param prompt       the user input text
+     * @param tokenHandler a consumer that receives incremental text chunks
+     * @return the final execution result
+     */
+    public AgentResult executeStreaming(String sessionId, String prompt, Consumer<String> tokenHandler) {
+        currentTokenConsumer = tokenHandler;
+        try {
+            return execute(sessionId, prompt);
+        } finally {
+            currentTokenConsumer = null;
+        }
+    }
+
+    /**
      * Asynchronously executes a prompt and streams tokens.
      *
      * @param prompt       the user input text

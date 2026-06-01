@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.quarkus.dto;
+package de.augmentia.strandsagents.core.model.api;
 
 public class ToolInfo {
     public String name;

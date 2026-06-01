@@ -76,14 +76,23 @@ public class CapabilityRegistry {
     public record Capability(String name, String description, String source, CapabilityType type) {}
     public enum CapabilityType { SKILL, MCP_TOOL }
 
-    public record McpServerConfig(String name, String url) {
+    public enum TransportType { SSE, STREAMABLE_HTTP }
+
+    public record McpServerConfig(String name, String url, TransportType transportType) {
+        public McpServerConfig(String name, String url) {
+            this(name, url, TransportType.SSE);
+        }
+
         public McpServerConfig {
             if (url == null || url.isBlank())
                 throw new IllegalArgumentException("url required for MCP server " + name);
         }
 
         public dev.langchain4j.mcp.client.transport.McpTransport toTransport() {
-            return HttpMcpTransport.builder().sseUrl(url).build();
+            return switch (transportType) {
+                case SSE -> HttpMcpTransport.builder().sseUrl(url).build();
+                case STREAMABLE_HTTP -> dev.langchain4j.mcp.client.transport.http.StreamableHttpMcpTransport.builder().url(url).build();
+            };
         }
 
         public McpClient toDirectClient() {

@@ -29,7 +29,11 @@ RUN mvn package -Pnative -DskipTests -pl strands-agents-quarkus \
     -Dquarkus.native.container-build=false
 
 # ==== Stage 3: Minimal Runtime ====
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libc6 libstdc++6 zlib1g \
+    && rm -rf /var/lib/apt/lists/*
+RUN groupadd -r appuser -g 1001 && useradd -r -g appuser -u 1001 -m appuser
 WORKDIR /work/
 RUN chown 1001:1001 /work \
     && chmod "g+rwX" /work

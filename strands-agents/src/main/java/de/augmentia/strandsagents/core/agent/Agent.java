@@ -98,17 +98,18 @@ public class Agent {
     private final ChatMemory chatMemory;
     private ToolRegistry toolRegistry;
     private final ToolExecutor toolExecutor;
-    private final String sessionId;
+    private String sessionId;
     private final ConversationManager conversationManager;
     private final SessionManager sessionManager;
     private final RetryConfig retryConfig;
     private final CircuitBreaker circuitBreaker;
     private final SubmissionPublisher<AgentEvent> eventPublisher;
-    private AgentEventListener eventListener;
+    private final List<AgentEventListener> eventListeners = new CopyOnWriteArrayList<>();
     private String systemPrompt = "";
     private final List<Consumer<StringBuilder>> pluginHooks = new ArrayList<>();
     private GuardrailPlugin guardrailPlugin;
     private HITLPlugin hitlPlugin;
+    private List<Plugin> plugins = new ArrayList<>();
     private CheckpointService checkpointService;
     private volatile AgentPhase phase = AgentPhase.IDLE;
     private final ReentrantLock pauseLock = new ReentrantLock();
@@ -236,6 +237,7 @@ public class Agent {
                  ResilienceConfig resilienceConfig, List<Plugin> plugins) {
         this(model, toolRegistry, toolExecutor, conversationManager, sessionManager, resilienceConfig);
         if (plugins != null && !plugins.isEmpty()) {
+            this.plugins = new ArrayList<>(plugins);
             for (var p : plugins) {
                 if (p instanceof GuardrailPlugin gp) this.guardrailPlugin = gp;
                 if (p instanceof HITLPlugin hp) this.hitlPlugin = hp;
@@ -251,6 +253,7 @@ public class Agent {
                  ResilienceConfig resilienceConfig, List<Plugin> plugins, HookRegistry hookRegistry) {
         this(model, toolRegistry, toolExecutor, conversationManager, sessionManager, resilienceConfig, hookRegistry);
         if (plugins != null && !plugins.isEmpty()) {
+            this.plugins = new ArrayList<>(plugins);
             for (var p : plugins) {
                 if (p instanceof GuardrailPlugin gp) this.guardrailPlugin = gp;
                 if (p instanceof HITLPlugin hp) this.hitlPlugin = hp;
@@ -267,6 +270,7 @@ public class Agent {
                  List<Plugin> plugins) {
         this(model, toolRegistry, toolExecutor, conversationManager, sessionManager, chatMemoryStore, resilienceConfig);
         if (plugins != null && !plugins.isEmpty()) {
+            this.plugins = new ArrayList<>(plugins);
             for (var p : plugins) {
                 if (p instanceof GuardrailPlugin gp) this.guardrailPlugin = gp;
                 if (p instanceof HITLPlugin hp) this.hitlPlugin = hp;
@@ -293,8 +297,25 @@ public class Agent {
         }
     }
 
+    public List<Plugin> getPlugins() {
+        return plugins;
+    }
+
     public void setEventListener(AgentEventListener eventListener) {
-        this.eventListener = eventListener;
+        this.eventListeners.clear();
+        if (eventListener != null) {
+            this.eventListeners.add(eventListener);
+        }
+    }
+
+    public void addEventListener(AgentEventListener eventListener) {
+        if (eventListener != null) {
+            this.eventListeners.add(eventListener);
+        }
+    }
+
+    public void removeEventListener(AgentEventListener eventListener) {
+        this.eventListeners.remove(eventListener);
     }
 
     public void setStructuredOutputModel(Class<?> modelClass) {
@@ -396,8 +417,13 @@ public class Agent {
         return executeAsync(prompt);
     }
 
+    public void setSessionId(String sessionId) {
+        this.sessionId = sessionId;
+    }
+
     private AgentResult executeWithSession(String sid, String prompt, Map<String, Object> contextVariables,
                                            boolean useSessionManager) {
+        this.sessionId = sid;
         if (useSessionManager && sessionManager != null) {
             var session = sessionManager.loadSession(sid)
                 .orElseGet(() -> {
@@ -902,8 +928,12 @@ public class Agent {
     }
 
     protected void fire(AgentEvent event) {
-        if (eventListener != null) {
-            eventListener.onEvent(event);
+        for (var listener : eventListeners) {
+            try {
+                listener.onEvent(event);
+            } catch (Exception e) {
+                log.warn("Error in event listener: {}", e.getMessage());
+            }
         }
         eventPublisher.submit(event);
     }

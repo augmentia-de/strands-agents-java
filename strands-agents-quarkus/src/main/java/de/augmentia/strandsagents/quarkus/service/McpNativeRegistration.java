@@ -3,12 +3,16 @@ package de.augmentia.strandsagents.quarkus.service;
 import de.augmentia.strandsagents.core.tools.local.*;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
-@RegisterForReflection(serialization = true, targets = {
+@RegisterForReflection(targets = {
     dev.langchain4j.mcp.protocol.McpJsonRpcMessage.class,
     dev.langchain4j.mcp.protocol.McpClientMethod.class,
     dev.langchain4j.mcp.protocol.McpClientMessage.class,
+    dev.langchain4j.mcp.protocol.McpClientParams.class,
     dev.langchain4j.mcp.protocol.McpClientRequest.class,
     dev.langchain4j.mcp.protocol.McpClientResponse.class,
+    dev.langchain4j.mcp.client.transport.http.HttpMcpTransport.class,
+    dev.langchain4j.mcp.client.transport.McpOperationHandler.class,
+    dev.langchain4j.mcp.client.McpCallContext.class,
     dev.langchain4j.mcp.protocol.McpInitializeRequest.class,
     dev.langchain4j.mcp.protocol.McpInitializeParams.class,
     dev.langchain4j.mcp.protocol.McpInitializeResult.class,

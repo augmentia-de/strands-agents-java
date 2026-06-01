@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.quarkus.dto;
+package de.augmentia.strandsagents.core.model.api;
 
 import de.augmentia.strandsagents.core.model.agent.StopReason;
 import java.util.List;

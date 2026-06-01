@@ -4,29 +4,28 @@ import de.augmentia.strandsagents.core.*;
 import de.augmentia.strandsagents.core.agent.MockChatModel;
 import de.augmentia.strandsagents.core.agent.MockStreamingChatModel;
 import de.augmentia.strandsagents.core.agent.Agent;
+import de.augmentia.strandsagents.core.agent.AgentFactory;
 import de.augmentia.strandsagents.core.agent.StreamingAgent;
 import de.augmentia.strandsagents.core.config.ModelFactory;
+import de.augmentia.strandsagents.core.conversation.SummarizingConversationManager;
 import de.augmentia.strandsagents.core.logging.FileLlmLogger;
 import de.augmentia.strandsagents.core.logging.LoggingChatModel;
 import de.augmentia.strandsagents.core.model.event.AgentStateChangedEvent;
 import de.augmentia.strandsagents.core.plugin.Plugin;
-import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailPlugin;
 import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.CheckpointHook;
 import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.CheckpointService;
-import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.ConsoleChannel;
 import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.SSEChannel;
-import de.augmentia.strandsagents.core.tools.ListToolsTool;
-import de.augmentia.strandsagents.core.tools.McpToolMethod;
 import de.augmentia.strandsagents.skills.*;
 import dev.langchain4j.mcp.client.McpClient;
-import de.augmentia.strandsagents.quarkus.dto.AgentInitRequest;
-import de.augmentia.strandsagents.quarkus.dto.ChatRequest;
-import de.augmentia.strandsagents.quarkus.dto.ChatResponse;
-import de.augmentia.strandsagents.quarkus.dto.McpServerSelection;
-import de.augmentia.strandsagents.quarkus.dto.SkillInfo;
-import de.augmentia.strandsagents.quarkus.dto.ToolInfo;
+import de.augmentia.strandsagents.core.config.StrandsAgentConfig;
+import de.augmentia.strandsagents.core.mcp.McpConnector;
+import de.augmentia.strandsagents.core.model.api.AgentInitRequest;
+import de.augmentia.strandsagents.core.model.api.ChatRequest;
+import de.augmentia.strandsagents.core.model.api.ChatResponse;
+import de.augmentia.strandsagents.core.model.api.McpServerSelection;
+import de.augmentia.strandsagents.core.model.api.SkillInfo;
+import de.augmentia.strandsagents.core.model.api.ToolInfo;
 import de.augmentia.strandsagents.sessions.FileSessionManager;
-import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import jakarta.annotation.PostConstruct;
@@ -38,16 +37,18 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailPlugin;
+import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.ConsoleChannel;
 import de.augmentia.strandsagents.core.model.event.ToolExecutionStartedEvent;
 import de.augmentia.strandsagents.core.model.event.ToolExecutionFinishedEvent;
 import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailResult;
 import de.augmentia.strandsagents.core.resilience.CircuitBreakerConfig;
 import de.augmentia.strandsagents.core.resilience.ResilienceConfig;
 import de.augmentia.strandsagents.core.resilience.RetryConfig;
-import de.augmentia.strandsagents.core.tools.local.HttpTool;
 import de.augmentia.strandsagents.core.tools.local.BashTool;
 import de.augmentia.strandsagents.core.tools.HumanInTheLoopTool;
 import de.augmentia.strandsagents.core.tools.local.ReadTool;
@@ -58,28 +59,23 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ApplicationScoped
-public class AgentService {
+public class AgentService implements de.augmentia.strandsagents.core.service.AgentService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentService.class);
+    private static final String TOOLS_PLACEHOLDER = "{{tools}}";
+    private static final String SKILLS_PLACEHOLDER = "{{skills}}";
+    static final String DEFAULT_SYSTEM_PROMPT = "You are a helpful general agent. "
+        + "Use the selected tools and skills when they are relevant, and explain important results clearly.";
 
     @Inject
     SecretService secretService;
 
+    private StrandsAgentConfig config;
     private ToolRegistry fullRegistry;
     private List<Skill> allSkills;
     private ChatModel model;
-    private FileSessionManager sessionManager;
+    private SessionManager sessionManager;
     private Path logDir;
-    private Path skillsDir;
-    private Path sessionDir;
-    private String skillsDirProp;
-    private String sessionDirProp;
-    private boolean llmLogEnabledProp;
-    private String llmLogPathProp;
-
-    private List<String> initialSkills;
-    private boolean skillSearchEnabled;
-    private boolean mcpIngestEnabled;
     private CapabilityRegistry capabilityRegistry;
     private CheckpointService checkpointService;
     private SSEChannel sseChannel;
@@ -91,7 +87,8 @@ public class AgentService {
         ToolRegistry registry,
         List<McpClient> mcpClients,
         List<String> phases,
-        StreamingChatModel streamingModel
+        StreamingChatModel streamingModel,
+        String systemPrompt
     ) {
         void close() {
             if (mcpClients != null) {
@@ -137,28 +134,8 @@ public class AgentService {
 
     @PostConstruct
     void init() {
-        this.skillsDirProp = System.getProperty("strands.agent.skills.dir",
-            System.getenv().getOrDefault("STRANDS_SKILLS_DIR", "skills"));
-        this.sessionDirProp = System.getProperty("strands.agent.session.dir",
-            System.getenv().getOrDefault("STRANDS_SESSION_DIR", ".sessions"));
-        this.llmLogEnabledProp = Boolean.parseBoolean(System.getProperty("strands.agent.llm-log.enabled",
-            System.getenv().getOrDefault("STRANDS_LLM_LOG_ENABLED", "true")));
-        this.llmLogPathProp = System.getProperty("strands.agent.llm-log.path",
-            System.getenv().getOrDefault("STRANDS_LLM_LOG_PATH", "logs/llm-calls.log"));
-        this.skillsDir = Path.of(skillsDirProp);
-        this.sessionDir = Path.of(sessionDirProp);
-
-        var initialProp = System.getProperty("strands.agent.skills.initial",
-            System.getenv().getOrDefault("STRANDS_SKILLS_INITIAL", ""));
-        this.initialSkills = initialProp.isBlank() ? List.of()
-            : List.of(initialProp.split(",")).stream().map(String::strip).filter(s -> !s.isEmpty()).toList();
-
-        this.skillSearchEnabled = Boolean.parseBoolean(System.getProperty("strands.agent.skills.search",
-            System.getenv().getOrDefault("STRANDS_SKILLS_SEARCH", "false")));
-
-        this.mcpIngestEnabled = Boolean.parseBoolean(System.getProperty("strands.agent.mcp.ingest",
-            System.getenv().getOrDefault("STRANDS_MCP_INGEST", "false")));
-
+        this.config = StrandsAgentConfig.fromMixed();
+        this.logDir = Path.of(config.llmLogPath()).getParent();
         this.capabilityRegistry = buildCapabilityRegistry();
     }
 
@@ -174,17 +151,14 @@ public class AgentService {
         if (model != null) return;
 
         this.model = createModel();
-        this.fullRegistry = createFullRegistry();
+        this.fullRegistry = AgentFactory.createToolRegistry(config);
         this.allSkills = loadSkills();
-        this.sessionManager = createSessionManager();
-        this.logDir = Path.of(llmLogPathProp).getParent();
+        this.sessionManager = AgentFactory.createSessionManager(Path.of(config.sessionDir()));
 
-        this.checkpointService = new CheckpointService(System.getenv("STRANDS_AGENT_HITL_TOOLS"), 120_000);
-        this.checkpointService.registerChannel(new ConsoleChannel());
         this.sseChannel = new SSEChannel();
-        this.checkpointService.registerChannel(sseChannel);
+        this.checkpointService = AgentFactory.createCheckpointService(config, sseChannel);
 
-        if (mcpIngestEnabled) {
+        if (config.mcpIngestEnabled()) {
             fullRegistry.register(new McpIngestTool(fullRegistry));
         }
         if (capabilityRegistry != null) {
@@ -205,8 +179,8 @@ public class AgentService {
             : fullRegistry.withOnly(new HashSet<>());
 
         // Mode 2: add MCP ingest tool per-session
-        boolean effectiveMcpIngest = req.mcpIngestEnabled != null ? req.mcpIngestEnabled : this.mcpIngestEnabled;
-        if (effectiveMcpIngest && !this.mcpIngestEnabled) {
+        boolean effectiveMcpIngest = req.mcpIngestEnabled != null ? req.mcpIngestEnabled : config.mcpIngestEnabled();
+        if (effectiveMcpIngest && !config.mcpIngestEnabled()) {
             selectedTools.register(new McpIngestTool(selectedTools));
         }
 
@@ -223,41 +197,24 @@ public class AgentService {
             ? allSkills.stream().filter(s -> req.skills.contains(s.name())).toList()
             : allSkills;
 
-        var effectiveInitialSkills = req.initialSkills != null ? req.initialSkills : initialSkills;
+        var effectiveInitialSkills = req.initialSkills != null ? req.initialSkills : config.initialSkills();
 
-        boolean effectiveSkillSearch = req.skillSearchEnabled != null ? req.skillSearchEnabled : this.skillSearchEnabled;
-        var plugins = buildPlugins(selectedSkills, effectiveInitialSkills, effectiveSkillSearch);
+        boolean effectiveSkillSearch = req.skillSearchEnabled != null ? req.skillSearchEnabled : config.skillSearchEnabled();
+        var plugins = AgentFactory.buildPlugins(selectedSkills, effectiveInitialSkills, effectiveSkillSearch);
 
         var modelToUse = wrapModel(model);
         var streamingModel = findStreamingModel();
-        var agent = new Agent(modelToUse, selectedTools, new ToolExecutor(),
-            null, sessionManager, null, plugins);
-
-        var cpService = new CheckpointService(System.getenv("STRANDS_AGENT_HITL_TOOLS"), 120_000);
-        cpService.registerChannel(new ConsoleChannel());
-        if (sseChannel != null) cpService.registerChannel(sseChannel);
-        var cpHook = new CheckpointHook(cpService);
-        agent.setCheckpointService(cpService);
-        agent.addHook(cpHook);
-        cpHook.setAgent(agent);
-
-        var phases = new CopyOnWriteArrayList<String>();
-        agent.setEventListener(event -> {
-            if (event instanceof AgentStateChangedEvent sce) {
-                phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
-            }
-        });
 
         var mcpClients = new ArrayList<McpClient>();
         // Multi-server: iterate over mcpServers list
         if (req.mcpServers != null && !req.mcpServers.isEmpty()) {
             for (var sel : req.mcpServers) {
-                var config = resolveServerConfig(sel);
-                if (config == null) continue;
+                var mcpCfg = resolveServerConfig(sel);
+                if (mcpCfg == null) continue;
                 var selectedMcpToolNames = sel.tools != null && !sel.tools.isEmpty()
                     ? new HashSet<>(sel.tools) : null;
                 try {
-                    var client = connectMcp(config, selectedTools, selectedMcpToolNames);
+                    var client = McpConnector.connect(mcpCfg, selectedTools, selectedMcpToolNames);
                     mcpClients.add(client);
                 } catch (Exception e) {
                     log.warn("MCP-Verbindung fehlgeschlagen ({}): {}", sel.serverName, e.getMessage());
@@ -271,14 +228,41 @@ public class AgentService {
                 ? capabilityRegistry.getServer(req.mcpServerName) : null;
             if (mcpServerConfig != null) {
                 try {
-                    mcpClients.add(connectMcp(mcpServerConfig, selectedTools, selectedMcpToolNames));
+                    mcpClients.add(McpConnector.connect(mcpServerConfig, selectedTools, selectedMcpToolNames));
                 } catch (Exception e) {
                     log.warn("MCP-Verbindung fehlgeschlagen: {}", e.getMessage());
                 }
             }
         }
 
-        initializedAgents.put(sessionId, new InitializedSession(agent, selectedTools, mcpClients, phases, streamingModel));
+        var systemPrompt = buildSystemPrompt(req.systemPrompt, selectedTools, selectedSkills);
+        Agent agent;
+        if (streamingModel != null) {
+            //TODO configurable
+            ResilienceConfig resilienceConfig = new ResilienceConfig(
+                    new RetryConfig(3, 1000, 2.0), // 3 retries, starting at 1s, doubling each time
+                    new CircuitBreakerConfig(0.5f, 10L, 30L) // 50% failure rate, 10s window, 30s half-open
+            );
+            SummarizingConversationManager conversationManager = new SummarizingConversationManager(
+                    ModelFactory.createOpenAiFromEnv(), 2048);
+            agent = new StreamingAgent(streamingModel, selectedTools, new ToolExecutor(),
+                    conversationManager, sessionManager, resilienceConfig, plugins);
+        } else {
+            agent = new Agent(modelToUse, selectedTools, new ToolExecutor(),
+                null, sessionManager, null, plugins);
+        }
+        agent.setSystemPrompt(systemPrompt);
+        agent.setSessionId(sessionId);
+
+        var phases = new CopyOnWriteArrayList<String>();
+        agent.addEventListener(event -> {
+            if (event instanceof AgentStateChangedEvent sce) {
+                phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
+            }
+        });
+
+
+        initializedAgents.put(sessionId, new InitializedSession(agent, selectedTools, mcpClients, phases, streamingModel, systemPrompt));
 
         var durationMs = (System.nanoTime() - start) / 1_000_000;
 
@@ -292,162 +276,40 @@ public class AgentService {
 
     public ChatResponse chat(ChatRequest req) {
         ensureInitialized();
-
         var session = req.sessionId != null ? initializedAgents.get(req.sessionId) : null;
         if (session != null) {
             return chatWithInit(req, session);
         }
+        return chatWithoutInit(req);
+    }
 
+    private ChatResponse chatWithoutInit(ChatRequest req) {
         var start = System.nanoTime();
         var activeTools = filterTools(req);
         var activeSkills = filterSkills(req);
-        var plugins = buildPlugins(activeSkills, initialSkills);
+        var plugins = buildPlugins(activeSkills, config.initialSkills());
         var modelToUse = wrapModel(model);
-
-        var agent = new Agent(modelToUse, activeTools, new ToolExecutor(),
-            null, sessionManager, null, plugins);
-
+        var agent = AgentFactory.createAgent(modelToUse, activeTools, sessionManager, null, plugins);
         var phases = new CopyOnWriteArrayList<String>();
-        var toolCallMap = new ConcurrentHashMap<String, ToolCallCapture>();
+        agent.addEventListener(event -> {
+            if (event instanceof AgentStateChangedEvent sce) {
+                phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
+            }
+        });
         if (req.sessionId == null) {
             req.sessionId = UUID.randomUUID().toString();
         }
-
-        agent.setEventListener(event -> {
-            if (event instanceof AgentStateChangedEvent sce) {
-                phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
-            } else if (event instanceof ToolExecutionStartedEvent te) {
-                var tc = te.toolCall();
-                toolCallMap.put(tc.id(), new ToolCallCapture(tc.toolName(), tc.arguments()));
-            } else if (event instanceof ToolExecutionFinishedEvent te) {
-                var existing = toolCallMap.get(te.result().toolCallId());
-                if (existing != null) {
-                    existing.result = te.result().result();
-                    existing.isError = te.result().isError();
-                }
-            }
-        });
-
-        var result = agent.execute(req.sessionId, req.prompt, Map.of());
+        var result = agent.execute(req.sessionId, req.prompt);
         var durationMs = (System.nanoTime() - start) / 1_000_000;
-
-        var resp = buildChatResponse(result, durationMs, phases, toolCallMap);
-        return resp;
+        return buildChatResponse(result, durationMs, phases, new ConcurrentHashMap<>());
     }
 
     private ChatResponse chatWithInit(ChatRequest req, InitializedSession session) {
         var start = System.nanoTime();
-
-        if (req.sessionId == null) {
-            req.sessionId = UUID.randomUUID().toString();
-        }
-
+        var phases = session.phases();
         var toolCallMap = new ConcurrentHashMap<String, ToolCallCapture>();
-        var currentPhases = session.phases();
-        currentPhases.clear();
-
         var agent = session.agent();
-        agent.setEventListener(event -> {
-            if (event instanceof AgentStateChangedEvent sce) {
-                currentPhases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
-            } else if (event instanceof ToolExecutionStartedEvent te) {
-                var tc = te.toolCall();
-                toolCallMap.put(tc.id(), new ToolCallCapture(tc.toolName(), tc.arguments()));
-            } else if (event instanceof ToolExecutionFinishedEvent te) {
-                var existing = toolCallMap.get(te.result().toolCallId());
-                if (existing != null) {
-                    existing.result = te.result().result();
-                    existing.isError = te.result().isError();
-                }
-            }
-        });
-
-        var result = agent.execute(req.sessionId, req.prompt, Map.of());
-        var durationMs = (System.nanoTime() - start) / 1_000_000;
-
-        var resp = buildChatResponse(result, durationMs, currentPhases, toolCallMap);
-        return resp;
-    }
-
-    public void chatSse(ChatRequest req, java.util.function.Consumer<String> onToken,
-                         java.util.function.Consumer<List<String>> onPhases,
-                         java.util.function.Consumer<ChatResponse> onComplete) {
-        ensureInitialized();
-        var start = System.nanoTime();
-
-        var session = req.sessionId != null ? initializedAgents.get(req.sessionId) : null;
-        if (session != null) {
-            var phases = new CopyOnWriteArrayList<String>();
-            var toolCallMap = new ConcurrentHashMap<String, ToolCallCapture>();
-            var sModel = session.streamingModel();
-            StreamingAgent sAgent;
-            if (sModel != null) {
-                sAgent = new StreamingAgent(sModel,
-                    session.registry(), new ToolExecutor(), null, sessionManager, null);
-            } else {
-                sAgent = new StreamingAgent(
-                    new MockStreamingChatModel(),
-                    session.registry(), new ToolExecutor());
-            }
-            if (req.sessionId == null) {
-                req.sessionId = UUID.randomUUID().toString();
-            }
-            if (sseChannel != null) {
-                var sid = req.sessionId;
-                sseChannel.register(sid, msg -> onToken.accept(
-                    "{\"type\":\"checkpoint\",\"data\":" + msg + "}"));
-            }
-            sAgent.setEventListener(event -> {
-                if (event instanceof AgentStateChangedEvent sce) {
-                    phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
-                } else if (event instanceof ToolExecutionStartedEvent te) {
-                    var tc = te.toolCall();
-                    toolCallMap.put(tc.id(), new ToolCallCapture(tc.toolName(), tc.arguments()));
-                } else if (event instanceof ToolExecutionFinishedEvent te) {
-                    var existing = toolCallMap.get(te.result().toolCallId());
-                    if (existing != null) {
-                        existing.result = te.result().result();
-                        existing.isError = te.result().isError();
-                    }
-                }
-            });
-            var result = sAgent.executeStreaming(req.prompt, onToken);
-            var durationMs = (System.nanoTime() - start) / 1_000_000;
-            if (onPhases != null) onPhases.accept(List.copyOf(phases));
-            var resp = buildChatResponse(result, durationMs, phases, toolCallMap);
-            if (onComplete != null) onComplete.accept(resp);
-            if (sseChannel != null) sseChannel.unregister(req.sessionId);
-            return;
-        }
-
-        var activeTools = filterTools(req);
-        var activeSkills = filterSkills(req);
-        var plugins = buildPlugins(activeSkills, initialSkills);
-        var modelToUse = wrapModel(model);
-
-        var streamingModel = findStreamingModel();
-        StreamingAgent agent;
-        if (streamingModel != null) {
-            agent = new StreamingAgent(streamingModel,
-                activeTools, new ToolExecutor(), null, sessionManager, null);
-        } else {
-            agent = new StreamingAgent(
-                new MockStreamingChatModel(),
-                activeTools, new ToolExecutor());
-        }
-
-        var phases = new CopyOnWriteArrayList<String>();
-        var toolCallMap = new ConcurrentHashMap<String, ToolCallCapture>();
-        if (req.sessionId == null) {
-            req.sessionId = UUID.randomUUID().toString();
-        }
-
-        if (sseChannel != null) {
-            sseChannel.register(req.sessionId, msg -> onToken.accept(
-                "{\"type\":\"checkpoint\",\"data\":" + msg + "}"));
-        }
-
-        agent.setEventListener(event -> {
+        AgentEventListener listener = event -> {
             if (event instanceof AgentStateChangedEvent sce) {
                 phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
             } else if (event instanceof ToolExecutionStartedEvent te) {
@@ -460,27 +322,113 @@ public class AgentService {
                     existing.isError = te.result().isError();
                 }
             }
-        });
-
-        var result = agent.executeStreaming(req.prompt, onToken);
-        if (sseChannel != null) {
-            sseChannel.unregister(req.sessionId);
+        };
+        agent.addEventListener(listener);
+        try {
+            var result = agent.execute(req.sessionId, req.prompt);
+            var durationMs = (System.nanoTime() - start) / 1_000_000;
+            return buildChatResponse(result, durationMs, phases, toolCallMap);
+        } finally {
+            agent.removeEventListener(listener);
         }
-        var durationMs = (System.nanoTime() - start) / 1_000_000;
+    }
 
-        if (onPhases != null) onPhases.accept(List.copyOf(phases));
+    public void chatSse(ChatRequest req,
+                         Consumer<String> onToken,
+                         Consumer<List<String>> onPhases,
+                         Consumer<ChatResponse> onComplete) {
+        ensureInitialized();
 
-        var resp = buildChatResponse(result, durationMs, phases, toolCallMap);
-        if (onComplete != null) onComplete.accept(resp);
+        var initializedSession = req.sessionId != null ? initializedAgents.get(req.sessionId) : null;
+
+        ToolRegistry activeTools;
+        List<Plugin> plugins;
+        StreamingChatModel streamingModelToUse;
+
+        if (initializedSession != null) {
+            activeTools = initializedSession.registry();
+            streamingModelToUse = initializedSession.streamingModel() != null
+                ? initializedSession.streamingModel() : findStreamingModel();
+            // Use same plugins/skills setup logic as in initAgent for consistency
+            plugins = initializedSession.agent().getPlugins();
+        } else {
+            activeTools = filterTools(req);
+            var activeSkills = filterSkills(req);
+            plugins = buildPlugins(activeSkills, config.initialSkills());
+            streamingModelToUse = findStreamingModel();
+        }
+
+        var start = System.nanoTime();
+        StreamingAgent agent;
+
+        if (initializedSession != null && initializedSession.agent() instanceof StreamingAgent sa) {
+            agent = sa;
+        } else {
+            if (streamingModelToUse != null) {
+                agent = new StreamingAgent(streamingModelToUse,
+                    activeTools, new ToolExecutor(), null, sessionManager, null, plugins);
+            } else {
+                agent = new StreamingAgent(
+                    new MockStreamingChatModel(),
+                    activeTools, new ToolExecutor());
+            }
+        }
+
+        if (initializedSession != null && initializedSession.systemPrompt() != null) {
+            agent.setSystemPrompt(initializedSession.systemPrompt());
+        } else if (req.systemPrompt != null && !req.systemPrompt.isBlank()) {
+            agent.setSystemPrompt(buildSystemPrompt(req.systemPrompt, activeTools, List.of()));
+        }
+
+        var phases = initializedSession != null ? initializedSession.phases() : new CopyOnWriteArrayList<String>();
+        var toolCallMap = new ConcurrentHashMap<String, ToolCallCapture>();
+        if (req.sessionId == null) {
+            req.sessionId = UUID.randomUUID().toString();
+        }
+        if (sseChannel != null) {
+            sseChannel.register(req.sessionId, msg -> onToken.accept(
+                "{\"type\":\"checkpoint\",\"data\":" + msg + "}"));
+        }
+        AgentEventListener listener = event -> {
+            if (event instanceof AgentStateChangedEvent sce) {
+                phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
+            } else if (event instanceof ToolExecutionStartedEvent te) {
+                var tc = te.toolCall();
+                toolCallMap.put(tc.id(), new ToolCallCapture(tc.toolName(), tc.arguments()));
+            } else if (event instanceof ToolExecutionFinishedEvent te) {
+                var existing = toolCallMap.get(te.result().toolCallId());
+                if (existing != null) {
+                    existing.result = te.result().result();
+                    existing.isError = te.result().isError();
+                }
+            }
+        };
+        agent.addEventListener(listener);
+        try {
+            var result = agent.executeStreaming(req.sessionId, req.prompt, onToken);
+            if (sseChannel != null) {
+                sseChannel.unregister(req.sessionId);
+            }
+            var durationMs = (System.nanoTime() - start) / 1_000_000;
+            if (onPhases != null) onPhases.accept(List.copyOf(phases));
+            var resp = buildChatResponse(result, durationMs, phases, toolCallMap);
+            if (onComplete != null) onComplete.accept(resp);
+        } finally {
+            agent.removeEventListener(listener);
+        }
+    }
+
+    public SSEChannel getSseChannel() {
+        ensureInitialized();
+        return sseChannel;
     }
 
     public Agent createDefaultAgent() {
         ensureInitialized();
         var selectedTools = fullRegistry.withOnly(new HashSet<>(fullRegistry.getToolNames()));
         var modelToUse = wrapModel(model);
-        var plugins = buildPlugins(allSkills, initialSkills);
-        return new Agent(modelToUse, selectedTools, new ToolExecutor(),
-            null, sessionManager, null, plugins);
+        var plugins = buildPlugins(allSkills, config.initialSkills());
+        return AgentFactory.createAgent(modelToUse, selectedTools, sessionManager, null, plugins);
     }
 
     public void releaseSession(String sessionId) {
@@ -586,7 +534,7 @@ public class AgentService {
         return allSkills;
     }
 
-    public FileSessionManager getSessionManager() {
+    public SessionManager getSessionManager() {
         ensureInitialized();
         return sessionManager;
     }
@@ -633,7 +581,7 @@ public class AgentService {
     }
 
     private static String mcpPrefix(CapabilityRegistry.McpServerConfig config) {
-        return "mcp_" + config.name().replaceAll("[^a-zA-Z0-9]", "_");
+        return McpConnector.prefix(config);
     }
 
     public List<Map<String, String>> getMcpServers() {
@@ -647,13 +595,13 @@ public class AgentService {
         if (capabilityRegistry == null) return List.of();
         var config = capabilityRegistry.getServer(serverName);
         if (config == null) return List.of();
-        return discoverToolsFromConfig(config);
+        return McpConnector.discoverTools(config);
     }
 
     public List<ToolInfo> connectMcpUrl(String url, String serverName) {
         var name = (serverName != null && !serverName.isBlank()) ? serverName : "custom";
         var config = new CapabilityRegistry.McpServerConfig(name, url);
-        return discoverToolsFromConfig(config);
+        return McpConnector.discoverTools(config);
     }
 
     private CapabilityRegistry.McpServerConfig resolveServerConfig(McpServerSelection sel) {
@@ -667,46 +615,8 @@ public class AgentService {
         return null;
     }
 
-    private List<ToolInfo> discoverToolsFromConfig(CapabilityRegistry.McpServerConfig config) {
-        try {
-            var client = config.toDirectClient();
-            var tools = client.listTools();
-            client.close();
-            var prefix = mcpPrefix(config);
-            return tools.stream()
-                .map(spec -> {
-                    var info = new ToolInfo();
-                    info.name = prefix + "_" + spec.name();
-                    info.description = spec.description() != null ? spec.description() : "";
-                    info.parameters = spec.parameters() != null ? spec.parameters().toString() : "";
-                    return info;
-                })
-                .toList();
-        } catch (Exception e) {
-            log.warn("MCP-Verbindung fehlgeschlagen: " + e.getMessage());
-            return List.of();
-        }
-    }
-
     private McpClient connectMcp(CapabilityRegistry.McpServerConfig config, ToolRegistry registry, Set<String> selectedTools) throws Exception {
-        var client = config.toDirectClient();
-        var tools = client.listTools();
-        var prefix = mcpPrefix(config);
-        int registered = 0;
-        for (var spec : tools) {
-            var prefixedName = prefix + "_" + spec.name();
-            if (selectedTools != null && !selectedTools.contains(prefixedName)) continue;
-            var prefixedSpec = ToolSpecification.builder()
-                .name(prefixedName)
-                .description(spec.description())
-                .parameters(spec.parameters())
-                .build();
-            registry.register(prefixedName, prefixedSpec,
-                new McpToolMethod(client, config.name(), spec.name(), prefixedSpec));
-            registered++;
-        }
-        log.info("MCP verbunden: {} ({}/{} Tools registriert)", config.name(), registered, tools.size());
-        return client;
+        return McpConnector.connect(config, registry, selectedTools);
     }
 
     private ToolRegistry filterTools(ChatRequest req) {
@@ -726,19 +636,62 @@ public class AgentService {
             .toList();
     }
 
-    private List<Plugin> buildPlugins(List<Skill> skills, List<String> initialSkills) {
-        return buildPlugins(skills, initialSkills, this.skillSearchEnabled);
+    static String buildSystemPrompt(String requestedPrompt, ToolRegistry selectedTools, List<Skill> selectedSkills) {
+        var basePrompt = requestedPrompt != null && !requestedPrompt.isBlank()
+            ? requestedPrompt.strip()
+            : DEFAULT_SYSTEM_PROMPT;
+        var toolSection = describeTools(selectedTools);
+        var skillSection = describeSkills(selectedSkills);
+        var hasToolsPlaceholder = basePrompt.contains(TOOLS_PLACEHOLDER);
+        var hasSkillsPlaceholder = basePrompt.contains(SKILLS_PLACEHOLDER);
+
+        var prompt = basePrompt
+            .replace(TOOLS_PLACEHOLDER, toolSection)
+            .replace(SKILLS_PLACEHOLDER, skillSection);
+
+        var appended = new StringBuilder(prompt);
+        if (!hasToolsPlaceholder) {
+            appended.append("\n\nSelected tools:\n").append(toolSection);
+        }
+        if (!hasSkillsPlaceholder) {
+            appended.append("\n\nSelected skills:\n").append(skillSection);
+        }
+        return appended.toString();
     }
 
-    private List<Plugin> buildPlugins(List<Skill> skills, List<String> initialSkills, boolean skillSearchEnabled) {
-        var plugins = new ArrayList<Plugin>();
-        if (!skills.isEmpty()) {
-            var skillsPlugin = new AgentSkillsPlugin(skills, initialSkills);
-            skillsPlugin.setSkillSearchEnabled(skillSearchEnabled);
-            plugins.add(skillsPlugin);
+    private static String describeTools(ToolRegistry selectedTools) {
+        if (selectedTools == null || selectedTools.size() == 0) {
+            return "- No tools selected.";
         }
-        plugins.add(new GuardrailPlugin(List.of(), List.of()));
-        return plugins;
+        return selectedTools.getToolNames().stream()
+            .sorted()
+            .map(name -> {
+                try {
+                    var description = selectedTools.get(name).spec().description();
+                    return "- " + name + formatDescription(description);
+                } catch (Exception e) {
+                    return "- " + name;
+                }
+            })
+            .collect(java.util.stream.Collectors.joining("\n"));
+    }
+
+    private static String describeSkills(List<Skill> selectedSkills) {
+        if (selectedSkills == null || selectedSkills.isEmpty()) {
+            return "- No skills selected.";
+        }
+        return selectedSkills.stream()
+            .sorted(Comparator.comparing(Skill::name))
+            .map(skill -> "- " + skill.name() + formatDescription(skill.description()))
+            .collect(java.util.stream.Collectors.joining("\n"));
+    }
+
+    private static String formatDescription(String description) {
+        return description != null && !description.isBlank() ? ": " + description.strip() : "";
+    }
+
+    private List<Plugin> buildPlugins(List<Skill> skills, List<String> initialSkills) {
+        return AgentFactory.buildPlugins(skills, initialSkills, config.skillSearchEnabled());
     }
 
     public boolean isRuntimeKeyActive() {
@@ -747,10 +700,6 @@ public class AgentService {
 
     public CheckpointService getCheckpointService() {
         return checkpointService;
-    }
-
-    public SSEChannel getSseChannel() {
-        return sseChannel;
     }
 
     public synchronized void activateModel(String apiKey) {
@@ -793,10 +742,10 @@ public class AgentService {
     }
 
     private ChatModel wrapModel(ChatModel m) {
-        if (!llmLogEnabledProp) return m;
+        if (!config.llmLogEnabled()) return m;
         try {
             Files.createDirectories(logDir);
-            var logger = new FileLlmLogger(Path.of(llmLogPathProp));
+            var logger = new FileLlmLogger(Path.of(config.llmLogPath()));
             var wrapped = new LoggingChatModel(m, logger);
             Runtime.getRuntime().addShutdownHook(new Thread(logger::close));
             return wrapped;
@@ -806,40 +755,8 @@ public class AgentService {
         }
     }
 
-    private ToolRegistry createFullRegistry() {
-        var workspaceProp = System.getProperty("strands.agent.workspace",
-            System.getenv().getOrDefault("STRANDS_AGENT_WORKSPACE", ""));
-        var workspace = workspaceProp.isBlank() ? Path.of("").toAbsolutePath()
-            : Path.of(workspaceProp).toAbsolutePath();
-
-        var bashAllowed = Boolean.parseBoolean(System.getProperty("strands.agent.bash.allow",
-            System.getenv().getOrDefault("STRANDS_AGENT_BASH_ALLOW", "false")));
-
-        var blockHttpPrivate = !Boolean.parseBoolean(System.getProperty("strands.agent.http.allow-private",
-            System.getenv().getOrDefault("STRANDS_AGENT_HTTP_ALLOW_PRIVATE", "false")));
-
-        var extraTools = System.getProperty("strands.agent.tools",
-            System.getenv().getOrDefault("STRANDS_AGENT_TOOLS", ""));
-
-        var builder = ToolRegistry.builder()
-            .standard(bashAllowed)
-            .workspace(workspace);
-
-        builder.with(new HttpTool(blockHttpPrivate));
-
-        if (!extraTools.isBlank()) {
-            for (var cn : extraTools.split(",")) {
-                cn = cn.strip();
-                if (!cn.isEmpty()) builder.with(cn);
-            }
-        }
-        var registry = builder.build();
-        registry.register(new ListToolsTool(registry));
-        return registry;
-    }
-
     private List<Skill> loadSkills() {
-        var dir = Path.of(skillsDirProp);
+        var dir = Path.of(config.skillsDir());
         if (!Files.isDirectory(dir)) {
             return List.of();
         }
@@ -852,8 +769,7 @@ public class AgentService {
     }
 
     private CapabilityRegistry buildCapabilityRegistry() {
-        var configPath = System.getProperty("strands.agent.mcp.config",
-            System.getenv().getOrDefault("STRANDS_MCP_CONFIG", "config/MCP_SERVER_CONFIG.json"));
+        var configPath = config.mcpConfigPath();
         var mcpServers = McpServerConfigLoader.load(Path.of(configPath));
 
         var dirsProp = System.getProperty("strands.agent.capabilities.dirs",
@@ -885,13 +801,6 @@ public class AgentService {
             }
         }
         return builder.build();
-    }
-
-    private FileSessionManager createSessionManager() {
-        try {
-            Files.createDirectories(sessionDir);
-        } catch (Exception ignored) {}
-        return new FileSessionManager(sessionDir);
     }
 
     private void setupLogging() {

@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  mcp-filesystem:
+    image: node:22-slim
+    container_name: mcp-filesystem
+    ports:
+      - "3000:8080"
+    command:
+      - npx
+      - "-y"
+      - mcp-proxy
+      - "--port"
+      - "8080"
+      - "--"
+      - npx
+      - "-y"
+      - "@modelcontextprotocol/server-filesystem"
+      - /workspace
+    volumes:
+      - ./shared_data:/workspace
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:8080/sse',r=>process.exit(r.statusCode==200?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  strands-agent:
+    image: strands-agents-quarkus:latest
+    container_name: strands-agent
+    depends_on:
+      mcp-filesystem:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    environment:
+      - STRANDS_AGENT_MCP_CONFIG=/work/config/MCP_SERVER_CONFIG.json
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+      - OPENAI_MODEL=${OPENAI_MODEL}
+    volumes:
+      - ./config:/work/config
+      - ./shared_data:/workspace
+      - ./.sessions:/work/.sessions
+      - ./logs:/work/logs
+    restart: unless-stopped
+
+  mcp-filesystem:
+    image: node:22-slim
+    container_name: mcp-filesystem
+    ports:
+      - "3000:8080"
+    command:
+      - npx
+      - "-y"
+      - mcp-proxy
+      - "--port"
+      - "8080"
+      - "--"
+      - npx
+      - "-y"
+      - "@modelcontextprotocol/server-filesystem"
+      - /workspace
+    volumes:
+      - ./shared_data:/workspace
+    restart: unless-stopped

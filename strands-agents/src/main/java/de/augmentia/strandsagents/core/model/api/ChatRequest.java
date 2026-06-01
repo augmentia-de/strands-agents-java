@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.quarkus.dto;
+package de.augmentia.strandsagents.core.model.api;
 
 import java.util.List;
 
@@ -7,4 +7,5 @@ public class ChatRequest {
     public String sessionId;
     public List<String> tools;
     public List<String> skills;
+    public String systemPrompt;
 }

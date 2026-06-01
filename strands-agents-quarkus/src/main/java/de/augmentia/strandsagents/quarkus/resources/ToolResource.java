@@ -1,7 +1,7 @@
 package de.augmentia.strandsagents.quarkus.resources;
 
-import de.augmentia.strandsagents.quarkus.dto.SkillInfo;
-import de.augmentia.strandsagents.quarkus.dto.ToolInfo;
+import de.augmentia.strandsagents.core.model.api.SkillInfo;
+import de.augmentia.strandsagents.core.model.api.ToolInfo;
 import de.augmentia.strandsagents.quarkus.service.AgentService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;

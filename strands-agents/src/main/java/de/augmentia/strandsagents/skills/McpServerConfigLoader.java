@@ -30,7 +30,11 @@ public class McpServerConfigLoader {
                 if (cfg == null) continue;
                 var url = cfg.has("url") ? cfg.get("url").asText() : null;
                 if (url == null || url.isBlank()) continue;
-                results.add(new CapabilityRegistry.McpServerConfig(name, url));
+                var type = cfg.has("type") ? cfg.get("type").asText() : "sse";
+                var transportType = "streamable-http".equals(type) || "streamable".equals(type)
+                    ? CapabilityRegistry.TransportType.STREAMABLE_HTTP
+                    : CapabilityRegistry.TransportType.SSE;
+                results.add(new CapabilityRegistry.McpServerConfig(name, url, transportType));
             }
             return results;
         } catch (IOException e) {

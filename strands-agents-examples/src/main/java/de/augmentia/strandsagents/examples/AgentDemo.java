@@ -8,6 +8,8 @@ import de.augmentia.strandsagents.core.hook.AgentHook;
 import de.augmentia.strandsagents.core.hook.HookContexts;
 import de.augmentia.strandsagents.core.hook.HookRegistry;
 import de.augmentia.strandsagents.core.hook.HookResult;
+import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.CheckpointService;
+import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.ConsoleChannel;
 import de.augmentia.strandsagents.sessions.SessionManager;
 import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.core.model.agent.AgentResult;
@@ -48,12 +50,14 @@ public class AgentDemo {
 
         // 1. ChatModel: The core LLM (using OpenAI from environment variables)
         ChatModel model = ModelFactory.createOpenAiFromEnv();
-
+        CheckpointService cpService = new CheckpointService(
+                System.getenv("STRANDS_AGENT_HITL_TOOLS"), 120_000);
+        cpService.registerChannel(new ConsoleChannel());
         // 2. ToolRegistry: Registering tools the agent can use
         ToolRegistry toolRegistry = new ToolRegistry();
         toolRegistry.register(new BashTool(Path.of(""))); // Allows executing bash commands
         toolRegistry.register(new ReadTool(Path.of(""))); // Allows reading files
-        toolRegistry.register(new HumanInTheLoopTool()); // Allows asking the human for help
+        toolRegistry.register(new HumanInTheLoopTool(cpService)); // Allows asking the human for help
 
         // 3. ToolExecutor: The engine that runs the tools
         ToolExecutor toolExecutor = new ToolExecutor();
@@ -82,12 +86,7 @@ public class AgentDemo {
             })
         );
 
-        HITLPlugin hitl = new HITLPlugin(
-            new HumanInTheLoopTool.ConsoleHITLProvider(),
-            HITLAuthority.CONFIRM // Requires human confirmation for all tool calls
-        );
-
-        List<Plugin> plugins = List.of(guardrails, hitl);
+        List<Plugin> plugins = List.of(guardrails);
 
         // 8. Hooks: interception points with flow control (cancel, modify, retry)
         AgentHook loggingHook = new AgentHook() {
