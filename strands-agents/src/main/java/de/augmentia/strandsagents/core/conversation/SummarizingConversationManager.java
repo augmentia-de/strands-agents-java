@@ -56,7 +56,10 @@ public record SummarizingConversationManager(ChatModel summarizer, int maxTokens
 
     private int estimateTokens(List<Message> messages) {
         return messages.stream()
-            .mapToInt(m -> m.content().length() / TOKEN_ESTIMATE_DIVISOR + 4)
+            .mapToInt(m -> {
+                String c = m.content();
+                return (c != null ? c.length() : 0) / TOKEN_ESTIMATE_DIVISOR + 4;
+            })
             .sum();
     }
 
@@ -71,7 +74,7 @@ public record SummarizingConversationManager(ChatModel summarizer, int maxTokens
                 case SystemMessage s -> "System";
                 case ToolMessage t -> "Tool (" + t.toolName() + ")";
             };
-            sb.append(role).append(": ").append(msg.content()).append("\n");
+            sb.append(role).append(": ").append(msg.content() != null ? msg.content() : "").append("\n");
         }
 
         var request = ChatRequest.builder()

@@ -22,3 +22,24 @@ services:
       - ../skills:/app/skills
       - ../config/MCP_SERVER_CONFIG.json:/app/config/MCP_SERVER_CONFIG.json:ro
     restart: unless-stopped
+
+  filesystem-mcp:
+    image: node:21-alpine
+    command:
+      - sh
+      - -c
+      - |
+        npx -y supergateway \
+          --stdio "npx -y @modelcontextprotocol/server-filesystem /data" \
+          --port 3000
+    ports:
+      - "3001:3000"
+    volumes:
+      - ../workspace:/data
+    networks:
+      - strands-net
+    restart: unless-stopped
+
+networks:
+  strands-net:
+    driver: bridge

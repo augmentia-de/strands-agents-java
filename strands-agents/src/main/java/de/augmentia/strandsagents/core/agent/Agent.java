@@ -117,6 +117,7 @@ public class Agent {
     private StructuredOutputConfig structuredOutputConfig;
     private HookRegistry hookRegistry;
     private final ChatMemoryStore chatMemoryStore;
+    private volatile String lastThinking;
 
     /**
      * Constructs an Agent with only a chat model and default components.
@@ -299,6 +300,10 @@ public class Agent {
 
     public List<Plugin> getPlugins() {
         return plugins;
+    }
+
+    public String getLastThinking() {
+        return lastThinking;
     }
 
     public void setEventListener(AgentEventListener eventListener) {
@@ -588,6 +593,7 @@ public class Agent {
 
                 aiMessage = response.aiMessage();
                 responseText = aiMessage.text() != null ? aiMessage.text() : "";
+                lastThinking = aiMessage.thinking();
 
                 var inputTokens = response.tokenUsage() != null ? response.tokenUsage().inputTokenCount() : 0;
                 var outputTokens = response.tokenUsage() != null ? response.tokenUsage().outputTokenCount() : 0;

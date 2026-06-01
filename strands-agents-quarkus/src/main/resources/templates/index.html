@@ -160,6 +160,22 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .message.tool-call.error { border-color: #e94560; }
 .msg-meta { font-size: 11px; color: #666; margin-top: 4px; display: flex; gap: 8px; align-items: center; }
 .msg-meta .status-icon { font-size: 10px; }
+.msg-thinking {
+  margin-top: 8px; border-top: 1px solid #2a4a7a; padding-top: 6px;
+}
+.msg-thinking .thinking-toggle {
+  font-size: 12px; color: #a0c0e0; cursor: pointer; user-select: none;
+  padding: 4px 0; display: inline-flex; align-items: center; gap: 4px;
+  min-height: 32px;
+}
+.msg-thinking .thinking-toggle:hover { color: #e0e0ff; }
+.msg-thinking .thinking-content {
+  display: none; margin-top: 4px; padding: 8px 10px;
+  background: #0f2a4e; border-radius: 8px; font-size: 13px;
+  color: #c0d0e0; line-height: 1.5; white-space: pre-wrap;
+  border-left: 3px solid #e94560;
+}
+.msg-thinking.open .thinking-content { display: block; }
 .msg-avatar {
   width: 28px; height: 28px; border-radius: 50%; display: flex;
   align-items: center; justify-content: center; font-size: 14px;

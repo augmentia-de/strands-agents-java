@@ -16,6 +16,7 @@ public class ChatResponse {
     public boolean memoryUsed;
     public List<String> memorySources;
     public List<String> phases;
+    public String thinking;
     public String error;
 
     public static class ToolCallInfo {

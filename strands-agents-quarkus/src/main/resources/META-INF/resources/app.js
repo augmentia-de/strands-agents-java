@@ -660,6 +660,29 @@ async function sendMessage() {
                 }
                 metaEl.textContent = metaParts.join(' · ');
               }
+              if (r.thinking) {
+                var existingThinking = agentMsg.querySelector('.msg-thinking');
+                if (!existingThinking) {
+                  var thinkingDiv = document.createElement('div');
+                  thinkingDiv.className = 'msg-thinking';
+                  var thinkingToggle = document.createElement('div');
+                  thinkingToggle.className = 'thinking-toggle';
+                  thinkingToggle.textContent = '\u{1F9E0} Reasoning anzeigen';
+                  var thinkingContent = document.createElement('div');
+                  thinkingContent.className = 'thinking-content';
+                  thinkingContent.innerHTML = renderMarkdown(r.thinking);
+                  thinkingDiv.appendChild(thinkingToggle);
+                  thinkingDiv.appendChild(thinkingContent);
+                  var msgContent = agentMsg.querySelector('.msg-content');
+                  msgContent.parentNode.insertBefore(thinkingDiv, msgContent.nextSibling);
+                  thinkingToggle.addEventListener('click', function() {
+                    thinkingDiv.classList.toggle('open');
+                    thinkingToggle.textContent = thinkingDiv.classList.contains('open')
+                      ? '\u{1F9E0} Reasoning ausblenden'
+                      : '\u{1F9E0} Reasoning anzeigen';
+                  });
+                }
+              }
               if (r.memoryUsed) {
                 updateMemoryBar(
                   state.currentTools.concat(state.currentMcpTools),

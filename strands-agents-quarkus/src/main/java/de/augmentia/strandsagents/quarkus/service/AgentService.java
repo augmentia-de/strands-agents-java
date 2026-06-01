@@ -412,6 +412,7 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
             var durationMs = (System.nanoTime() - start) / 1_000_000;
             if (onPhases != null) onPhases.accept(List.copyOf(phases));
             var resp = buildChatResponse(result, durationMs, phases, toolCallMap);
+            resp.thinking = agent.getLastThinking();
             if (onComplete != null) onComplete.accept(resp);
         } finally {
             agent.removeEventListener(listener);
@@ -499,6 +500,7 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
         var durationMs = (System.nanoTime() - start) / 1_000_000;
 
         var resp = buildChatResponse(result, durationMs, new CopyOnWriteArrayList<>(), new ConcurrentHashMap<>());
+        resp.thinking = agent.getLastThinking();
         return resp;
     }
 
