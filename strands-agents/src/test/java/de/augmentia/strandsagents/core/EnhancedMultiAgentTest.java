@@ -104,7 +104,7 @@ class EnhancedMultiAgentTest {
             public dev.langchain4j.model.chat.response.ChatResponse chat(
                     dev.langchain4j.model.chat.request.ChatRequest request) {
                 if (counter.incrementAndGet() < 2) {
-                    throw new RuntimeException("temporärer Fehler");
+                    throw new RuntimeException("temporary error");
                 }
                 return super.chat(request);
             }

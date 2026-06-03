@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.examples;
+package de.augmentia.strandsagents.examples.feature;
 
 import java.time.Instant;
 
@@ -97,7 +97,7 @@ public class StructuredOutputDemo {
 
     public static void main(String[] args) {
         if (System.getenv("OPENAI_API_KEY") == null || System.getenv("OPENAI_API_KEY").isBlank()) {
-            System.out.println("Fehler: OPENAI_API_KEY ist nicht gesetzt.");
+            System.out.println("Error: OPENAI_API_KEY is not set.");
             System.out.println("  Setze die Umgebungsvariable: export OPENAI_API_KEY=sk-...");
             System.exit(1);
         }
@@ -125,7 +125,7 @@ public class StructuredOutputDemo {
 
         try {
             var c = MAPPER.readValue(result.structuredOutput(), Customer.class);
-            System.out.println("  Geparst (typsicher über Record-Konstruktor):");
+            System.out.println("  Parsed (type-safe via Record constructor):");
             System.out.println("    name:         " + c.name());
             System.out.println("    age:          " + c.age());
             System.out.println("    email:        " + c.email());
@@ -134,7 +134,7 @@ public class StructuredOutputDemo {
                 + ", " + c.address().zip() + " " + c.address().city());
             System.out.println("  -> Customer.address ist ein eigenes Record");
         } catch (Exception e) {
-            System.out.println("  Parse-Fehler: " + e.getMessage());
+            System.out.println("  Parse error: " + e.getMessage());
         }
         System.out.println();
     }
@@ -157,7 +157,7 @@ public class StructuredOutputDemo {
 
         try {
             var json = MAPPER.readTree(result.structuredOutput());
-            System.out.println("  JsonNode-Zugriff (kein Record nötig):");
+            System.out.println("  JsonNode access (no Record needed):");
             System.out.println("    name:         " + json.get("name").asText());
             System.out.println("    age:          " + json.get("age").asInt());
             System.out.println("    email:        " + json.get("email").asText());
@@ -167,7 +167,7 @@ public class StructuredOutputDemo {
                 + " " + json.get("address").get("city").asText());
             System.out.println("  -> Flexibel: Schema kann zur Laufzeit kommen");
         } catch (Exception e) {
-            System.out.println("  Parse-Fehler: " + e.getMessage());
+            System.out.println("  Parse error: " + e.getMessage());
         }
         System.out.println();
     }
@@ -184,7 +184,7 @@ public class StructuredOutputDemo {
 
         var result = agent.execute(
             "Erstelle einen Warenkorb: Kunde ist Max Mustermann (max@test.de). " +
-            "Enthält: 2x Laptop (je 899.99), 1x Maus (je 24.95), 3x USB-C Kabel (je 9.99).");
+            "Contains: 2x Laptop (each 899.99), 1x Mouse (each 24.95), 3x USB-C Cable (each 9.99).");
 
         printResult(result);
 
@@ -200,7 +200,7 @@ public class StructuredOutputDemo {
             System.out.println("  Gesamt: " + json.get("total").asText());
             System.out.println("  -> Dynamisch: Array-L\u00e4nge variiert mit Eingabe");
         } catch (Exception e) {
-            System.out.println("  Parse-Fehler: " + e.getMessage());
+            System.out.println("  Parse error: " + e.getMessage());
         }
         System.out.println();
     }

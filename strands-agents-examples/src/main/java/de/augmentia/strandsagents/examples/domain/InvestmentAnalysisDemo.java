@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.examples;
+package de.augmentia.strandsagents.examples.domain;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -28,8 +28,8 @@ import java.util.Scanner;
  *   ├── Financial Analyst (Agent): Analyzes key metrics & financials.
  *   └── Market Analyst (Agent): Analyzes news & sentiment.
  */
-public class FinanceAssistantSwarmDemo {
-    private static final Logger log = LoggerFactory.getLogger(FinanceAssistantSwarmDemo.class);
+public class InvestmentAnalysisDemo {
+    private static final Logger log = LoggerFactory.getLogger(InvestmentAnalysisDemo.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
     public static void main(String[] args) {
@@ -41,7 +41,7 @@ public class FinanceAssistantSwarmDemo {
         System.out.println("\n🤖 Hybrid Multi-Agent Stock Analysis (Java 21) 📊");
         System.out.println("Features: Real-time data + Specialized collaborative agents + Swarm synthesis\n");
 
-        new FinanceAssistantSwarmDemo().run();
+        new InvestmentAnalysisDemo().run();
     }
 
     public void run() {

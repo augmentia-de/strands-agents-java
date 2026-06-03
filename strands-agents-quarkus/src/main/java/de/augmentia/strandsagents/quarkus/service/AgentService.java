@@ -176,7 +176,7 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
     public ChatResponse reinitAgent(AgentInitRequest req) {
         if (req.sessionId == null || req.sessionId.isBlank()) {
             var err = new ChatResponse();
-            err.error = "sessionId erforderlich für Reinitialisierung";
+            err.error = "sessionId required for reinitialization";
             return err;
         }
         releaseSession(req.sessionId);
@@ -765,7 +765,7 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
             Runtime.getRuntime().addShutdownHook(new Thread(logger::close));
             return wrapped;
         } catch (Exception e) {
-            log.warn("LLM-Logging nicht verfügbar: {}", e.getMessage());
+            log.warn("LLM logging not available: {}", e.getMessage());
             return m;
         }
     }

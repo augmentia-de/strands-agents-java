@@ -875,7 +875,7 @@ public class Agent {
                     RetryConfig cfg = effectiveRetryConfig();
                     return circuitBreaker.call(
                         () -> Retry.run(chatCall, cfg),
-                        () -> { throw new RuntimeException("CircuitBreaker: Service temporär nicht verfügbar"); });
+                        () -> { throw new RuntimeException("CircuitBreaker: Service temporarily unavailable"); });
                 }
 
                 return Retry.run(chatCall, effectiveRetryConfig());

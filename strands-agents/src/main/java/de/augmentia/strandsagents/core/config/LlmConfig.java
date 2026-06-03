@@ -43,11 +43,11 @@ public record LlmConfig(
     }
 
     private static String envOrProperty(String key) {
-        var val = System.getenv(key);
+        var val = System.getProperty("vault." + key);
         if (val != null && !val.isBlank()) return val;
-        val = System.getProperty(key);
+        val = System.getenv(key);
         if (val != null && !val.isBlank()) return val;
-        return System.getProperty("vault." + key);
+        return System.getProperty(key);
     }
 
     private static Double parseDoubleOrNull(String s) {

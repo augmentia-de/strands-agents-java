@@ -51,7 +51,7 @@ public class FileChatMemoryStore implements ChatMemoryStore {
         try {
             Files.deleteIfExists(file);
         } catch (IOException e) {
-            throw new RuntimeException("Fehler beim Löschen von " + file, e);
+            throw new RuntimeException("Error deleting " + file, e);
         }
     }
 

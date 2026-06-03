@@ -48,7 +48,7 @@ public class ChatCLI {
         } else {
             var apiKey = System.getenv("OPENAI_API_KEY");
             if (apiKey == null || apiKey.isBlank()) {
-                System.err.println("OPENAI_API_KEY nicht gesetzt. Nutze --mock für Demo-Modus.");
+                System.err.println("OPENAI_API_KEY not set. Use --mock for demo mode.");
                 System.exit(1);
             }
             model = ModelFactory.createOpenAiFromEnv();
@@ -88,7 +88,7 @@ public class ChatCLI {
                     System.out.println("  Skills: " + skills.stream().map(Skill::name).toList());
                 }
             } catch (Exception e) {
-                System.out.println("  Skills-Fehler: " + e.getMessage());
+                System.out.println("  Skills error: " + e.getMessage());
             }
         }
 
@@ -107,11 +107,11 @@ public class ChatCLI {
 
         agent.setEventListener(event -> {
             switch (event) {
-                case AgentStartedEvent e -> System.out.println("\n  Agent gestartet");
-                case ModelRequestedEvent e -> System.out.println("  LLM-Call (" + e.promptHistory().size() + " Nachrichten)");
+                case AgentStartedEvent e -> System.out.println("\n  Agent started");
+                case ModelRequestedEvent e -> System.out.println("  LLM-Call (" + e.promptHistory().size() + " messages)");
                 case ToolExecutionStartedEvent e -> System.out.println("  Tool: " + e.toolCall().toolName());
                 case ToolExecutionFinishedEvent e ->
-                    System.out.println("  " + e.result().toolName() + " → " + truncate(e.result().result(), 80));
+                    System.out.println("  " + e.result().toolName() + " -> " + truncate(e.result().result(), 80));
                 case BeforeInvocationEvent e -> {}
                 case AfterInvocationEvent e -> {}
                 case AgentStateChangedEvent e -> System.out.println("  " + e.previousPhase() + " → " + e.currentPhase());
@@ -144,7 +144,7 @@ public class ChatCLI {
                 try {
                     result = agent.execute(actualSessionId, input, Map.of());
                 } catch (Exception e) {
-                    System.out.println("  Fehler: " + e.getMessage());
+                        System.out.println("  Error: " + e.getMessage());
                     continue;
                 }
                 var durationMs = (System.nanoTime() - start) / 1_000_000;
@@ -163,7 +163,7 @@ public class ChatCLI {
         var parts = input.split("\\s+", 2);
         switch (parts[0].toLowerCase()) {
             case "/exit", "/quit" -> {
-                System.out.println("  Tschuss!");
+                System.out.println("  Bye!");
                 return false;
             }
             case "/tools" -> {
@@ -176,7 +176,7 @@ public class ChatCLI {
             case "/session" -> {
                 System.out.println("  Session-ID: " + sessionId);
                 var history = agent.getChatMemory().messages();
-                System.out.println("  Nachrichten: " + history.size());
+                System.out.println("  Messages: " + history.size());
                 for (var msg : history) {
                     var role = msg.type().name();
                     var text = msg instanceof dev.langchain4j.data.message.AiMessage ai
@@ -187,10 +187,10 @@ public class ChatCLI {
             }
             case "/mcp" -> {
                 if (mcpClient == null) {
-                    System.out.println("  Kein MCP-Server verbunden.");
-                    System.out.println("  Setze MCP_SERVER_COMMAND oder MCP_SERVER_URL.");
+                    System.out.println("  No MCP server connected.");
+                    System.out.println("  Set MCP_SERVER_COMMAND or MCP_SERVER_URL.");
                 } else {
-                    System.out.println("  MCP-Server: verbunden");
+                    System.out.println("  MCP server: connected");
                     try {
                         var tools = mcpClient.listTools();
                         System.out.println("  Tools (" + tools.size() + "):");
@@ -198,20 +198,20 @@ public class ChatCLI {
                             System.out.println("    - " + spec.name() + ": " + (spec.description() != null ? spec.description() : ""));
                         }
                     } catch (Exception e) {
-                        System.out.println("  Fehler: " + e.getMessage());
+                    System.out.println("  Error: " + e.getMessage());
                     }
                 }
             }
             case "/help" -> {
                 System.out.println("  Commands:");
-                System.out.println("    /exit            Beenden");
-                System.out.println("    /tools           Registrierte Tools anzeigen");
-                System.out.println("    /session         Aktuelle Session & Verlauf");
-                System.out.println("    /mcp             MCP-Server-Status & Tools");
-                System.out.println("    /help            Diese Hilfe");
-                System.out.println("  Alles andere wird als Prompt an den Agenten gesendet.");
+                System.out.println("    /exit            Exit");
+                System.out.println("    /tools           Show registered tools");
+                System.out.println("    /session         Show current session & history");
+                System.out.println("    /mcp             MCP server status & tools");
+                System.out.println("    /help            This help");
+                System.out.println("  Everything else is sent as a prompt to the agent.");
             }
-            default -> System.out.println("  Unbekanntes Command: " + parts[0] + " (/help fur Hilfe)");
+            default -> System.out.println("  Unknown command: " + parts[0] + " (/help for help)");
         }
         return true;
     }
@@ -229,7 +229,7 @@ public class ChatCLI {
                 System.out.println("    - " + spec.name() + ": " + spec.description());
             }
         } catch (Exception e) {
-            System.out.println("  MCP-Fehler: " + e.getMessage());
+            System.out.println("  MCP error: " + e.getMessage());
             if (mcpClient != null) try { mcpClient.close(); } catch (Exception ignored) {}
             mcpClient = null;
         }
@@ -246,7 +246,7 @@ public class ChatCLI {
                 System.out.println("    - " + spec.name() + ": " + spec.description());
             }
         } catch (Exception e) {
-            System.out.println("  MCP-Fehler: " + e.getMessage());
+            System.out.println("  MCP error: " + e.getMessage());
             if (mcpClient != null) try { mcpClient.close(); } catch (Exception ignored) {}
             mcpClient = null;
         }
@@ -261,16 +261,16 @@ public class ChatCLI {
 
     static void printHelp() {
         System.out.println("""
-            Nutzung: ChatCLI [Optionen]
-            Optionen:
-              --mock              Ohne API-Key im Mock-Modus starten
-              --session <id>      Bestehende Session fortsetzen
-              --session-dir <pfad> Verzeichnis fur Session-Persistierung
-              --help              Diese Hilfe
+            Usage: ChatCLI [Options]
+            Options:
+              --mock              Start without API key in mock mode
+              --session <id>      Resume existing session
+              --session-dir <path> Directory for session persistence
+              --help              This help
 
-            Umgebungsvariablen (optional):
-              MCP_SERVER_COMMAND  MCP-Server via Stdio (z.B. "npx -y ...")
-              MCP_SERVER_URL      MCP-Server via HTTP/SSE (z.B. "http://...")
+            Environment variables (optional):
+              MCP_SERVER_COMMAND  MCP server via Stdio (e.g. "npx -y ...")
+              MCP_SERVER_URL      MCP server via HTTP/SSE (e.g. "http://...")
             """);
     }
 
@@ -292,9 +292,9 @@ public class ChatCLI {
                     ? um.singleText() : last.toString();
                 return dev.langchain4j.model.chat.response.ChatResponse.builder()
                     .aiMessage(dev.langchain4j.data.message.AiMessage.from(
-                        "Mock-Agent:\n\nDu sagtest: \"" + text + "\"\n\n"
-                        + "Das ist eine simulierte Antwort. Im echten Modus (ohne --mock) "
-                        + "wurde hier die OpenAI-API antworten."))
+                        "Mock-Agent:\n\nYou said: \"" + text + "\"\n\n"
+                        + "This is a simulated response. In real mode (without --mock) "
+                        + "the OpenAI API would respond."))
                     .tokenUsage(new dev.langchain4j.model.output.TokenUsage(10, text.length()))
                     .finishReason(dev.langchain4j.model.output.FinishReason.STOP)
                     .build();

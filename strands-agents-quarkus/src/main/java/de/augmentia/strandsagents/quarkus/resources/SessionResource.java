@@ -44,7 +44,7 @@ public class SessionResource {
                     .toList(),
                 "status", s.state() != null ? s.state().status().name() : "UNKNOWN"
             ))
-            .orElse(Map.of("error", "Session nicht gefunden"));
+            .orElse(Map.of("error", "Session not found"));
     }
 
     @DELETE

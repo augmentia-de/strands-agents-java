@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.examples;
+package de.augmentia.strandsagents.examples.feature;
 
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
@@ -14,7 +14,7 @@ import de.augmentia.strandsagents.examples.tools.UnreliableCalculatorTool;
 import de.augmentia.strandsagents.examples.tools.UnreliableWeatherTool;
 import dev.langchain4j.model.chat.ChatModel;
 
-public class UnreliableToolsDemo {
+public class ResilienceDemo {
 
     public static void main(String[] args) {
         boolean useMock = false;

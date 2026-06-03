@@ -40,19 +40,19 @@ public class MainMock {
         var agent = new Agent(model, registry, new ToolExecutor());
         agent.setEventListener(event -> {
             switch (event) {
-                case AgentStartedEvent e -> System.out.println("  [EVENT] Gestartet");
-                case ModelRequestedEvent e -> System.out.println("  [EVENT] LLM-Call (" + e.promptHistory().size() + " Nachrichten)");
+                case AgentStartedEvent e -> System.out.println("  [EVENT] Started");
+                case ModelRequestedEvent e -> System.out.println("  [EVENT] LLM-Call (" + e.promptHistory().size() + " messages)");
                 case ToolExecutionStartedEvent e -> System.out.println("  [EVENT] Tool: " + e.toolCall().toolName());
-                case ToolExecutionFinishedEvent e -> System.out.println("  [EVENT] Result: " + e.result().toolName() + " → " + e.result().result());
+                case ToolExecutionFinishedEvent e -> System.out.println("  [EVENT] Result: " + e.result().toolName() + " -> " + e.result().result());
                 case BeforeInvocationEvent e -> {}
                 case AfterInvocationEvent e -> {}
-                case AgentStateChangedEvent e -> System.out.println("  [EVENT] Zustand: " + e.previousPhase() + " → " + e.currentPhase());
+                case AgentStateChangedEvent e -> System.out.println("  [EVENT] State: " + e.previousPhase() + " -> " + e.currentPhase());
                 case TokenEvent e -> {}
-                case AgentFinishedEvent e -> System.out.println("  [EVENT] Beendet");
+                case AgentFinishedEvent e -> System.out.println("  [EVENT] Finished");
             }
         });
 
-        var result = agent.execute("Hallo Welt");
+        var result = agent.execute("Hello world");
         System.out.println("  Agent: " + result.finalAnswer());
         System.out.println("  StopReason: " + result.stopReason());
         System.out.println("  Tool-Calls: " + result.metrics().toolCallsCount()
@@ -67,8 +67,8 @@ public class MainMock {
         var subAgent = new Agent(subModel);
         subAgent.setEventListener(e -> {});
 
-        var agentTool = new SubAgentTool(subAgent, "recherche",
-            "Führt Recherchen in einer Wissensdatenbank durch");
+        var agentTool = new SubAgentTool(subAgent, "research",
+            "Performs searches in a knowledge database");
 
         System.out.println("  AgentTool-Typ: " + agentTool.getClass().getSimpleName());
         System.out.println("  @Tool-Methode: execute(String prompt)");
@@ -81,31 +81,31 @@ public class MainMock {
 
         var parentModel = new DemoMockModel();
         var parentAgent = new Agent(parentModel, registry, new ToolExecutor());
-        var result = parentAgent.execute("Recherchiere das Wetter");
+        var result = parentAgent.execute("Research the weather");
         System.out.println("  Parent-Agent: " + result.finalAnswer());
         System.out.println();
     }
 
     static void demoSwarmOrchestrator() {
-        System.out.println("─── 3. Swarm: Orchestrator routet nach Topic ───");
+        System.out.println("─── 3. Swarm: Orchestrator routes by Topic ───");
 
-        var wetterAgent = new Agent(new DemoMockModel("Wetterbericht: %s"));
-        var matheAgent = new Agent(new DemoMockModel("Mathe-Ergebnis: %s"));
+        var weatherAgent = new Agent(new DemoMockModel("Weather report: %s"));
+        var mathAgent = new Agent(new DemoMockModel("Math result: %s"));
 
-        var defaultAgent = new Agent(new DemoMockModel("Allgemein: %s"));
+        var defaultAgent = new Agent(new DemoMockModel("General: %s"));
 
         var orchestrator = new SwarmOrchestrator(Map.of(
-            "wetter", wetterAgent,
-            "mathe", matheAgent
+            "weather", weatherAgent,
+            "math", mathAgent
         ), defaultAgent);
 
         System.out.println("  Routen: " + orchestrator.getRoutes().stream()
             .map(r -> r.topic()).toList());
 
         for (var prompt : List.of(
-            "Wie wird das Wetter morgen?",
-            "Löse diese Mathe-Aufgabe: 5 + 3",
-            "Hallo, wie geht es dir?"
+            "What will the weather be tomorrow?",
+            "Solve this math problem: 5 + 3",
+            "Hello, how are you?"
         )) {
             var result = orchestrator.execute(prompt);
             System.out.println("  Prompt: \"" + prompt + "\"");
@@ -118,9 +118,9 @@ public class MainMock {
         System.out.println("─── 4. Config: AgentConfig + ToolRegistry.Builder ───");
 
         var config = AgentConfig.builder()
-            .name("recherche-agent")
+            .name("research-agent")
             .modelName("openai/gpt-4o")
-            .systemPrompt("Du bist ein Recherche-Agent.")
+            .systemPrompt("You are a research agent.")
             .toolRegistry(ToolRegistry.builder()
                 .standard()
                 .include("bash", "read", "ls")
@@ -135,7 +135,7 @@ public class MainMock {
         System.out.println("  MaxIterations: " + config.maxIterations());
 
         var agent = config.createAgent(new DemoMockModel());
-        System.out.println("  Agent erstellt via config.createAgent(model)");
+        System.out.println("  Agent created via config.createAgent(model)");
 
         var result = agent.execute("Hallo");
         System.out.println("  Agent: " + result.finalAnswer());

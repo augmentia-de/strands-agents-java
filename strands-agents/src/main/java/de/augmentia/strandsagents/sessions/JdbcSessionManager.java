@@ -111,7 +111,7 @@ public class JdbcSessionManager implements SessionManager {
             stmt.setString(1, sessionId);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Fehler beim Löschen von Session " + sessionId, e);
+            throw new RuntimeException("Error deleting session " + sessionId, e);
         }
     }
 
@@ -128,7 +128,7 @@ public class JdbcSessionManager implements SessionManager {
                 }
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Fehler beim Auflisten von Sessions für " + agentName, e);
+            throw new RuntimeException("Error listing sessions for " + agentName, e);
         }
         return sessions;
     }

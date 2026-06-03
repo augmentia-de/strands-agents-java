@@ -25,4 +25,4 @@ mvn -q install -DskipTests
 mvn -q -pl strands-agents-examples \
     exec:exec \
     -Dexec.executable="java" \
-    -Dexec.args="--enable-preview -cp %classpath de.augmentia.strandsagents.examples.SelfImprovementDemo"
+    -Dexec.args="--enable-preview -cp %classpath de.augmentia.strandsagents.examples.feature.SelfImprovementDemo"

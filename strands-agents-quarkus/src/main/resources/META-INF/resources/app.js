@@ -234,7 +234,7 @@ async function checkApiKeyStatus() {
 async function setupApiKey() {
   var apiKey = document.getElementById('setup-api-key').value.trim();
   var password = document.getElementById('setup-password').value.trim();
-  if (!apiKey || !password) { showApiKeyError('API-Key und Passwort erforderlich'); return; }
+  if (!apiKey || !password) { showApiKeyError('API Key and password required'); return; }
   showApiKeyError('');
   try {
     var resp = await fetch('/api/admin/setup', {
@@ -243,31 +243,12 @@ async function setupApiKey() {
       body: JSON.stringify({ apiKey: apiKey, password: password })
     });
     var data = await resp.json();
-    if (!resp.ok) { showApiKeyError(data.error || 'Fehler'); return; }
+    if (!resp.ok) { showApiKeyError(data.error || 'Error'); return; }
     document.getElementById('setup-api-key').value = '';
     document.getElementById('setup-password').value = '';
     renderApiKeyState(true, false);
   } catch (err) {
-    showApiKeyError('Fehler: ' + err.message);
-  }
-}
-
-async function activate() {
-  var password = document.getElementById('activate-password').value.trim();
-  if (!password) { showApiKeyError('Passwort erforderlich'); return; }
-  showApiKeyError('');
-  try {
-    var resp = await fetch('/api/admin/activate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: password })
-    });
-    var data = await resp.json();
-    if (!resp.ok) { showApiKeyError(data.error || 'Fehler'); return; }
-    document.getElementById('activate-password').value = '';
-    renderApiKeyState(true, true);
-  } catch (err) {
-    showApiKeyError('Fehler: ' + err.message);
+    showApiKeyError('Error: ' + err.message);
   }
 }
 
@@ -278,7 +259,7 @@ async function deactivate() {
     if (!resp.ok) return;
     renderApiKeyState(true, false);
   } catch (err) {
-    showApiKeyError('Fehler: ' + err.message);
+    showApiKeyError('Error: ' + err.message);
   }
 }
 
@@ -294,10 +275,10 @@ function updateMcpTools() { state.currentMcpTools = getSelected('mcp-tool'); }
 function setInitialized(val) {
   state.isInitialized = val;
   document.getElementById('init-btn').disabled = val ? false : false;
-  document.getElementById('init-btn').textContent = val ? '\u27F3 Neu initialisieren' : 'Agent initialisieren';
+  document.getElementById('init-btn').textContent = val ? '\u27F3 Re-initialize' : 'Initialize Agent';
   document.getElementById('send-btn').disabled = !val;
   document.getElementById('prompt-input').disabled = !val;
-  document.getElementById('init-status').textContent = val ? '\u2705 Agent bereit' : '\u23f3 Nicht initialisiert';
+  document.getElementById('init-status').textContent = val ? '\u2705 Agent ready' : '\u23f3 Not initialized';
   document.getElementById('init-status').className = val ? 'status-ready' : 'status-pending';
 }
 
@@ -317,7 +298,7 @@ async function fetchMcpServers() {
     state.mcpServers = await resp.json();
     renderMcpServers();
   } catch (err) {
-    console.error('Fehler beim Laden der MCP-Server:', err);
+    console.error('Error loading MCP servers:', err);
   }
 }
 
@@ -337,7 +318,7 @@ function renderMcpServers() {
         '<span class="mcp-server-type">' + escapeHtml(s.type) + '</span>' +
       '</label>' +
       '<div class="mcp-server-tools' + (isOpen ? ' open' : '') + '" id="mcp-tools-' + safeId + '">' +
-        (isOpen && state.mcpServersTools[s.name] ? renderToolChips(state.mcpServersTools[s.name]) : '<p class="empty">Server ausw\u00e4hlen, um Tools zu laden</p>') +
+        (isOpen && state.mcpServersTools[s.name] ? renderToolChips(state.mcpServersTools[s.name]) : '<p class="empty">Select server to load tools</p>') +
       '</div>';
     var cb = item.querySelector('input[type="checkbox"]');
     cb.addEventListener('change', function(srv) {
@@ -348,7 +329,7 @@ function renderMcpServers() {
 }
 
 function renderToolChips(tools) {
-  if (!tools || tools.length === 0) return '<p class="empty">Keine Tools gefunden</p>';
+  if (!tools || tools.length === 0) return '<p class="empty">No tools found</p>';
   var html = '';
   for (var i = 0; i < tools.length; i++) {
     html += mcpToolCheckboxHtml(tools[i].name, tools[i].description);
@@ -362,12 +343,12 @@ async function toggleMcpServer(serverName, checked) {
     // Deselect all tools from this server
     state.mcpServersTools[serverName] = [];
     var toolsDiv = document.getElementById('mcp-tools-' + serverName.replace(/[^a-zA-Z0-9_-]/g, '_'));
-    if (toolsDiv) { toolsDiv.classList.remove('open'); toolsDiv.innerHTML = '<p class="empty">Server ausw\u00e4hlen, um Tools zu laden</p>'; }
+    if (toolsDiv) { toolsDiv.classList.remove('open'); toolsDiv.innerHTML = '<p class="empty">Select server to load tools</p>'; }
     updateMcpTools();
     return;
   }
   var toolsDiv = document.getElementById('mcp-tools-' + serverName.replace(/[^a-zA-Z0-9_-]/g, '_'));
-  if (toolsDiv) toolsDiv.innerHTML = '<p class="status-pending" style="font-size:12px">\u23f3 Lade Tools...</p>';
+  if (toolsDiv) toolsDiv.innerHTML = '<p class="status-pending" style="font-size:12px">\u23f3 Loading tools...</p>';
   try {
     var resp = await fetch('/api/mcp/discover', {
       method: 'POST',
@@ -391,7 +372,7 @@ async function connectMcpServer() {
   var url = input.value.trim();
   if (!url) return;
   var statusEl = document.getElementById('mcp-status');
-  statusEl.textContent = '\u23f3 Verbinde...';
+  statusEl.textContent = '\u23f3 Connecting...';
   statusEl.className = 'status-pending';
   try {
     var customName = 'custom_' + url.replace(/[^a-zA-Z0-9]/g, '_');
@@ -403,7 +384,7 @@ async function connectMcpServer() {
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     var tools = await resp.json();
     if (!tools || tools.length === 0) {
-      statusEl.textContent = '\u274c Keine Tools gefunden';
+      statusEl.textContent = '\u274c No tools found';
       statusEl.className = 'status-error';
       return;
     }
@@ -424,7 +405,7 @@ async function connectMcpServer() {
     statusEl.className = 'status-ready';
     input.value = '';
   } catch (err) {
-    statusEl.textContent = '\u274c Fehler: ' + err.message;
+    statusEl.textContent = '\u274c Error: ' + err.message;
     statusEl.className = 'status-error';
   }
 }
@@ -446,7 +427,7 @@ async function loadSessions() {
 function renderSessions(sessions) {
   var list = document.getElementById('session-list');
   if (!sessions || sessions.length === 0) {
-    list.innerHTML = '<p class="empty">Keine Sessions</p>';
+    list.innerHTML = '<p class="empty">No sessions</p>';
     return;
   }
   list.innerHTML = '';
@@ -457,7 +438,7 @@ function renderSessions(sessions) {
     var title = (s.metadata && s.metadata.lastPrompt) ? s.metadata.lastPrompt : s.sessionId.slice(0, 12) + '...';
     item.innerHTML =
       '<div><button class="sess-delete" data-sid="' + escapeHtml(s.sessionId) + '">✕</button><span class="sess-title">' + escapeHtml(title) + '</span></div>' +
-      '<span class="sess-meta">' + (s.createdAt ? new Date(s.createdAt).toLocaleString() : '') + ' · ' + (s.messageCount || 0) + ' Nachrichten</span>';
+      '<span class="sess-meta">' + (s.createdAt ? new Date(s.createdAt).toLocaleString() : '') + ' · ' + (s.messageCount || 0) + ' messages</span>';
     item.addEventListener('click', function(e) {
       if (e.target.classList.contains('sess-delete')) return;
       switchSession(s.sessionId);
@@ -475,7 +456,7 @@ async function switchSession(sid) {
   state.sessionId = sid;
   document.getElementById('session-id').textContent = sid.slice(0, 8) + '...';
   closeDrawer();
-  addMessage('system', 'Zu Session ' + sid.slice(0, 8) + '... gewechselt');
+  addMessage('system', 'Switched to session ' + sid.slice(0, 8) + '...');
   setInitialized(false);
   loadSessions();
 }
@@ -501,7 +482,7 @@ function newSession() {
   state.messages = [];
   document.getElementById('session-id').textContent = state.sessionId.slice(0, 8) + '...';
   document.getElementById('messages').innerHTML =
-    '<div class="message system"><div class="msg-content">Neue Session gestartet. W\u00e4hle Tools/Skills und klicke "Agent initialisieren".</div></div>';
+    '<div class="message system"><div class="msg-content">New session started. Select Tools/Skills and click "Initialize Agent".</div></div>';
   updateMemoryBar([], 0);
   setInitialized(false);
   loadSessions();
@@ -540,8 +521,8 @@ function buildInitBody() {
 async function initAgent() {
   var btn = document.getElementById('init-btn');
   btn.disabled = true;
-  document.getElementById('init-status').textContent = '\u23f3 Initialisiere...';
-  addMessage('system', 'Initialisiere Agent mit aktuellen Tools/Skills/MCP-Tools...');
+  document.getElementById('init-status').textContent = '\u23f3 Initializing...';
+  addMessage('system', 'Initializing agent with current Tools/Skills/MCP Tools...');
 
   try {
     var resp = await fetch('/api/agent/init', {
@@ -552,7 +533,7 @@ async function initAgent() {
 
     var data = await resp.json();
     if (data.error) {
-      addMessage('system', 'Fehler bei Initialisierung: ' + data.error);
+      addMessage('system', 'Error during initialization: ' + data.error);
       btn.disabled = false;
       return;
     }
@@ -561,7 +542,7 @@ async function initAgent() {
     document.getElementById('session-id').textContent = state.sessionId.slice(0, 8) + '...';
     setInitialized(true);
     var toolCount = state.currentTools.length + state.currentMcpTools.length;
-    addMessage('system', '\u2705 Agent initialisiert (' + toolCount + ' Tools)');
+    addMessage('system', '\u2705 Agent initialized (' + toolCount + ' tools)');
 
     updateMemoryBar(
       state.currentTools.concat(state.currentMcpTools),
@@ -572,13 +553,13 @@ async function initAgent() {
     if (toolCount > 0) {
       greeting += ' Ich habe Zugriff auf ' + toolCount + ' Tool' + (toolCount > 1 ? 's' : '') + '.';
     }
-    greeting += ' Was kann ich für dich tun?';
+    greeting += ' What can I do for you?';
     addMessage('agent', greeting);
 
     document.getElementById('prompt-input').focus();
     loadSessions();
   } catch (err) {
-    addMessage('system', 'Fehler: ' + err.message);
+    addMessage('system', 'Error: ' + err.message);
     btn.disabled = false;
   }
 }
@@ -599,14 +580,14 @@ async function reinitAgent() {
 
     var data = await resp.json();
     if (data.error) {
-      addMessage('system', 'Fehler bei Reinitialisierung: ' + data.error);
+      addMessage('system', 'Error during reinitialization: ' + data.error);
       btn.disabled = false;
       return;
     }
 
     setInitialized(true);
     var toolCount = state.currentTools.length + state.currentMcpTools.length;
-    addMessage('system', '\u2705 Agent neu initialisiert (' + toolCount + ' Tools)');
+    addMessage('system', '\u2705 Agent re-initialized (' + toolCount + ' tools)');
 
     updateMemoryBar(
       state.currentTools.concat(state.currentMcpTools),
@@ -616,8 +597,7 @@ async function reinitAgent() {
     document.getElementById('prompt-input').focus();
     loadSessions();
   } catch (err) {
-    addMessage('system', 'Fehler: ' + err.message);
-    btn.disabled = false;
+    addMessage('system', 'Error: ' + err.message);
   }
 }
 
@@ -651,7 +631,7 @@ async function sendMessage() {
 
     removeTyping();
 
-    // Erstelle leere Agent-Nachricht für Streaming
+    // Create empty agent message for streaming
     var agentMsg = addMessage('agent', '', '', { html: true, status: '✓' });
     state.streamingMsg = agentMsg;
     var fullText = '';
@@ -744,10 +724,10 @@ async function sendMessage() {
   } catch (err) {
     removeTyping();
     if (state.streamingMsg) {
-      state.streamingMsg.querySelector('.msg-content').textContent = 'Fehler: ' + err.message;
+      state.streamingMsg.querySelector('.msg-content').textContent = 'Error: ' + err.message;
       state.streamingMsg = null;
     } else {
-      addMessage('agent', 'Fehler: ' + err.message);
+      addMessage('agent', 'Error: ' + err.message);
     }
   }
 
@@ -772,7 +752,7 @@ window.onload = function() {
   state.currentSkills = getSelected('skill');
   setInitialized(false);
 
-  // Alle Panels standardmäßig geschlossen; API-Key-Panel öffnen wenn nicht angemeldet
+  // All panels closed by default; open API key panel if not logged in
   checkApiKeyStatus().then(function() {
     var setup = document.getElementById('apikey-setup');
     var activate = document.getElementById('apikey-activate');

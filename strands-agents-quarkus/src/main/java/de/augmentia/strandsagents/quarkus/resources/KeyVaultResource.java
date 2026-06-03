@@ -35,7 +35,7 @@ public class KeyVaultResource {
     public Response authenticate(Map<String, String> body) {
         var password = body != null ? body.get("password") : null;
         if (password == null || password.isBlank()) {
-            return Response.status(400).entity(Map.of("error", "password erforderlich")).build();
+            return Response.status(400).entity(Map.of("error", "password required")).build();
         }
         if (!ApiKeyVault.isStored()) {
             return Response.ok(Map.of("exists", false)).build();
@@ -55,7 +55,7 @@ public class KeyVaultResource {
     public Response write(Map<String, String> body) {
         var password = body != null ? body.get("password") : null;
         if (password == null || password.isBlank()) {
-            return Response.status(400).entity(Map.of("error", "password erforderlich")).build();
+            return Response.status(400).entity(Map.of("error", "password required")).build();
         }
         var key = body != null ? body.get("key") : null;
         if (key == null || key.isBlank()) {
@@ -89,10 +89,10 @@ public class KeyVaultResource {
     public Response reload(Map<String, String> body) {
         var password = body != null ? body.get("password") : null;
         if (password == null || password.isBlank()) {
-            return Response.status(400).entity(Map.of("error", "password erforderlich")).build();
+            return Response.status(400).entity(Map.of("error", "password required")).build();
         }
         if (!ApiKeyVault.isStored()) {
-            return Response.status(400).entity(Map.of("error", "Keine verschlüsselte Datei vorhanden")).build();
+            return Response.status(400).entity(Map.of("error", "No encrypted file found")).build();
         }
         try {
             var entries = ApiKeyVault.loadMap(password);

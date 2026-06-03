@@ -36,25 +36,25 @@ public class CoTPlanner implements Planner {
     @Override
     public Plan createPlan(String goal, List<String> availableToolNames) {
         var systemPrompt = """
-            Du bist ein Planungs-Assistent. Zerlege komplexe Ziele in einzelne, ausführbare Schritte.
+            You are a planning assistant. Break down complex goals into individual, executable steps.
             
-            Jeder Schritt muss genau EINEM verfügbaren Tool zugeordnet sein.
+            Each step must be assigned to exactly ONE available tool.
             
-            Verfügbare Tools: %s
+            Available tools: %s
             
-            Antworte NUR mit einem JSON-Array. Keine Erklärungen, kein Markdown.
-            Jedes Objekt im Array hat folgende Felder:
-            - "id": eindeutige Kennung (z.B. "step-1")
-            - "description": Beschreibung des Schritts
-            - "toolName": Name des zu verwendenden Tools (aus der Liste der verfügbaren Tools)
-            - "argumentsTemplate": Platzhalter für Tool-Argumente, z.B. "${wert}" 
-            - "dependsOn": Array von IDs, von denen dieser Schritt abhängt (leeres Array, wenn keine)
+            Respond ONLY with a JSON array. No explanations, no markdown.
+            Each object in the array has the following fields:
+            - "id": unique identifier (e.g. "step-1")
+            - "description": description of the step
+            - "toolName": name of the tool to use (from the list of available tools)
+            - "argumentsTemplate": placeholder for tool arguments, e.g. "${value}" 
+            - "dependsOn": array of IDs this step depends on (empty array if none)
             - "optional": true/false
             
-            Falls kein Tool für einen Schritt benötigt wird, setze "toolName" auf "none".
+            If no tool is needed for a step, set "toolName" to "none".
             """.formatted(formatToolNames(availableToolNames));
 
-        var userPrompt = "Erstelle einen Plan für das folgende Ziel:\n%s".formatted(goal);
+        var userPrompt = "Create a plan for the following goal:\n%s".formatted(goal);
 
         var response = model.chat(ChatRequest.builder()
             .messages(List.of(
@@ -67,7 +67,7 @@ public class CoTPlanner implements Planner {
         var steps = parseSteps(text);
 
         if (steps.isEmpty()) {
-            steps = List.of(new Step("step-1", "Führe aus: " + goal, "none", goal));
+            steps = List.of(new Step("step-1", "Execute: " + goal, "none", goal));
         }
 
         return new Plan(goal, steps, 0, new HashMap<>());
@@ -90,35 +90,35 @@ public class CoTPlanner implements Planner {
 
             return StepResult.ok(result, Map.of("result", result));
         } catch (Exception e) {
-            return StepResult.fail("Schritt '%s' fehlgeschlagen: %s".formatted(step.id(), e.getMessage()));
+            return StepResult.fail("Step '%s' failed: %s".formatted(step.id(), e.getMessage()));
         }
     }
 
     @Override
     public Plan revise(Plan plan, StepResult failure, String feedback) {
         var systemPrompt = """
-            Ein vorheriger Plan ist fehlgeschlagen. Erstelle einen REVIDIERTEN Plan.
+            A previous plan has failed. Create a REVISED plan.
             
-            Antworte NUR mit einem JSON-Array. Jedes Objekt hat:
-            - "id": eindeutige Kennung
-            - "description": Beschreibung des Schritts
-            - "toolName": Tool-Name oder "none"
-            - "argumentsTemplate": Argumente
-            - "dependsOn": Array von Abhängigkeiten
+            Respond ONLY with a JSON array. Each object has:
+            - "id": unique identifier
+            - "description": description of the step
+            - "toolName": tool name or "none"
+            - "argumentsTemplate": arguments
+            - "dependsOn": array of dependencies
             - "optional": true/false
             """;
 
         var userPrompt = """
-            Ursprüngliches Ziel: %s
+            Original goal: %s
             
-            Fehlgeschlagener Schritt: %s
-            Fehler: %s
+            Failed step: %s
+            Error: %s
             
             Feedback: %s
             
-            Bisheriger Kontext: %s
+            Previous context: %s
             
-            Erstelle einen neuen, korrigierten Plan.
+            Create a new, corrected plan.
             """.formatted(
                 plan.goal(),
                 plan.steps().get(Math.min(plan.currentStep(), plan.steps().size() - 1)),
@@ -137,7 +137,7 @@ public class CoTPlanner implements Planner {
         var steps = parseSteps(response.aiMessage().text());
 
         if (steps.isEmpty()) {
-            steps = List.of(new Step("step-1", "Führe aus: " + plan.goal(), "none", plan.goal()));
+            steps = List.of(new Step("step-1", "Execute: " + plan.goal(), "none", plan.goal()));
         }
 
         return new Plan(plan.goal(), steps, 0, plan.sharedContext());
@@ -146,13 +146,13 @@ public class CoTPlanner implements Planner {
     @Override
     public boolean isComplete(Plan plan, String finalOutput) {
         var prompt = """
-            Prüfe, ob das folgende Ziel erreicht wurde.
+            Check whether the following goal has been achieved.
             
-            Ziel: %s
+            Goal: %s
             
-            Ergebnis: %s
+            Result: %s
             
-            Antworte ausschließlich mit "true" oder "false".
+            Answer exclusively with "true" or "false".
             """.formatted(plan.goal(), finalOutput);
 
         var response = model.chat(ChatRequest.builder()
@@ -194,7 +194,7 @@ public class CoTPlanner implements Planner {
     }
 
     private static String formatToolNames(List<String> names) {
-        if (names == null || names.isEmpty()) return "keine (nur 'none' erlaubt)";
+        if (names == null || names.isEmpty()) return "none (only 'none' allowed)";
         return names.stream().collect(Collectors.joining(", "));
     }
 

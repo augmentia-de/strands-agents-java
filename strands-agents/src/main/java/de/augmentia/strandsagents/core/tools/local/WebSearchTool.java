@@ -21,12 +21,12 @@ public class WebSearchTool implements AgentTool<WebSearchTool.Params> {
     private final String baseUrl = "https://api.tavily.com";
 
     public WebSearchTool() {
-        var key = System.getenv("TAVILY_API_KEY");
+        var key = System.getProperty("vault.TAVILY_API_KEY");
         if (key == null || key.isBlank()) {
-            key = System.getProperty("TAVILY_API_KEY");
+            key = System.getenv("TAVILY_API_KEY");
         }
         if (key == null || key.isBlank()) {
-            key = System.getProperty("vault.TAVILY_API_KEY");
+            key = System.getProperty("TAVILY_API_KEY");
         }
         this.apiKey = key;
     }

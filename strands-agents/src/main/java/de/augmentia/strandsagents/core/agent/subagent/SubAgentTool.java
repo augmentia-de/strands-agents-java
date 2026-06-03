@@ -31,11 +31,11 @@ public class SubAgentTool implements AgentTool<SubAgentTool.Params> {
     }
 
     public SubAgentTool(Agent subAgent, String toolName) {
-        this(subAgent, toolName, "Führt einen spezialisierten Sub-Agenten aus: " + toolName);
+        this(subAgent, toolName, "Executes a specialized sub-agent: " + toolName);
     }
 
     public SubAgentTool(Agent subAgent, String toolName, SubAgentExecutor executor) {
-        this(subAgent, toolName, "Führt einen spezialisierten Sub-Agenten aus: " + toolName, executor);
+        this(subAgent, toolName, "Executes a specialized sub-agent: " + toolName, executor);
     }
 
     @Override
@@ -75,7 +75,7 @@ public class SubAgentTool implements AgentTool<SubAgentTool.Params> {
         Integer prevDepthVal = RECURSION_DEPTH.get();
         int currentDepth = prevDepthVal != null ? prevDepthVal : 0;
         if (currentDepth >= MAX_RECURSION_DEPTH) {
-            return ToolResult.error("Maximale Rekursionstiefe von " + MAX_RECURSION_DEPTH + " erreicht.");
+            return ToolResult.error("Maximum recursion depth of " + MAX_RECURSION_DEPTH + " reached.");
         }
         var prevDepth = RECURSION_DEPTH.get();
         RECURSION_DEPTH.set(currentDepth + 1);
@@ -83,7 +83,7 @@ public class SubAgentTool implements AgentTool<SubAgentTool.Params> {
             SubAgentResult a2aResult = executor.call(subAgent, params.prompt(), toolName);
             return ToolResult.success(a2aResult.result());
         } catch (Exception e) {
-            return ToolResult.error("Fehler im Sub-Agenten: " + e.getMessage());
+            return ToolResult.error("Error in sub-agent: " + e.getMessage());
         } finally {
             if (prevDepth != null) {
                 RECURSION_DEPTH.set(prevDepth);

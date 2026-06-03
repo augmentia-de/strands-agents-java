@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.examples;
+package de.augmentia.strandsagents.examples.domain;
 
 
 import de.augmentia.strandsagents.core.agent.Agent;
@@ -22,12 +22,12 @@ import dev.langchain4j.agent.tool.Tool;
  *   ├── RCA Sub-Agent (SRE Reasoning)
  *   └── Operations Sub-Agent (K8s/Remediation)
  */
-public class SreIncidentResponseDemo {
+public class IncidentResponseDemo {
 
     public static void main(String[] args) {
         System.out.println("🚨 Starting SRE Incident Response Demo (Java)");
         
-        SreIncidentResponseDemo demo = new SreIncidentResponseDemo();
+        IncidentResponseDemo demo = new IncidentResponseDemo();
         demo.runIncidentWorkflow();
     }
 

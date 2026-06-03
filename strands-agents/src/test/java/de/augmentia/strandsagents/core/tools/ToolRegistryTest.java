@@ -35,18 +35,18 @@ class ToolRegistryTest {
 
     @Test
     void shouldRegisterToolFromAnnotatedClass() {
-        registry.register(simpleTool("add", "Addiert zwei Zahlen"));
-        registry.register(simpleTool("multiply", "Multipliziert zwei Zahlen"));
-        registry.register(simpleTool("stringLength", "Gibt die Länge eines Strings zurück"));
+        registry.register(simpleTool("add", "Adds two numbers"));
+        registry.register(simpleTool("multiply", "Multiplies two numbers"));
+        registry.register(simpleTool("stringLength", "Returns the length of a string"));
         assertThat(registry.getToolNames()).contains("add", "multiply", "stringLength");
         assertThat(registry.size()).isEqualTo(3);
     }
 
     @Test
     void shouldProvideToolSpecifications() {
-        registry.register(simpleTool("add", "Addiert zwei Zahlen"));
-        registry.register(simpleTool("multiply", "Multipliziert zwei Zahlen"));
-        registry.register(simpleTool("stringLength", "Gibt die Länge eines Strings zurück"));
+        registry.register(simpleTool("add", "Adds two numbers"));
+        registry.register(simpleTool("multiply", "Multiplies two numbers"));
+        registry.register(simpleTool("stringLength", "Returns the length of a string"));
         var specs = registry.getSpecifications();
         assertThat(specs).hasSize(3);
         assertThat(specs).extracting("name").contains("add", "multiply");
@@ -54,7 +54,7 @@ class ToolRegistryTest {
 
     @Test
     void shouldLookUpToolMethod() {
-        registry.register(simpleTool("add", "Addiert zwei Zahlen"));
+        registry.register(simpleTool("add", "Adds two numbers"));
         var toolMethod = registry.get("add");
         assertThat(toolMethod).isNotNull();
         assertThat(toolMethod.spec().name()).isEqualTo("add");

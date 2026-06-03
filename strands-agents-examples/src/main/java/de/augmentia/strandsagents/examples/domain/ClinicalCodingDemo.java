@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.examples;
+package de.augmentia.strandsagents.examples.domain;
 
 
 import de.augmentia.strandsagents.core.agent.Agent;
@@ -22,14 +22,14 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  *   ├── Medical Coding Tools (Terminology Lookup)
  *   └── Structured Linker Tools (Extraction & Coding)
  */
-public class MedicalAssistantDemo {
+public class ClinicalCodingDemo {
 
     private static final ObjectMapper mapper = new ObjectMapper();
 
     public static void main(String[] args) {
         System.out.println("🏥 Welcome to the Java Medical Document Processing Assistant");
         
-        MedicalAssistantDemo demo = new MedicalAssistantDemo();
+        ClinicalCodingDemo demo = new ClinicalCodingDemo();
         demo.runMedicalAgent();
     }
 

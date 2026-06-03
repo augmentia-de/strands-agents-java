@@ -173,7 +173,7 @@ public class PlanningAgent extends Agent {
 
     /**
      * Setzt ab letztem completed Step fort.
-     * Überspringt alle bereits COMPLETED Steps.
+     * Skips all already COMPLETED steps.
      * Erfordert nicht-null CheckpointStore.
      */
     public AgentResult resumeSession(String sessionId, String goal) {
@@ -262,7 +262,7 @@ public class PlanningAgent extends Agent {
             if (output != null) {
                 sb.append(output).append("\n");
             } else {
-                sb.append("_(nicht ausgeführt)_\n");
+                sb.append("_(not executed)_\n");
             }
             sb.append("\n");
         }

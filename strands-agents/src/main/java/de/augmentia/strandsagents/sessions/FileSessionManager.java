@@ -73,7 +73,7 @@ public class FileSessionManager implements SessionManager {
         try {
             Files.deleteIfExists(file);
         } catch (IOException e) {
-            throw new RuntimeException("Fehler beim Löschen von Session " + sessionId, e);
+            throw new RuntimeException("Error deleting session " + sessionId, e);
         }
     }
 

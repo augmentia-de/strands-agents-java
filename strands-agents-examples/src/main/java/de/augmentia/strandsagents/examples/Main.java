@@ -17,9 +17,9 @@ public class Main {
     public static void main(String[] args) {
         var apiKey = System.getenv("OPENAI_API_KEY");
         if (apiKey == null || apiKey.isBlank()) {
-            System.out.println("Fehler: OPENAI_API_KEY ist nicht gesetzt.");
-            System.out.println("  Nutze ./dev.sh run-mock für einen Demo-Durchlauf ohne API-Key.");
-            System.out.println("  Oder setze die Umgebungsvariable: export OPENAI_API_KEY=sk-...");
+            System.out.println("Error: OPENAI_API_KEY not set.");
+            System.out.println("  Use ./dev.sh run-mock for a demo run without API key.");
+            System.out.println("  Or set the environment variable: export OPENAI_API_KEY=sk-...");
             System.exit(1);
         }
 
@@ -131,12 +131,12 @@ public class Main {
         agent.setEventListener(event -> {
             switch (event) {
                 case AgentStartedEvent e ->
-                    System.out.println("  [EVENT] Gestartet");
+                    System.out.println("  [EVENT] Started");
                 case ToolExecutionStartedEvent e ->
                     System.out.println("  [EVENT] Tool: " + e.toolCall().toolName());
                 case ToolExecutionFinishedEvent e ->
                     System.out.println("  [EVENT] Result: " + e.result().toolName()
-                        + " \u2192 " + e.result().result());
+                        + " -> " + e.result().result());
                 default -> {}
             }
         });

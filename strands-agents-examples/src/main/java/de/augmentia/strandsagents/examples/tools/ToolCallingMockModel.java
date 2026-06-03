@@ -27,13 +27,10 @@ import java.util.stream.Collectors;
     static int MAX_AGENT_LOOP = 10;
     private static final ObjectMapper JSON = new ObjectMapper();
     private boolean structuredMode;
-    private static final Pattern NUMBER_PATTERN = Pattern.compile("(\\d+)\\s*\\+\\s*(\\d+)");
-    private static final Pattern CITY_PATTERN = Pattern.compile("(?:weather|in|for)\\s+(\\w+)",
-        Pattern.CASE_INSENSITIVE);
-    private static final Pattern CALC_KEYWORDS =
-        Pattern.compile("(?i)\\b(calculate|add|sum|plus|\\d+\\s*\\+)\\b");
-    private static final Pattern WEATHER_KEYWORDS =
-        Pattern.compile("(?i)\\b(weather|temperature|celsius|forecast)\\b");
+    private static final Pattern EDIT_KEYWORDS =
+        Pattern.compile("(?i)\\b(edit|replace|change|modify|update|sed)\\b");
+    private static final Pattern GREP_KEYWORDS =
+        Pattern.compile("(?i)\\b(grep|search|find|pattern|contains?|match)\\b");
     private static final Pattern ITERATIONS_PATTERN =
         Pattern.compile("run (\\d+) iterations", Pattern.CASE_INSENSITIVE);
 
@@ -152,7 +149,7 @@ import java.util.stream.Collectors;
     // --- Orchestrator Mode ---
 
     private boolean isOrchestratorMode(List<String> toolNames) {
-        return toolNames.contains("runTask") || toolNames.contains("verifyAndLog");
+        return toolNames.contains("runTask");
     }
 
     private ChatResponse startOrchestratorCycle(String userText, List<ToolSpecification> tools) {
@@ -208,27 +205,30 @@ import java.util.stream.Collectors;
                 }
             }
         }
-        return "Calculate 10 + 20";
+        return "Read workspace/data.txt and grep for 'TODO'";
     }
 
     private String generateTask() {
         var r = ThreadLocalRandom.current();
-        var a = r.nextInt(1000);
-        var b = r.nextInt(1000);
-        var cities = List.of("Berlin", "Paris", "London", "Tokyo", "Rome", "Madrid");
-        var city = cities.get(r.nextInt(cities.size()));
-        var files = List.of("/tmp/data.txt", "/tmp/out.txt", "/tmp/result.txt", "/tmp/test.txt");
-        var file = files.get(r.nextInt(files.size()));
+        var files = List.of("workspace/data.txt", "workspace/out.txt", "workspace/result.txt",
+            "workspace/test.txt", "workspace/config.txt", "workspace/notes.txt");
+        var file1 = files.get(r.nextInt(files.size()));
+        var file2 = files.get(r.nextInt(files.size()));
+        var patterns = List.of("TODO", "ERROR", "FIXME", "username", "password", "api_key", "DEBUG");
+        var pattern = patterns.get(r.nextInt(patterns.size()));
+        var oldText = List.of("foo", "old_value", "placeholder", "admin", "localhost");
+        var newText = List.of("bar", "new_value", "actual_value", "guest", "0.0.0.0");
 
         return switch (r.nextInt(6)) {
-            case 0 -> "Calculate " + a + " + " + b;
-            case 1 -> "What's the weather in " + city + "?";
-            case 2 -> "Calculate " + a + " + " + b + " and weather for " + city;
-            case 3 -> "Calculate " + a + " + " + b + " and write the result to " + file;
-            case 4 -> "Read " + file + " and weather for " + city;
-            case 5 -> "Calculate " + a + " + " + b + ", weather for " + city
-                + ", and write all results to " + file;
-            default -> "Calculate " + a + " + " + b;
+            case 0 -> "Read " + file1;
+            case 1 -> "Grep for '" + pattern + "' in " + file1;
+            case 2 -> "Edit " + file1 + ": replace '" + oldText.get(r.nextInt(oldText.size()))
+                + "' with '" + newText.get(r.nextInt(newText.size())) + "'";
+            case 3 -> "Read " + file1 + " and grep for '" + pattern + "'";
+            case 4 -> "Write 'hello world' to " + file1 + " and then read it back";
+            case 5 -> "Grep for '" + pattern + "' in " + file1 + ", then edit "
+                + file2 + " to replace 'old' with 'new'";
+            default -> "Read " + file1;
         };
     }
 
@@ -347,13 +347,9 @@ import java.util.stream.Collectors;
 
     private LinkedHashMap<String, Object> buildMockTaskResult(String userText) {
         var r = ThreadLocalRandom.current();
-        var m = NUMBER_PATTERN.matcher(userText);
-        var result = m.find()
-            ? String.valueOf(Integer.parseInt(m.group(1)) + Integer.parseInt(m.group(2)) + (r.nextBoolean() ? 0 : 1))
-            : "completed";
         var resultObj = new LinkedHashMap<String, Object>();
         resultObj.put("taskName", truncate(userText, 60));
-        resultObj.put("result", result);
+        resultObj.put("result", "completed — see log file for details");
         resultObj.put("toolCalls", r.nextInt(3) + 1);
         resultObj.put("errors", r.nextDouble() < 0.2 ? 1 : 0);
         resultObj.put("timeouts", r.nextDouble() < 0.1 ? 1 : 0);
@@ -362,34 +358,29 @@ import java.util.stream.Collectors;
         return resultObj;
     }
 
-    // --- Known tool detection (add, weather, readFile, writeFile) ---
+    // --- Known tool detection (readFile, writeFile, editFile, grepFile) ---
 
     private List<String> detectAllKnownTools(String userText, List<ToolSpecification> tools) {
-        boolean needsCalc = CALC_KEYWORDS.matcher(userText).find();
-        boolean needsWeather = WEATHER_KEYWORDS.matcher(userText).find();
         boolean needsRead = userText.toLowerCase().contains("read");
         boolean needsWrite = userText.toLowerCase().contains("write");
-        boolean needsFile = needsRead || needsWrite || userText.toLowerCase().contains("/tmp");
+        boolean needsEdit = EDIT_KEYWORDS.matcher(userText).find();
+        boolean needsGrep = GREP_KEYWORDS.matcher(userText).find();
+        boolean needsFile = needsRead || needsWrite || needsEdit || needsGrep
+            || userText.toLowerCase().contains("/tmp");
 
         var available = tools.stream().map(ToolSpecification::name).toList();
         var result = new ArrayList<String>();
 
-        if (needsCalc) {
-            if (available.contains("add")) result.add("add");
-            else if (available.contains("multiply")) result.add("multiply");
-        }
-        if (needsWeather && available.contains("getCurrentWeather")) {
-            result.add("getCurrentWeather");
-        }
-        if (needsFile) {
-            if (needsRead && available.contains("readFile")) result.add("readFile");
-            if (needsWrite && available.contains("writeFile")) result.add("writeFile");
-            // read/write via /tmp path without explicit keyword – add readFile
-            if (!needsRead && !needsWrite
-                && userText.toLowerCase().contains("/tmp")
-                && available.contains("readFile")) {
-                result.add("readFile");
-            }
+        if (needsRead && available.contains("readFile")) result.add("readFile");
+        if (needsWrite && available.contains("writeFile")) result.add("writeFile");
+        if (needsEdit && available.contains("editFile")) result.add("editFile");
+        if (needsGrep && available.contains("grepFile")) result.add("grepFile");
+
+        // Fallback: /tmp with no explicit keyword → add readFile
+        if (result.isEmpty() && !needsRead && !needsWrite && !needsEdit && !needsGrep
+            && userText.toLowerCase().contains("/tmp")
+            && available.contains("readFile")) {
+            result.add("readFile");
         }
 
         if (result.isEmpty() && !available.isEmpty()) {
@@ -403,32 +394,40 @@ import java.util.stream.Collectors;
         var args = new LinkedHashMap<String, Object>();
 
         switch (toolName) {
-            case "add", "multiply" -> {
-                var m = NUMBER_PATTERN.matcher(userText);
-                if (m.find()) {
-                    args.put("a", Integer.parseInt(m.group(1)));
-                    args.put("b", Integer.parseInt(m.group(2)));
-                } else {
-                    args.put("a", ThreadLocalRandom.current().nextInt(100));
-                    args.put("b", ThreadLocalRandom.current().nextInt(100));
-                }
-            }
-            case "getCurrentWeather" -> {
-                var m = CITY_PATTERN.matcher(userText);
-                args.put("city", m.find() ? m.group(1) : "Berlin");
-            }
             case "readFile" -> {
-                args.put("path", "/tmp/data.txt");
+                var path = extractPath(userText, "workspace/data.txt");
             }
             case "writeFile" -> {
-                args.put("path", "/tmp/out.txt");
-                args.put("content", userText);
+                var path = extractPath(userText, "workspace/out.txt");
+                args.put("path", path);
+                args.put("content", "mock content for " + path);
+            }
+            case "editFile" -> {
+                var path = extractPath(userText, "workspace/data.txt");
+                args.put("path", path);
+                args.put("oldText", "old");
+                args.put("newText", "new");
+            }
+            case "grepFile" -> {
+                var path = extractPath(userText, "workspace/data.txt");
+                args.put("path", path);
+                args.put("pattern", extractPattern(userText, "TODO"));
             }
             case "stringLength" -> {
                 args.put("text", userText.length() > 50 ? userText.substring(0, 50) : userText);
             }
         }
         return args;
+    }
+
+    private static String extractPath(String userText, String fallback) {
+        var m = Pattern.compile("workspace/[\\w./-]+").matcher(userText);
+        return m.find() ? m.group() : fallback;
+    }
+
+    private static String extractPattern(String userText, String fallback) {
+        var m = Pattern.compile("['\"]([^'\"]+)['\"]").matcher(userText);
+        return m.find() ? m.group(1) : fallback;
     }
 
     // --- Utilities ---

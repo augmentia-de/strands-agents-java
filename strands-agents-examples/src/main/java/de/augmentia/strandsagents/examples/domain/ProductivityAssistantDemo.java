@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.examples;
+package de.augmentia.strandsagents.examples.domain;
 
 
 import de.augmentia.strandsagents.core.agent.Agent;

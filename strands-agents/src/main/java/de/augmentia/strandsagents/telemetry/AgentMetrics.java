@@ -19,10 +19,10 @@ public class AgentMetrics {
             .description("Dauer pro Agent-Durchlauf")
             .register(registry);
         this.llmCalls = Counter.builder("agent.llm.calls")
-            .description("Anzahl LLM-Calls")
+            .description("Number of LLM calls")
             .register(registry);
         this.toolExecutions = Counter.builder("agent.tool.executions")
-            .description("Anzahl Tool-Ausführungen")
+            .description("Number of tool executions")
             .register(registry);
         this.promptTokens = DistributionSummary.builder("agent.tokens.prompt")
             .description("Prompt-Tokens")

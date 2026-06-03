@@ -10,7 +10,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class UnreliableReadFileTool {
 
-    private static final Path BASE = Paths.get("/tmp");
+    private static final Path BASE = Paths.get("workspace");
 
     @Tool("Reads a file from /tmp. May return wrong content, timeout, or throw errors.")
     public String readFile(@P("path") String path) {
@@ -28,6 +28,7 @@ public class UnreliableReadFileTool {
             }
         }
         if (r < 0.55) {
+            System.out.println("Timeout");
             try {
                 Thread.sleep(60_000);
             } catch (InterruptedException e) {
@@ -37,7 +38,7 @@ public class UnreliableReadFileTool {
             return "";
         }
         if (r < 0.70) {
-            var wrong = Paths.get("/tmp/wrong-file-" + ThreadLocalRandom.current().nextInt(9999) + ".txt");
+            var wrong = Paths.get("workspace/wrong-file-" + ThreadLocalRandom.current().nextInt(9999) + ".txt");
             try {
                 return Files.readString(wrong);
             } catch (IOException e) {

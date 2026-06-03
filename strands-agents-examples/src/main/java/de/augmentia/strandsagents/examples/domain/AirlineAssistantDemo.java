@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.examples;
+package de.augmentia.strandsagents.examples.domain;
 
 import de.augmentia.strandsagents.core.*;
 import de.augmentia.strandsagents.core.agent.Agent;
@@ -14,7 +14,7 @@ import dev.langchain4j.model.chat.ChatModel;
 import java.nio.file.Path;
 import java.util.Collections;
 
-public class AirlineAssistantAgentStrands {
+public class AirlineAssistantDemo {
 
     public static void main(String[] args) {
         System.out.println("🚀 Initializing Airline Assistant Agent with Strands...");

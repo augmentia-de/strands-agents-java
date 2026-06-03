@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.examples;
+package de.augmentia.strandsagents.examples.feature;
 
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -36,7 +36,7 @@ public class WorkflowDemo {
 
     public static void main(String[] args) {
         if (System.getenv("OPENAI_API_KEY") == null || System.getenv("OPENAI_API_KEY").isBlank()) {
-            System.out.println("Fehler: OPENAI_API_KEY ist nicht gesetzt.");
+            System.out.println("Error: OPENAI_API_KEY is not set.");
             System.exit(1);
         }
         new WorkflowDemo().run();
@@ -70,7 +70,7 @@ public class WorkflowDemo {
 
         var research = parse(r1, ResearchData.class);
         state.put("research", research);
-        if (research == null) { System.out.println("  Research fehlgeschlagen"); return; }
+        if (research == null) { System.out.println("  Research failed"); return; }
         System.out.println("  Topic: " + research.topic());
         System.out.println("  Key Points: " + String.join(" | ", research.keyPoints()));
         System.out.println("  Sources: " + String.join(", ", research.sources()));
@@ -87,13 +87,13 @@ public class WorkflowDemo {
             .createAgent(model);
 
         var r2 = exec(draftAgent,
-            "Schreibe einen Artikel-Entwurf auf Basis dieser Research-Daten:\n" +
+            "Write an article draft based on this research data:\n" +
             "Key Points: " + String.join(", ", research.keyPoints()) + "\n" +
-            "Quellen: "    + String.join(", ", research.sources()));
+            "Sources: "    + String.join(", ", research.sources()));
 
         var draft = parse(r2, ArticleDraft.class);
         state.put("draft", draft);
-        if (draft == null) { System.out.println("  Draft fehlgeschlagen"); return; }
+        if (draft == null) { System.out.println("  Draft failed"); return; }
         System.out.println("  Title: " + draft.title());
         System.out.println("  Sections: " + String.join(" | ", draft.sections()));
         System.out.println();
@@ -109,15 +109,15 @@ public class WorkflowDemo {
             .createAgent(model);
 
         var r3 = exec(reviewAgent,
-            "Review den folgenden Artikel-Entwurf:\n" +
-            "Titel: "        + draft.title() + "\n" +
-            "Einleitung: "   + draft.introduction() + "\n" +
-            "Sektionen: "    + String.join(", ", draft.sections()) + "\n\n" +
-            "Gib konstruktives Feedback und liste notwendige Änderungen.");
+            "Review the following article draft:\n" +
+            "Title: "        + draft.title() + "\n" +
+            "Introduction: " + draft.introduction() + "\n" +
+            "Sections: "     + String.join(", ", draft.sections()) + "\n\n" +
+            "Give constructive feedback and list necessary changes.");
 
         var review = parse(r3, ReviewFeedback.class);
         state.put("review", review);
-        if (review == null) { System.out.println("  Review fehlgeschlagen"); return; }
+        if (review == null) { System.out.println("  Review failed"); return; }
         System.out.println("  Verdict: " + review.verdict());
         System.out.println("  Changes: " + String.join(" | ", review.changes()));
         System.out.println("  Approved: " + review.approved());
@@ -150,7 +150,7 @@ public class WorkflowDemo {
             "(title, content, slug, word count) as structured data.");
 
         var published = parse(r4, PublishedArticle.class);
-        if (published == null) { System.out.println("  Publish fehlgeschlagen"); return; }
+        if (published == null) { System.out.println("  Publish failed"); return; }
         System.out.println("  Title: " + published.title());
         System.out.println("  Slug: " + published.slug());
         System.out.println("  WordCount: " + published.wordCount());
@@ -189,7 +189,7 @@ public class WorkflowDemo {
         try {
             return MAPPER.readValue(result.structuredOutput(), type);
         } catch (Exception e) {
-            System.out.println("  Parse-Fehler für " + type.getSimpleName()
+            System.out.println("  Parse error for " + type.getSimpleName()
                 + ": " + e.getMessage());
             return null;
         }

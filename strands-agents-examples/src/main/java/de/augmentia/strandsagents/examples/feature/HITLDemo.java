@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.examples;
+package de.augmentia.strandsagents.examples.feature;
 
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
@@ -15,16 +15,16 @@ import java.util.List;
 import java.util.Scanner;
 
 /**
- * HITLDemo zeigt den Human-in-the-Loop-Mechanismus via Hook-System.
+ * HITLDemo demonstrates the Human-in-the-Loop mechanism via Hook system.
  *
- * Der Agent darf erst ein Tool ausfuhren, nachdem der Mensch es per
- * Konsoleneingabe bestatigt hat (CONFIRM-Authority).
+ * The agent may only execute a tool after the human has confirmed it
+ * via console input (CONFIRM authority).
  */
 public class HITLDemo {
 
     public static void main(String[] args) {
-        System.out.println("=== HITL Demo (Hook-basiert) ===");
-        System.out.println("Jeder Tool-Aufruf muss manuell bestatigt werden.\n");
+        System.out.println("=== HITL Demo (Hook-based) ===");
+        System.out.println("Each tool call must be manually confirmed.\n");
 
         ChatModel model = ModelFactory.createOpenAiFromEnv();
 
@@ -58,7 +58,7 @@ public class HITLDemo {
 
         try (var scanner = new Scanner(System.in)) {
             while (true) {
-                System.out.print("\nDu: ");
+                System.out.print("\nYou: ");
                 if (!scanner.hasNextLine()) break;
                 var input = scanner.nextLine().strip();
                 if (input.isBlank()) continue;
@@ -70,7 +70,7 @@ public class HITLDemo {
 
                 if (input.equals("/help")) {
                     System.out.println("Commands: /exit, /help");
-                    System.out.println("Alles andere wird als Prompt gesendet.");
+                    System.out.println("Everything else is sent as a prompt.");
                     continue;
                 }
 
@@ -79,7 +79,7 @@ public class HITLDemo {
                 try {
                     result = agent.execute(input);
                 } catch (Exception e) {
-                    System.out.println("Fehler: " + e.getMessage());
+                    System.out.println("Error: " + e.getMessage());
                     continue;
                 }
                 var durationMs = (System.nanoTime() - start) / 1_000_000;

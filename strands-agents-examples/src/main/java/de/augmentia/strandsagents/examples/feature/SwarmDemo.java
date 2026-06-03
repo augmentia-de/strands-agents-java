@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.examples;
+package de.augmentia.strandsagents.examples.feature;
 
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -14,14 +14,14 @@ import de.augmentia.strandsagents.core.model.event.ToolExecutionStartedEvent;
 import dev.langchain4j.model.chat.ChatModel;
 import de.augmentia.strandsagents.core.tools.CalculatorTool;
 
-public class AutonomousSwarmDemo {
+public class SwarmDemo {
 
     public static void main(String[] args) {
         if (System.getenv("OPENAI_API_KEY") == null || System.getenv("OPENAI_API_KEY").isBlank()) {
             System.out.println("OPENAI_API_KEY not set.");
             System.exit(1);
         }
-        new AutonomousSwarmDemo().run();
+        new SwarmDemo().run();
     }
 
     void run() {

@@ -10,18 +10,18 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
- * Regression-Test: Stellt sicher, dass in jedem REST-Controller die
- * korrekten Agenten/Services an die jeweiligen Endpunkte delegiert werden.
+ * Regression test: ensures every REST controller delegates to the
+ * correct agents/services for each endpoint.
  *
- * Bekannter Bug aus einem Code-Review:
- * Ein Controller hatte zwei verschiedene Agenten per @Qualifier injiziert
- * (agenticChatAgent, sharedStateAgent), aber fast alle Methoden riefen
- * fälschlich immer den agenticChatAgent auf – egal ob shared_state,
- * tool_based_generative_ui, human_in_the_loop oder agentic_generative_ui
- * aufgerufen wurde. Auch die Pfadvariable {agentId} in /sse/{agentId}
- * wurde ignoriert.
+ * Known bug from a code review:
+ * A controller had two different agents injected via @Qualifier
+ * (agenticChatAgent, sharedStateAgent), but almost all methods
+ * incorrectly always called agenticChatAgent — regardless of whether
+ * shared_state, tool_based_generative_ui, human_in_the_loop or
+ * agentic_generative_ui was invoked. The path variable {agentId}
+ * in /sse/{agentId} was also ignored.
  *
- * Dieser Test verhindert ein erneutes Einschleichen dieses Anti-Patterns.
+ * This test prevents this anti-pattern from being reintroduced.
  */
 class AgentAssignmentTest {
 
@@ -29,17 +29,17 @@ class AgentAssignmentTest {
         "src/main/java/de/augmentia/strandsagents/quarkus";
 
     /**
-     * Prüft: Jeder Endpoint in ChatResource delegiert an AgentService.
+     * Verifies: every endpoint in ChatResource delegates to AgentService.
      */
     @Test
     void chatResourceAllEndpointsUseAgentService() throws IOException {
         var source = readSource("resources/ChatResource.java");
         var methods = parseEndpointMethods(source);
-        assertFalse(methods.isEmpty(), "Keine Endpoint-Methoden in ChatResource gefunden");
+            assertFalse(methods.isEmpty(), "No endpoint methods found in ChatResource");
         for (var m : methods) {
             assertTrue(m.body().contains("agentService"),
-                "ChatResource." + m.name() + "() verwendet nicht 'agentService'."
-                    + " Möglicher Bug: falscher Agent/Service zugewiesen?");
+                "ChatResource." + m.name() + "() does not use 'agentService'."
+                    + " Possible bug: wrong agent/service assigned?");
         }
     }
 
@@ -47,10 +47,10 @@ class AgentAssignmentTest {
     void toolResourceAllEndpointsUseAgentService() throws IOException {
         var source = readSource("resources/ToolResource.java");
         var methods = parseEndpointMethods(source);
-        assertFalse(methods.isEmpty(), "Keine Endpoint-Methoden in ToolResource gefunden");
+        assertFalse(methods.isEmpty(), "No endpoint methods found in ToolResource");
         for (var m : methods) {
             assertTrue(m.body().contains("agentService"),
-                "ToolResource." + m.name() + "() verwendet nicht 'agentService'.");
+                "ToolResource." + m.name() + "() does not use 'agentService'.");
         }
     }
 
@@ -58,10 +58,10 @@ class AgentAssignmentTest {
     void sessionResourceAllEndpointsUseAgentService() throws IOException {
         var source = readSource("resources/SessionResource.java");
         var methods = parseEndpointMethods(source);
-        assertFalse(methods.isEmpty(), "Keine Endpoint-Methoden in SessionResource gefunden");
+        assertFalse(methods.isEmpty(), "No endpoint methods found in SessionResource");
         for (var m : methods) {
             assertTrue(m.body().contains("agentService"),
-                "SessionResource." + m.name() + "() verwendet nicht 'agentService'.");
+                "SessionResource." + m.name() + "() does not use 'agentService'.");
         }
     }
 
@@ -69,10 +69,10 @@ class AgentAssignmentTest {
     void uiResourceAllEndpointsUseAgentService() throws IOException {
         var source = readSource("resources/UiResource.java");
         var methods = parseEndpointMethods(source);
-        assertFalse(methods.isEmpty(), "Keine Endpoint-Methoden in UiResource gefunden");
+        assertFalse(methods.isEmpty(), "No endpoint methods found in UiResource");
         for (var m : methods) {
             assertTrue(m.body().contains("agentService"),
-                "UiResource." + m.name() + "() verwendet nicht 'agentService'.");
+                "UiResource." + m.name() + "() does not use 'agentService'.");
         }
     }
 
@@ -80,17 +80,17 @@ class AgentAssignmentTest {
     void aguiResourceAllEndpointsUseAgentService() throws IOException {
         var source = readSource("agui/resources/AguiResource.java");
         var methods = parseEndpointMethods(source);
-        assertFalse(methods.isEmpty(), "Keine Endpoint-Methoden in AguiResource gefunden");
+        assertFalse(methods.isEmpty(), "No endpoint methods found in AguiResource");
         for (var m : methods) {
             assertTrue(m.body().contains("agentService"),
-                "AguiResource." + m.name() + "() verwendet nicht 'agentService'."
-                    + " Möglicher Bug: falscher Agent/Service zugewiesen?");
+                "AguiResource." + m.name() + "() does not use 'agentService'."
+                    + " Possible bug: wrong agent/service assigned?");
         }
     }
 
     /**
-     * Prüft: Endpoints mit Pfadvariable verwenden die @PathParam auch
-     * tatsächlich im Methodenrumpf. Schlägt fehl, wenn ignoriert.
+     * Verifies: endpoints with path variables actually use @PathParam
+     * in the method body. Fails if ignored.
      */
     @Test
     void endpointsWithPathVariablesActuallyUseThem() throws IOException {
@@ -103,27 +103,27 @@ class AgentAssignmentTest {
                 var pathVars = extractPathVariables(pathVal);
                 if (pathVars.isEmpty()) continue;
 
-                // @PathParam kann in der Methodensignatur stehen (Parameter-Annotation)
+                // @PathParam may be in the method signature (parameter annotation)
                 var ctx = m.annotations() + "\n" + m.signature();
                 var declaredParams = extractAnnotationValues(ctx, "@PathParam");
                 for (var varName : pathVars) {
                     assertTrue(declaredParams.contains(varName),
                         file + ": " + m.name() + "() hat {" + varName
-                            + "} in @Path, aber kein @PathParam(\"" + varName + "\")."
-                            + " Pfadvariable wird ignoriert!");
+                            + "} in @Path, but no @PathParam(\"" + varName + "\")."
+                            + " Path variable is ignored!");
 
                     assertTrue(m.body().contains(varName),
-                        file + ": " + m.name() + "() hat @PathParam(\"" + varName
-                            + "\"), verwendet es aber nicht im Rumpf."
-                            + " Pfadvariable wird ignoriert!");
+                        file + ": " + m.name() + "() has @PathParam(\"" + varName
+                            + "\") but does not use it in the body."
+                            + " Path variable is ignored!");
                 }
             }
         }
     }
 
     /**
-     * Resource-Klassen mit mehreren @Inject-Feldern müssen jedes Feld
-     * in mindestens einem Endpoint verwenden.
+     * Resource classes with multiple @Inject fields must use each field
+     * in at least one endpoint.
      */
     @Test
     void noResourceHasUnusedInjectedFields() throws IOException {
@@ -139,14 +139,14 @@ class AgentAssignmentTest {
             }
             for (var field : injectedFields) {
                 assertTrue(usedInAnyEndpoint.contains(field),
-                    file + " hat @Inject-Feld '" + field
-                        + "', aber kein Endpoint verwendet es."
-                        + " Möglicher Bug: falscher Agent oder vergessenes Feld.");
+                    file + " has @Inject field '" + field
+                        + "' but no endpoint uses it."
+                        + " Possible bug: wrong agent or forgotten field.");
             }
         }
     }
 
-    // ========== Source-Parsing ==========
+    // ========== Source parsing ==========
 
     private record EndpointMethod(String name, String annotations, String signature, String body) {}
 
@@ -170,17 +170,16 @@ class AgentAssignmentTest {
     }
 
     /**
-     * Findet alle HTTP-Endpoint-Methoden mit korrektem Brace-Matching.
-     * Sucht nach @GET, @POST, @PUT, @DELETE, @PATCH und extrahiert die
-     * zugehörige Methodendeklaration + Rumpf (geschweifte Klammern
-     * in beliebiger Tiefe).
+     * Finds all HTTP endpoint methods with correct brace matching.
+     * Searches for @GET, @POST, @PUT, @DELETE, @PATCH and extracts the
+     * associated method declaration + body (curly braces at any depth).
      */
     private static List<EndpointMethod> parseEndpointMethods(String source) {
         var result = new ArrayList<EndpointMethod>();
         var clean = stripComments(source);
         var lines = clean.split("\n", -1);
 
-        // Erstelle Positions-Array für effizienteren Zugriff
+        // Create position array for more efficient access
         int[] annTypeAtLine = new int[lines.length];
         Arrays.fill(annTypeAtLine, -1);
 
@@ -196,8 +195,8 @@ class AgentAssignmentTest {
         for (int i = 0; i < annTypeAtLine.length; i++) {
             if (annTypeAtLine[i] < 0) continue;
 
-            // Annotation-Block: von hier zurück bis zur vorherigen Methode
-            // oder bis zur Klassendeklaration
+            // Annotation block: go back from here to previous method
+            // or to the class declaration
             var annBlock = new StringBuilder();
             int blockStart = i;
             while (blockStart > 0) {
@@ -205,8 +204,8 @@ class AgentAssignmentTest {
                 if (prev.startsWith("@") || prev.isEmpty()) {
                     blockStart--;
                 } else {
-                    // Prüfe ob es eine Parameter-Annotation innerhalb einer Signatur ist
-                    // (z.B. @PathParam("id") in der Methodensignatur)
+                    // Check if it's a parameter annotation within a signature
+                    // (e.g., @PathParam("id") in the method signature)
                     if (prev.contains("@") && !prev.contains("public ")
                         && !prev.contains("class ") && !prev.contains("import ")
                         && !prev.contains(";")) {
@@ -220,13 +219,13 @@ class AgentAssignmentTest {
                 annBlock.append(lines[j]).append("\n");
             }
 
-            // Methodensignatur suchen: suche ab aktueller Zeile die erste Zeile
-            // mit "public " und runden Klammern
+            // Find method signature: from current line, find first line
+            // with "public " and parentheses
             int sigLine = i;
             while (sigLine < lines.length) {
                 var sl = lines[sigLine].strip();
                 if (sl.contains("public ") && sl.contains("(")) break;
-                // Annotationen zwischen HTTP-Methode und Signatur sammeln
+                // Collect annotations between HTTP method and signature
                 if (sigLine > i && (sl.startsWith("@") || sl.isEmpty())) {
                     annBlock.append(lines[sigLine]).append("\n");
                 }
@@ -234,7 +233,7 @@ class AgentAssignmentTest {
             }
             if (sigLine >= lines.length) continue;
 
-            // Methodennamen extrahieren: Wort direkt vor '('
+            // Extract method name: word directly before '('
             var sigLineStr = lines[sigLine].strip();
             var parenIdx = sigLineStr.indexOf('(');
             if (parenIdx < 0) continue;
@@ -243,12 +242,12 @@ class AgentAssignmentTest {
             if (words.length == 0) continue;
             var methodName = words[words.length - 1];
 
-            // Rumpf extrahieren mit Brace-Depth-Tracking
+            // Extract body with brace depth tracking
             var body = extractMethodBody(lines, sigLine);
             if (body == null) continue;
 
             result.add(new EndpointMethod(methodName, annBlock.toString(), sigLineStr, body));
-            // Springe hinter den Methodenrumpf
+            // Skip past the method body
             i = skipMethodBody(lines, sigLine);
         }
 
@@ -256,11 +255,11 @@ class AgentAssignmentTest {
     }
 
     /**
-     * Extrahiert den Methodenrumpf ab der Zeile mit der Signatur.
-     * Handelt beliebig tiefe geschachtelte Klammern.
+     * Extracts the method body starting from the signature line.
+     * Handles arbitrarily deeply nested braces.
      */
     private static String extractMethodBody(String[] lines, int sigLine) {
-        // Finde erste { ab sigLine
+        // Find first { from sigLine
         int braceLine = sigLine;
         while (braceLine < lines.length && !lines[braceLine].contains("{")) {
             braceLine++;
@@ -279,7 +278,7 @@ class AgentAssignmentTest {
                     depth++;
                     if (!started) {
                         started = true;
-                        // Ab erstem Zeichen nach { beginnen
+                        // Start from first char after {
                         body.append(l.substring(c + 1));
                         if (depth == 0) break;
                         body.append("\n");
@@ -302,7 +301,7 @@ class AgentAssignmentTest {
         return body.toString().strip();
     }
 
-    /** Gibt Zeilenindex nach dem schliessenden } der Methode zurück. */
+    /** Returns the line index after the closing } of the method. */
     private static int skipMethodBody(String[] lines, int sigLine) {
         int braceLine = sigLine;
         while (braceLine < lines.length && !lines[braceLine].contains("{")) {

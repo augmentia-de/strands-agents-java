@@ -290,27 +290,27 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     <h2>Strands Agent</h2>
 
     <p style="font-size:12px;margin-bottom:6px;">
-      <a href="/keys" style="color:#e94560;text-decoration:none;">&#128273; Key Vault verwalten</a>
+      <a href="/keys" style="color:#e94560;text-decoration:none;">&#128273; Manage Key Vault</a>
     </p>
 
     <section id="apikey-section">
-      <h3 data-toggle="apikey">API-Key &#9662;</h3>
+      <h3 data-toggle="apikey">API Key &#9662;</h3>
       <div id="apikey-list" style="display:none">
         <div id="apikey-setup" class="apikey-config" style="display:none">
           <label for="setup-api-key">API-Key</label>
           <input type="password" id="setup-api-key" placeholder="sk-...">
-          <label for="setup-password">Passwort (zur Verschl&uuml;sselung)</label>
-          <input type="password" id="setup-password" placeholder="Passwort">
-          <button id="setup-btn">Einrichten</button>
+          <label for="setup-password">Password (for encryption)</label>
+          <input type="password" id="setup-password" placeholder="Password">
+          <button id="setup-btn">Setup</button>
         </div>
         <div id="apikey-activate" class="apikey-config" style="display:none">
-          <label for="activate-password">Passwort</label>
-          <input type="password" id="activate-password" placeholder="Passwort">
-          <button id="activate-btn">Aktivieren</button>
+          <label for="activate-password">Password</label>
+          <input type="password" id="activate-password" placeholder="Password">
+          <button id="activate-btn">Activate</button>
         </div>
         <div id="apikey-active" class="apikey-config" style="display:none">
-          <p id="apikey-status-text" class="status-ready">&#x1f7e2; Aktiv (nur RAM)</p>
-          <button id="deactivate-btn">Deaktivieren</button>
+          <p id="apikey-status-text" class="status-ready">&#x1f7e2; Active (RAM only)</p>
+          <button id="deactivate-btn">Deactivate</button>
         </div>
         <p id="apikey-error"></p>
       </div>
@@ -327,7 +327,7 @@ Available tools:
 
 Available skills:
 &#123;&#123;skills&#125;&#125;</textarea>
-          <p class="mode-hint">Platzhalter: &#123;&#123;tools&#125;&#125; und &#123;&#123;skills&#125;&#125; werden beim Initialisieren ersetzt.</p>
+          <p class="mode-hint">Placeholders: &#123;&#123;tools&#125;&#125; and &#123;&#123;skills&#125;&#125; are replaced during initialization.</p>
         </div>
       </div>
     </section>
@@ -337,7 +337,7 @@ Available skills:
       <div id="mcp-list" style="display:none">
         <div id="mcp-servers-list" class="mcp-servers"></div>
         <div id="mcp-custom" class="mcp-custom">
-          <label>Benutzerdefinierter MCP Server</label>
+          <label>Custom MCP Server</label>
           <div class="mcp-url-row">
             <input type="text" id="mcp-custom-url" placeholder="http://localhost:3001/mcp" spellcheck="false">
             <button id="mcp-connect-btn">Connect</button>
@@ -358,7 +358,7 @@ Available skills:
             </label>
           {/for}
         {#else}
-          <p class="empty">Keine Tools registriert</p>
+          <p class="empty">No tools registered</p>
         {/if}
       </div>
     </section>
@@ -374,7 +374,7 @@ Available skills:
             </label>
           {/for}
         {#else}
-          <p class="empty">Keine Skills geladen</p>
+          <p class="empty">No skills loaded</p>
         {/if}
       </div>
     </section>
@@ -396,7 +396,7 @@ Available skills:
             <span>MCP Ingest aktivieren</span>
           </label>
         </div>
-        <p class="mode-hint">Erlaubt dem Agenten, Skills und MCP-Tools dynamisch zu entdecken</p>
+        <p class="mode-hint">Allows the agent to discover skills and MCP tools dynamically</p>
       </div>
     </section>
 
@@ -404,8 +404,8 @@ Available skills:
       <h3 data-toggle="mode3">Capability Search (Modus 3) &#9656;</h3>
       <div id="mode3-list" style="display:none">
         <div class="mode-config">
-          <label for="cap-dirs">Skill-Verzeichnisse (komma-getrennt)</label>
-          <input type="text" id="cap-dirs" placeholder="z.B. skills,extra-skills">
+          <label for="cap-dirs">Skill directories (comma-separated)</label>
+          <input type="text" id="cap-dirs" placeholder="e.g. skills,extra-skills">
         </div>
         <p class="mode-hint">Sub-Agent analysiert Aufgaben und empfiehlt passende Capabilities</p>
       </div>
@@ -414,15 +414,15 @@ Available skills:
     <section id="session-list-section">
       <h3 data-toggle="session-list">Sessions &#9662;</h3>
       <div id="session-list" style="display:none">
-        <p class="empty">Keine Sessions</p>
+        <p class="empty">No sessions</p>
       </div>
     </section>
 
     <section id="info-section">
       <p id="session-info">Session: <span id="session-id">-</span></p>
-      <p id="init-status" class="status-pending">&#x23f3; Nicht initialisiert</p>
-      <button id="init-btn">&#x1f680; Agent initialisieren</button>
-      <button id="new-session-btn">Neue Session</button>
+      <p id="init-status" class="status-pending">&#x23f3; Not initialized</p>
+      <button id="init-btn">&#x1f680; Initialize Agent</button>
+      <button id="new-session-btn">New Session</button>
     </section>
     <p style="font-size:10px;color:#555;text-align:center;padding-top:8px;border-top:1px solid #0f3460;">build 2026-06-02</p>
   </aside>
@@ -435,13 +435,13 @@ Available skills:
     </div>
     <div id="messages">
       <div class="message system">
-        <div class="msg-content">Strands Agent bereit. W&auml;hle Tools/Skills/MCP-Tools aus und klicke "Agent initialisieren".</div>
+        <div class="msg-content">Strands Agent ready. Select Tools/Skills/MCP tools and click "Initialize Agent".</div>
       </div>
     </div>
     <div id="memory-bar"></div>
     <div id="input-area">
-      <textarea id="prompt-input" rows="1" placeholder="Zuerst initialisieren, dann Nachricht eingeben..." disabled></textarea>
-      <button id="send-btn" disabled>Senden</button>
+      <textarea id="prompt-input" rows="1" placeholder="Initialize first, then enter message..." disabled></textarea>
+      <button id="send-btn" disabled>Send</button>
     </div>
   </main>
 </div>

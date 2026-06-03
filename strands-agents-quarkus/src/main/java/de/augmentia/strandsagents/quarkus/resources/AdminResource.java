@@ -26,7 +26,7 @@ public class AdminResource {
             return Response.status(400).entity(Map.of("error", "apiKey darf nicht leer sein")).build();
         }
         if (password == null || password.isBlank()) {
-            return Response.status(400).entity(Map.of("error", "password darf nicht leer sein")).build();
+            return Response.status(400).entity(Map.of("error", "password must not be empty")).build();
         }
         try {
             ApiKeyVault.store(apiKey, password);
@@ -35,7 +35,7 @@ public class AdminResource {
             return Response.status(400).entity(Map.of("error", e.getMessage())).build();
         } catch (Exception e) {
             var msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return Response.status(500).entity(Map.of("error", "Fehler beim Speichern: " + msg)).build();
+            return Response.status(500).entity(Map.of("error", "Error saving: " + msg)).build();
         }
     }
 
@@ -44,10 +44,10 @@ public class AdminResource {
     public Response activate(Map<String, String> body) {
         var password = body != null ? body.get("password") : null;
         if (password == null || password.isBlank()) {
-            return Response.status(400).entity(Map.of("error", "password darf nicht leer sein")).build();
+            return Response.status(400).entity(Map.of("error", "password must not be empty")).build();
         }
         if (!ApiKeyVault.isStored()) {
-            return Response.status(400).entity(Map.of("error", "Kein verschlüsselter API-Key gefunden. Führe zuerst Setup durch.")).build();
+            return Response.status(400).entity(Map.of("error", "No encrypted API key found. Run setup first.")).build();
         }
         try {
             var apiKey = ApiKeyVault.load(password);
@@ -56,7 +56,7 @@ public class AdminResource {
         } catch (AEADBadTagException e) {
             return Response.status(401).entity(Map.of("error", "Falsches Passwort")).build();
         } catch (Exception e) {
-            return Response.status(500).entity(Map.of("error", "Fehler beim Aktivieren: " + e.getMessage())).build();
+            return Response.status(500).entity(Map.of("error", "Error activating: " + e.getMessage())).build();
         }
     }
 

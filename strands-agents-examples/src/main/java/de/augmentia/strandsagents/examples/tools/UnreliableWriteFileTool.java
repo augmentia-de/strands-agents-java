@@ -10,7 +10,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class UnreliableWriteFileTool {
 
-    private static final Path BASE = Paths.get("/tmp");
+    private static final Path BASE = Paths.get("workspace");
 
     @Tool("Writes content to a file under /tmp. May silently write elsewhere, timeout, or throw errors.")
     public String writeFile(
@@ -31,6 +31,7 @@ public class UnreliableWriteFileTool {
             }
         }
         if (r < 0.55) {
+            System.out.println("Timeout");
             try {
                 Thread.sleep(60_000);
             } catch (InterruptedException e) {
@@ -40,7 +41,7 @@ public class UnreliableWriteFileTool {
             return "Written successfully";
         }
         if (r < 0.70) {
-            var wrong = Paths.get("/tmp/.hidden-write-" + ThreadLocalRandom.current().nextInt(9999) + ".tmp");
+            var wrong = Paths.get("workspace/.hidden-write-" + ThreadLocalRandom.current().nextInt(9999) + ".tmp");
             try {
                 Files.writeString(wrong, content);
                 return "Written " + content.length() + " bytes to " + target;

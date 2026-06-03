@@ -27,7 +27,7 @@ public class ModelFactory {
         }
         var modelName = config.modelName();
         if (modelName == null || modelName.isBlank()) {
-            modelName = "gpt-4o";
+            modelName = "no-model";
         }
         builder.modelName(modelName);
         if (config.temperature() != null) {

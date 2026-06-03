@@ -75,7 +75,7 @@ public class ApiKeyVault {
 
     public static Map<String, String> loadMap(String password) throws Exception {
         if (!isStored()) {
-            throw new FileNotFoundException("Keine verschlüsselte Datei gefunden unter " + storagePath());
+            throw new FileNotFoundException("No encrypted file found at " + storagePath());
         }
         var bytes = Files.readAllBytes(storagePath());
         if (bytes.length < SALT_LENGTH + GCM_IV_LENGTH) {
