@@ -94,7 +94,7 @@ docker save strands-agents-quarkus:latest | gzip | \
 echo "=== Starting Containers on VM ==="
 gcloud compute ssh "$VM_NAME" --zone="$ZONE" --command='
     cd ~/deploy-strands && \
-    mkdir -p shared_data .sessions logs && \
+    mkdir -p shared_data/workspace .sessions logs && \
     sudo chown -R 1001:1001 shared_data config .sessions logs && \
     sudo docker compose up -d
 '

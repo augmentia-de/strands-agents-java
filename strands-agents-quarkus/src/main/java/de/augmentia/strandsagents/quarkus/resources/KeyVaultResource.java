@@ -31,18 +31,18 @@ public class KeyVaultResource {
     }
 
     @POST
-    @Path("/read")
-    public Response read(Map<String, String> body) {
+    @Path("/authenticate")
+    public Response authenticate(Map<String, String> body) {
         var password = body != null ? body.get("password") : null;
         if (password == null || password.isBlank()) {
             return Response.status(400).entity(Map.of("error", "password erforderlich")).build();
         }
         if (!ApiKeyVault.isStored()) {
-            return Response.ok(Map.of("entries", Map.of())).build();
+            return Response.ok(Map.of("exists", false)).build();
         }
         try {
             var entries = ApiKeyVault.loadMap(password);
-            return Response.ok(Map.of("entries", entries)).build();
+            return Response.ok(Map.of("exists", true, "keys", entries.keySet())).build();
         } catch (AEADBadTagException e) {
             return Response.status(401).entity(Map.of("error", "Falsches Passwort")).build();
         } catch (Exception e) {
@@ -52,19 +52,31 @@ public class KeyVaultResource {
 
     @POST
     @Path("/write")
-    public Response write(Map<String, Object> body) {
-        var password = body != null ? (String) body.get("password") : null;
+    public Response write(Map<String, String> body) {
+        var password = body != null ? body.get("password") : null;
         if (password == null || password.isBlank()) {
             return Response.status(400).entity(Map.of("error", "password erforderlich")).build();
         }
-        @SuppressWarnings("unchecked")
-        var entries = body != null ? (Map<String, String>) body.get("entries") : null;
-        if (entries == null || entries.isEmpty()) {
-            return Response.status(400).entity(Map.of("error", "entries darf nicht leer sein")).build();
+        var key = body != null ? body.get("key") : null;
+        if (key == null || key.isBlank()) {
+            return Response.status(400).entity(Map.of("error", "key erforderlich")).build();
         }
+        var value = body.get("value");
         try {
+            var entries = new java.util.LinkedHashMap<String, String>();
+            if (ApiKeyVault.isStored()) {
+                entries.putAll(ApiKeyVault.loadMap(password));
+            }
+            if (value == null || value.isBlank()) {
+                entries.remove(key);
+            } else {
+                entries.put(key, value);
+            }
+            if (entries.isEmpty()) {
+                return Response.ok(Map.of("status", "ok", "entryCount", 0)).build();
+            }
             ApiKeyVault.store(entries, password);
-            return Response.ok(Map.of("status", "ok")).build();
+            return Response.ok(Map.of("status", "ok", "entryCount", entries.size())).build();
         } catch (AEADBadTagException e) {
             return Response.status(401).entity(Map.of("error", "Falsches Passwort")).build();
         } catch (Exception e) {

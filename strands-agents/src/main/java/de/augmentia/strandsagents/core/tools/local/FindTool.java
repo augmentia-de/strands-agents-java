@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import de.augmentia.strandsagents.core.internal.WorkspacePaths;
 import de.augmentia.strandsagents.core.tools.AgentTool;
 import de.augmentia.strandsagents.core.tools.TextContent;
 import de.augmentia.strandsagents.core.tools.ToolResult;
@@ -32,10 +33,14 @@ public class FindTool implements AgentTool<FindTool.Params> {
         ".DS_Store", "Thumbs.db", "desktop.ini"
     );
 
-    private final Path cwd;
+    private final WorkspacePaths workspacePaths;
 
     public FindTool(Path cwd) {
-        this.cwd = cwd;
+        try {
+            this.workspacePaths = new WorkspacePaths(cwd);
+        } catch (java.io.IOException e) {
+            throw new IllegalArgumentException("Invalid workspace path: " + cwd, e);
+        }
     }
 
     @Override
@@ -86,7 +91,7 @@ public class FindTool implements AgentTool<FindTool.Params> {
             throw new RuntimeException("Operation aborted");
         }
 
-        var searchPath = params.path() != null ? resolve(params.path()) : cwd;
+        var searchPath = params.path() != null ? workspacePaths.resolve(params.path()) : workspacePaths.workspace();
         var matcher = FileSystems.getDefault().getPathMatcher("glob:" + params.pattern());
         var maxResults = params.maxResults() != null ? params.maxResults() : 100;
         var results = new ArrayList<String>();
@@ -150,20 +155,6 @@ public class FindTool implements AgentTool<FindTool.Params> {
         return new ToolResult(
             List.of(new TextContent(output)),
             new FindDetails(results.size(), params.pattern()));
-    }
-
-    private Path resolve(String path) {
-        try {
-            var p = Paths.get(path);
-            var resolved = (p.isAbsolute() ? p : cwd.resolve(p)).normalize().toAbsolutePath();
-            var canonical = cwd.toRealPath();
-            if (!resolved.startsWith(canonical)) {
-                throw new RuntimeException("Access denied: path outside working directory: " + path);
-            }
-            return resolved;
-        } catch (IOException e) {
-            throw new RuntimeException("Access denied: path outside working directory: " + path);
-        }
     }
 
     public record Params(String pattern, String path, Integer maxResults) {}

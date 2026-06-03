@@ -20,8 +20,6 @@
         <module>strands-agents</module>
         <module>strands-agents-quarkus</module>
         <module>strands-agents-examples</module>
-        <module>strands-agenttest</module>
-        <module>strands-agents-mcp-server</module>
     </modules>
 
     <properties>
@@ -51,36 +49,7 @@
                 <artifactId>strands-agents</artifactId>
                 <version>${project.version}</version>
             </dependency>
-            <dependency>
-                <groupId>de.augmentia.strandsagents</groupId>
-                <artifactId>strands-agents-sessions</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>de.augmentia.strandsagents</groupId>
-                <artifactId>strands-agents-mcp</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>de.augmentia.strandsagents</groupId>
-                <artifactId>strands-agents-skills</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>de.augmentia.strandsagents</groupId>
-                <artifactId>strands-agents-telemetry</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>de.augmentia.strandsagents</groupId>
-                <artifactId>strands-agents-vault</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>de.augmentia.strandsagents</groupId>
-                <artifactId>strands-agents-mcp-server</artifactId>
-                <version>${project.version}</version>
-            </dependency>
+
             <dependency>
                 <groupId>dev.langchain4j</groupId>
                 <artifactId>langchain4j-core</artifactId>

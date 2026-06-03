@@ -293,7 +293,8 @@ function updateMcpTools() { state.currentMcpTools = getSelected('mcp-tool'); }
 
 function setInitialized(val) {
   state.isInitialized = val;
-  document.getElementById('init-btn').disabled = val;
+  document.getElementById('init-btn').disabled = val ? false : false;
+  document.getElementById('init-btn').textContent = val ? '\u27F3 Neu initialisieren' : 'Agent initialisieren';
   document.getElementById('send-btn').disabled = !val;
   document.getElementById('prompt-input').disabled = !val;
   document.getElementById('init-status').textContent = val ? '\u2705 Agent bereit' : '\u23f3 Nicht initialisiert';
@@ -506,13 +507,7 @@ function newSession() {
   loadSessions();
 }
 
-async function initAgent() {
-  var btn = document.getElementById('init-btn');
-  btn.disabled = true;
-  document.getElementById('init-status').textContent = '\u23f3 Initialisiere...';
-  addMessage('system', 'Initialisiere Agent mit aktuellen Tools/Skills/MCP-Tools...');
-
-  // Build mcpServers list from open servers with selected tools
+function buildMcpServerList() {
   var mcpServers = [];
   for (var srvName in state.mcpServersOpen) {
     if (!state.mcpServersOpen[srvName]) continue;
@@ -524,22 +519,35 @@ async function initAgent() {
     var url = state.mcpCustomUrls[srvName] || undefined;
     mcpServers.push({ serverName: srvName, tools: selectedSrvTools.length > 0 ? selectedSrvTools : undefined, url: url });
   }
+  return mcpServers;
+}
+
+function buildInitBody() {
+  var mcpServers = buildMcpServerList();
+  return {
+    tools: state.currentTools.length > 0 ? state.currentTools : undefined,
+    skills: state.currentSkills.length > 0 ? state.currentSkills : undefined,
+    mcpServerName: mcpServers.length === 1 ? mcpServers[0].serverName : undefined,
+    mcpTools: mcpServers.length === 1 && mcpServers[0].tools ? mcpServers[0].tools : undefined,
+    mcpServers: mcpServers.length > 0 ? mcpServers : undefined,
+    systemPrompt: document.getElementById('system-prompt').value.trim(),
+    skillSearchEnabled: document.getElementById('skill-search-enabled').checked,
+    mcpIngestEnabled: document.getElementById('mcp-ingest-enabled').checked,
+    capabilityDirs: document.getElementById('cap-dirs').value.trim() || undefined
+  };
+}
+
+async function initAgent() {
+  var btn = document.getElementById('init-btn');
+  btn.disabled = true;
+  document.getElementById('init-status').textContent = '\u23f3 Initialisiere...';
+  addMessage('system', 'Initialisiere Agent mit aktuellen Tools/Skills/MCP-Tools...');
 
   try {
     var resp = await fetch('/api/agent/init', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tools: state.currentTools.length > 0 ? state.currentTools : undefined,
-        skills: state.currentSkills.length > 0 ? state.currentSkills : undefined,
-        mcpServerName: mcpServers.length === 1 ? mcpServers[0].serverName : undefined,
-        mcpTools: mcpServers.length === 1 && mcpServers[0].tools ? mcpServers[0].tools : undefined,
-        mcpServers: mcpServers.length > 0 ? mcpServers : undefined,
-        systemPrompt: document.getElementById('system-prompt').value.trim(),
-        skillSearchEnabled: document.getElementById('skill-search-enabled').checked,
-        mcpIngestEnabled: document.getElementById('mcp-ingest-enabled').checked,
-        capabilityDirs: document.getElementById('cap-dirs').value.trim() || undefined
-      })
+      body: JSON.stringify(buildInitBody())
     });
 
     var data = await resp.json();
@@ -560,13 +568,50 @@ async function initAgent() {
       data.memoryCount || 0
     );
 
-    // Personalisierte Begrüßung
     var greeting = 'Hey! Ich bin dein Strands Agent.';
     if (toolCount > 0) {
       greeting += ' Ich habe Zugriff auf ' + toolCount + ' Tool' + (toolCount > 1 ? 's' : '') + '.';
     }
     greeting += ' Was kann ich für dich tun?';
     addMessage('agent', greeting);
+
+    document.getElementById('prompt-input').focus();
+    loadSessions();
+  } catch (err) {
+    addMessage('system', 'Fehler: ' + err.message);
+    btn.disabled = false;
+  }
+}
+
+async function reinitAgent() {
+  var btn = document.getElementById('init-btn');
+  btn.disabled = true;
+  document.getElementById('init-status').textContent = '\u23f3 Reinitialisiere...';
+
+  try {
+    var body = buildInitBody();
+    body.sessionId = state.sessionId;
+    var resp = await fetch('/api/agent/reinit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    var data = await resp.json();
+    if (data.error) {
+      addMessage('system', 'Fehler bei Reinitialisierung: ' + data.error);
+      btn.disabled = false;
+      return;
+    }
+
+    setInitialized(true);
+    var toolCount = state.currentTools.length + state.currentMcpTools.length;
+    addMessage('system', '\u2705 Agent neu initialisiert (' + toolCount + ' Tools)');
+
+    updateMemoryBar(
+      state.currentTools.concat(state.currentMcpTools),
+      data.memoryCount || 0
+    );
 
     document.getElementById('prompt-input').focus();
     loadSessions();
@@ -741,7 +786,13 @@ window.onload = function() {
   document.getElementById('setup-btn').addEventListener('click', setupApiKey);
   document.getElementById('activate-btn').addEventListener('click', activate);
   document.getElementById('deactivate-btn').addEventListener('click', deactivate);
-  document.getElementById('init-btn').addEventListener('click', initAgent);
+  document.getElementById('init-btn').addEventListener('click', function() {
+    if (state.isInitialized) {
+      reinitAgent();
+    } else {
+      initAgent();
+    }
+  });
   document.getElementById('send-btn').addEventListener('click', sendMessage);
   document.getElementById('new-session-btn').addEventListener('click', newSession);
   document.getElementById('mcp-connect-btn').addEventListener('click', connectMcpServer);

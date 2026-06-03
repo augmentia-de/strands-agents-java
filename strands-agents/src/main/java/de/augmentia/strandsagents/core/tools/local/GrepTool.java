@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.regex.*;
 
+import de.augmentia.strandsagents.core.internal.WorkspacePaths;
 import de.augmentia.strandsagents.core.tools.AgentTool;
 import de.augmentia.strandsagents.core.tools.TextContent;
 import de.augmentia.strandsagents.core.tools.ToolResult;
@@ -35,10 +36,14 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
         ".mp4", ".avi", ".mov", ".bin", ".dat", ".db", ".sqlite"
     );
 
-    private final Path cwd;
+    private final WorkspacePaths workspacePaths;
 
     public GrepTool(Path cwd) {
-        this.cwd = cwd;
+        try {
+            this.workspacePaths = new WorkspacePaths(cwd);
+        } catch (java.io.IOException e) {
+            throw new IllegalArgumentException("Invalid workspace path: " + cwd, e);
+        }
     }
 
     @Override
@@ -98,7 +103,7 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
             throw new RuntimeException("Operation aborted");
         }
 
-        var searchPath = params.path() != null ? resolve(params.path()) : cwd;
+        var searchPath = params.path() != null ? workspacePaths.resolve(params.path()) : workspacePaths.workspace();
         var flags = Boolean.TRUE.equals(params.caseSensitive()) ? 0 : Pattern.CASE_INSENSITIVE;
         Pattern pattern;
         try {
@@ -195,20 +200,6 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
             }
         }
         return false;
-    }
-
-    private Path resolve(String path) {
-        try {
-            var p = Paths.get(path);
-            var resolved = (p.isAbsolute() ? p : cwd.resolve(p)).normalize().toAbsolutePath();
-            var canonical = cwd.toRealPath();
-            if (!resolved.startsWith(canonical)) {
-                throw new RuntimeException("Access denied: path outside working directory: " + path);
-            }
-            return resolved;
-        } catch (IOException e) {
-            throw new RuntimeException("Access denied: path outside working directory: " + path);
-        }
     }
 
     public record Params(String pattern, String include, String path, Boolean caseSensitive, Integer maxResults) {}

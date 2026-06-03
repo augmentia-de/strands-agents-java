@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+import de.augmentia.strandsagents.core.internal.WorkspacePaths;
 import de.augmentia.strandsagents.core.tools.AgentTool;
 import de.augmentia.strandsagents.core.tools.TextContent;
 import de.augmentia.strandsagents.core.tools.ToolResult;
@@ -16,10 +17,14 @@ import org.slf4j.LoggerFactory;
 
 public class EditTool implements AgentTool<EditTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(EditTool.class);
-    private final Path cwd;
+    private final WorkspacePaths workspacePaths;
 
     public EditTool(Path cwd) {
-        this.cwd = cwd;
+        try {
+            this.workspacePaths = new WorkspacePaths(cwd);
+        } catch (java.io.IOException e) {
+            throw new IllegalArgumentException("Invalid workspace path: " + cwd, e);
+        }
     }
 
     @Override
@@ -67,7 +72,7 @@ public class EditTool implements AgentTool<EditTool.Params> {
             log.debug("Tool: edit ABORTED");
             throw new RuntimeException("Operation aborted");
         }
-        var path = resolve(params.path());
+        var path = workspacePaths.resolve(params.path());
         try {
             var content = Files.readString(path);
             if (!content.contains(params.oldText())) {
@@ -111,20 +116,6 @@ public class EditTool implements AgentTool<EditTool.Params> {
             i += text.length();
         }
         return c;
-    }
-
-    private Path resolve(String path) {
-        try {
-            var p = Paths.get(path);
-            var resolved = (p.isAbsolute() ? p : cwd.resolve(p)).normalize().toAbsolutePath();
-            var canonical = cwd.toRealPath();
-            if (!resolved.startsWith(canonical)) {
-                throw new RuntimeException("Access denied: path outside working directory: " + path);
-            }
-            return resolved;
-        } catch (IOException e) {
-            throw new RuntimeException("Access denied: path outside working directory: " + path);
-        }
     }
 
     public record Params(String path, String oldText, String newText) {}

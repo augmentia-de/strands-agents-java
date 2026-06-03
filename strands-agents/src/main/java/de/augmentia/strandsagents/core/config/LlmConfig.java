@@ -12,11 +12,11 @@ public record LlmConfig(
 
     public static LlmConfig fromEnv() {
         return new LlmConfig(
-            System.getenv("OPENAI_API_KEY"),
-            System.getenv("OPENAI_BASE_URL"),
-            System.getenv("OPENAI_MODEL"),
-            parseDoubleOrNull(System.getenv("LLM_TEMPERATURE")),
-            parseIntOrNull(System.getenv("LLM_MAX_RETRIES"))
+            envOrProperty("OPENAI_API_KEY"),
+            envOrProperty("OPENAI_BASE_URL"),
+            envOrProperty("OPENAI_MODEL"),
+            parseDoubleOrNull(envOrProperty("LLM_TEMPERATURE")),
+            parseIntOrNull(envOrProperty("LLM_MAX_RETRIES"))
         );
     }
 
@@ -35,11 +35,19 @@ public record LlmConfig(
         var secrets = vault.getSecrets(path);
         return new LlmConfig(
             secrets.get("api_key"),
-            secrets.getOrDefault("base_url", System.getenv("OPENAI_BASE_URL")),
-            secrets.getOrDefault("model", System.getenv("OPENAI_MODEL")),
+            secrets.getOrDefault("base_url", envOrProperty("OPENAI_BASE_URL")),
+            secrets.getOrDefault("model", envOrProperty("OPENAI_MODEL")),
             parseDoubleOrNull(secrets.get("temperature")),
             parseIntOrNull(secrets.get("max_retries"))
         );
+    }
+
+    private static String envOrProperty(String key) {
+        var val = System.getenv(key);
+        if (val != null && !val.isBlank()) return val;
+        val = System.getProperty(key);
+        if (val != null && !val.isBlank()) return val;
+        return System.getProperty("vault." + key);
     }
 
     private static Double parseDoubleOrNull(String s) {

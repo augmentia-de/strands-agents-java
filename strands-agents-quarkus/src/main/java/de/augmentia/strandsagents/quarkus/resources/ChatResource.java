@@ -101,6 +101,14 @@ public class ChatResource {
     }
 
     @POST
+    @Path("/agent/reinit")
+    public ChatResponse reinitAgent(AgentInitRequest req) {
+        if (req.tools == null) req.tools = List.of();
+        if (req.skills == null) req.skills = List.of();
+        return agentService.reinitAgent(req);
+    }
+
+    @POST
     @Path("/mcp/discover")
     public List<ToolInfo> discoverMcpTools(Map<String, String> body) {
         var server = body != null ? body.get("server") : null;

@@ -170,8 +170,21 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
     }
 
     public ChatResponse initAgent(AgentInitRequest req) {
+        return initAgent(req, UUID.randomUUID().toString());
+    }
+
+    public ChatResponse reinitAgent(AgentInitRequest req) {
+        if (req.sessionId == null || req.sessionId.isBlank()) {
+            var err = new ChatResponse();
+            err.error = "sessionId erforderlich für Reinitialisierung";
+            return err;
+        }
+        releaseSession(req.sessionId);
+        return initAgent(req, req.sessionId);
+    }
+
+    private ChatResponse initAgent(AgentInitRequest req, String sessionId) {
         ensureInitialized();
-        var sessionId = UUID.randomUUID().toString();
         var start = System.nanoTime();
 
         var selectedTools = req.tools != null && !req.tools.isEmpty()

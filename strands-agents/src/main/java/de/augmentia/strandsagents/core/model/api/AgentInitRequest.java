@@ -13,4 +13,5 @@ public class AgentInitRequest {
     public Boolean skillSearchEnabled;
     public Boolean mcpIngestEnabled;
     public String capabilityDirs;
+    public String sessionId;
 }

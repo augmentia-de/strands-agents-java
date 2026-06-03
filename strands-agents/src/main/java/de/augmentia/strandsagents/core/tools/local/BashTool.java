@@ -33,7 +33,9 @@ public class BashTool implements AgentTool<BashTool.Params> {
 
     @Override
     public String description() {
-        return "Execute a bash command. Output truncated to last " + MAX_LINES + " lines.";
+        return "Execute a bash command. Output truncated to last " + MAX_LINES + " lines. "
+            + "Note: this tool is NOT restricted to the workspace directory. "
+            + "The command runs in the workspace directory but can access any path the process has permissions for.";
     }
 
     @Override

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+import de.augmentia.strandsagents.core.internal.WorkspacePaths;
 import de.augmentia.strandsagents.core.tools.AgentTool;
 import de.augmentia.strandsagents.core.tools.TextContent;
 import de.augmentia.strandsagents.core.tools.ToolResult;
@@ -15,10 +16,14 @@ import org.slf4j.LoggerFactory;
 
 public class WriteTool implements AgentTool<WriteTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(WriteTool.class);
-    private final Path cwd;
+    private final WorkspacePaths workspacePaths;
 
     public WriteTool(Path cwd) {
-        this.cwd = cwd;
+        try {
+            this.workspacePaths = new WorkspacePaths(cwd);
+        } catch (java.io.IOException e) {
+            throw new IllegalArgumentException("Invalid workspace path: " + cwd, e);
+        }
     }
 
     @Override
@@ -65,7 +70,7 @@ public class WriteTool implements AgentTool<WriteTool.Params> {
             log.debug("Tool: write ABORTED");
             throw new RuntimeException("Operation aborted");
         }
-        var path = resolve(params.path());
+        var path = workspacePaths.resolve(params.path());
         try {
             var parent = path.getParent();
             if (parent != null) {
@@ -79,20 +84,6 @@ public class WriteTool implements AgentTool<WriteTool.Params> {
         } catch (IOException e) {
             log.debug("Tool: write ERROR: {}", e.getMessage());
             throw new RuntimeException(e.getMessage(), e);
-        }
-    }
-
-    private Path resolve(String path) {
-        try {
-            var p = Paths.get(path);
-            var resolved = (p.isAbsolute() ? p : cwd.resolve(p)).normalize().toAbsolutePath();
-            var canonical = cwd.toRealPath();
-            if (!resolved.startsWith(canonical)) {
-                throw new RuntimeException("Access denied: path outside working directory: " + path);
-            }
-            return resolved;
-        } catch (IOException e) {
-            throw new RuntimeException("Access denied: path outside working directory: " + path);
         }
     }
 
