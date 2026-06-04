@@ -5,6 +5,7 @@ import de.augmentia.strandsagents.core.model.message.SystemMessage;
 import de.augmentia.strandsagents.core.model.message.UserMessage;
 import de.augmentia.strandsagents.core.model.message.AssistantMessage;
 import de.augmentia.strandsagents.core.model.message.ToolMessage;
+import de.augmentia.strandsagents.core.prompt.PromptRegistry;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -44,7 +45,7 @@ public record SummarizingConversationManager(ChatModel summarizer, int maxTokens
         Message summaryMessage = new SystemMessage(
             UUID.randomUUID().toString(),
             Instant.now(),
-            "Zusammenfassung der bisherigen Konversation: " + summary,
+            PromptRegistry.get("summarizing.prefix") + summary,
             Map.of()
         );
 
@@ -65,7 +66,7 @@ public record SummarizingConversationManager(ChatModel summarizer, int maxTokens
 
     String generateSummary(List<Message> messages) {
         var sb = new StringBuilder();
-        sb.append("Fasse die folgende Konversation zusammen. Gib nur die Zusammenfassung, keine Einleitung:\n\n");
+        sb.append(PromptRegistry.get("summarizing.instruction")).append("\n\n");
         for (var msg : messages) {
             String role = switch (msg) {
                 case UserMessage u -> "User";

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
+import de.augmentia.strandsagents.core.prompt.PromptRegistry;
 import de.augmentia.strandsagents.core.tools.AgentTool;
 import de.augmentia.strandsagents.core.tools.ToolResult;
 import dev.langchain4j.model.chat.ChatModel;
@@ -88,24 +89,7 @@ public class CapabilitySearchTool implements AgentTool<CapabilitySearchTool.Para
             subRegistry.register(new McpListTool(registry.mcpServers()));
         }
 
-        var systemPrompt = """
-            You are a capability analysis agent. Find relevant skills and MCP tools for a given task.
-
-            Steps:
-            1. Call skill_search to list all available skills
-            2. If MCP servers are configured, call mcp_list to see their tools
-            3. For any promising skill, call skill_search(skillName="...") to inspect its full instructions
-            4. Analyze the task and select the most relevant capabilities
-            5. Remove duplicates and similar tools
-
-            Return a JSON object with:
-            {
-              "reasoning": "brief explanation",
-              "recommendedSkills": ["skill1", "skill2"],
-              "recommendedMcpTools": ["tool1", "tool2"],
-              "summary": "human-readable summary"
-            }
-            """;
+        var systemPrompt = PromptRegistry.get("capability_search_tool.system");
 
         var subAgent = new Agent(subAgentModel, subRegistry, new ToolExecutor());
         subAgent.setSystemPrompt(systemPrompt);

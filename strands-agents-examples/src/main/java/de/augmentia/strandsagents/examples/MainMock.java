@@ -144,7 +144,7 @@ public class MainMock {
 
     static class DemoMockModel implements ChatModel {
         private final String template;
-        DemoMockModel() { this("Mock antwortet: %s"); }
+        DemoMockModel() { this("Mock response: %s"); }
         DemoMockModel(String template) { this.template = template; }
 
         @Override

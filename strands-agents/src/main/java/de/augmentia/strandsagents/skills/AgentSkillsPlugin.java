@@ -4,7 +4,7 @@ package de.augmentia.strandsagents.skills;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.plugin.Plugin;
-
+import de.augmentia.strandsagents.core.prompt.PromptRegistry;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -102,7 +102,7 @@ public class AgentSkillsPlugin implements Plugin {
 
         buf.append("<available_skills>\n");
         if (skills.isEmpty()) {
-            buf.append("No skills are currently available.\n");
+            buf.append(PromptRegistry.get("agent_skills_plugin.no_skills")).append("\n");
         } else {
             for (var s : skills.values()) {
                 buf.append("<skill>\n");
@@ -117,7 +117,7 @@ public class AgentSkillsPlugin implements Plugin {
         buf.append("</available_skills>\n");
 
         if (skillSearchEnabled) {
-            buf.append("\nUse the skill_search tool to search and activate skills instead of referring to the XML above directly.\n");
+            buf.append("\n").append(PromptRegistry.get("agent_skills_plugin.use_skill_search")).append("\n");
         }
 
         return buf.toString();
@@ -127,7 +127,7 @@ public class AgentSkillsPlugin implements Plugin {
         var skill = skills.get(skillName);
         if (skill == null) {
             var available = skills.keySet().stream().sorted().collect(Collectors.joining(", "));
-            return "Error: Skill '" + skillName + "' not found.\nAvailable skills: " + available;
+            return PromptRegistry.get("agent_skills_plugin.error_not_found", skillName, available);
         }
         return formatSkillResponse(skill);
     }

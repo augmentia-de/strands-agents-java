@@ -58,7 +58,7 @@ class ToolRegistryTest {
         var toolMethod = registry.get("add");
         assertThat(toolMethod).isNotNull();
         assertThat(toolMethod.spec().name()).isEqualTo("add");
-        assertThat(toolMethod.spec().description()).contains("Addiert");
+        assertThat(toolMethod.spec().description()).contains("Adds two numbers");
     }
 
     @Test

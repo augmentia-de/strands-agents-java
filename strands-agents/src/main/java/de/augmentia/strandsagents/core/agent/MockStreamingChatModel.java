@@ -1,5 +1,6 @@
 package de.augmentia.strandsagents.core.agent;
 
+import de.augmentia.strandsagents.core.prompt.PromptRegistry;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.StreamingChatModel;
@@ -15,7 +16,7 @@ public class MockStreamingChatModel implements StreamingChatModel {
     private final long tokenDelayMs;
 
     public MockStreamingChatModel() {
-        this("Mock antwortet: %s", 0);
+        this(PromptRegistry.getOrDefault("mock_streaming_chat_model.template", "Mock response: %s"), 0);
     }
 
     public MockStreamingChatModel(String responseTemplate) {

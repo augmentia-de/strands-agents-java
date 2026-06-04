@@ -66,7 +66,7 @@ class AgentEventTest {
         agent.execute("Hallo");
 
         var finished = (AgentFinishedEvent) events.get(events.size() - 1);
-        assertThat(finished.finalAnswer()).contains("Mock antwortet");
+        assertThat(finished.finalAnswer()).contains("Mock response:");
     }
 
     @Test

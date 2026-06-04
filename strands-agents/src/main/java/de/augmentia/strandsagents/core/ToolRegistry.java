@@ -97,6 +97,10 @@ public class ToolRegistry {
         }
     }
 
+    public Map<String, ToolMethod> getTools() {
+        return Collections.unmodifiableMap(tools);
+    }
+
     public ToolMethod get(String name) {
         var tm = tools.get(name);
         if (tm == null) {

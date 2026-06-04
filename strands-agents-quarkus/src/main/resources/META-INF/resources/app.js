@@ -252,6 +252,25 @@ async function setupApiKey() {
   }
 }
 
+async function activate() {
+  var password = document.getElementById('activate-password').value.trim();
+  if (!password) { showApiKeyError('Password required'); return; }
+  showApiKeyError('');
+  try {
+    var resp = await fetch('/api/admin/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
+    });
+    var data = await resp.json();
+    if (!resp.ok) { showApiKeyError(data.error || 'Error'); return; }
+    document.getElementById('activate-password').value = '';
+    renderApiKeyState(true, true);
+  } catch (err) {
+    showApiKeyError('Error: ' + err.message);
+  }
+}
+
 async function deactivate() {
   showApiKeyError('');
   try {
@@ -512,6 +531,7 @@ function buildInitBody() {
     mcpTools: mcpServers.length === 1 && mcpServers[0].tools ? mcpServers[0].tools : undefined,
     mcpServers: mcpServers.length > 0 ? mcpServers : undefined,
     systemPrompt: document.getElementById('system-prompt').value.trim(),
+    modelTier: document.getElementById('llm-tier').value,
     skillSearchEnabled: document.getElementById('skill-search-enabled').checked,
     mcpIngestEnabled: document.getElementById('mcp-ingest-enabled').checked,
     capabilityDirs: document.getElementById('cap-dirs').value.trim() || undefined
@@ -755,9 +775,9 @@ window.onload = function() {
   // All panels closed by default; open API key panel if not logged in
   checkApiKeyStatus().then(function() {
     var setup = document.getElementById('apikey-setup');
-    var activate = document.getElementById('apikey-activate');
+    var activatePanel = document.getElementById('apikey-activate');
     var active = document.getElementById('apikey-active');
-    if ((setup && setup.style.display !== 'none') || (activate && activate.style.display !== 'none')) {
+    if ((setup && setup.style.display !== 'none') || (activatePanel && activatePanel.style.display !== 'none')) {
       togglePanel('apikey');
     }
   });

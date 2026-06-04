@@ -1,5 +1,6 @@
 package de.augmentia.strandsagents.core.agent.routing;
 
+import de.augmentia.strandsagents.core.prompt.PromptRegistry;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
@@ -23,13 +24,7 @@ public class LlmRouter {
 
     public RoutingResult classify(String prompt, List<String> topics) {
         var topicsJoined = String.join(", ", topics);
-        var systemPrompt = """
-            Du bist ein Router. Klassifiziere die Anfrage des Users in genau EINE der folgenden Kategorien:
-            [%s]
-            
-            Antworte NUR mit dem Kategorie-Namen, sonst nichts.
-            Wenn keine Kategorie passt, antworte mit: DEFAULT
-            """.formatted(topicsJoined).strip();
+        var systemPrompt = PromptRegistry.get("llm_router.system", topicsJoined).strip();
 
         var request = ChatRequest.builder()
             .messages(List.of(

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+import de.augmentia.strandsagents.core.prompt.PromptRegistry;
 import de.augmentia.strandsagents.core.tools.AgentTool;
 import de.augmentia.strandsagents.core.tools.TextContent;
 import de.augmentia.strandsagents.core.tools.ToolResult;
@@ -139,20 +140,7 @@ public class WebSearchTool implements AgentTool<WebSearchTool.Params> {
     }
 
     private ToolResult mockSearch(String query) {
-        return ToolResult.success("""
-            Search results for: %s
-
-            1. Example Result 1
-            https://example.com/result1
-            This is a mock result for demonstration.
-
-            2. Example Result 2
-            https://example.com/result2
-            Configure TAVILY_API_KEY for real results.
-
-            Note: Set environment variable TAVILY_API_KEY for real search results.
-            Get free API key at https://tavily.com
-            """.formatted(query));
+        return ToolResult.success(PromptRegistry.get("web_search_tool.mock_result", query));
     }
 
     public record Params(String query) {}

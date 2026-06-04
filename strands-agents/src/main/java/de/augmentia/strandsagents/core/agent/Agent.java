@@ -6,11 +6,13 @@ import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.config.AgentConfig;
 import de.augmentia.strandsagents.core.config.LlmConfig;
 import de.augmentia.strandsagents.core.config.ModelFactory;
+import de.augmentia.strandsagents.core.config.ModelTier;
 import de.augmentia.strandsagents.core.context.AgentContext;
 import de.augmentia.strandsagents.core.conversation.ConversationManager;
 import de.augmentia.strandsagents.sessions.SessionManager;
 import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.core.internal.ChatMessageConverter;
+import de.augmentia.strandsagents.core.prompt.PromptRegistry;
 import de.augmentia.strandsagents.core.model.agent.*;
 import de.augmentia.strandsagents.core.model.event.*;
 import de.augmentia.strandsagents.core.model.message.Message;
@@ -95,10 +97,13 @@ public class Agent {
         Executors.newVirtualThreadPerTaskExecutor();
 
     private final ChatModel model;
+    private ChatModel advancedModel;
+    private ModelTier currentTier;
     private final ChatMemory chatMemory;
     private ToolRegistry toolRegistry;
     private final ToolExecutor toolExecutor;
     private String sessionId;
+    private ChatModel simpleModel;
     private final ConversationManager conversationManager;
     private final SessionManager sessionManager;
     private final RetryConfig retryConfig;
@@ -489,7 +494,7 @@ public class Agent {
         } else if (beforeAgentResult instanceof HookResult.Cancel c) {
             log.debug("beforeAgent hook cancelled — reason={}", c.reason());
             var durationMs = (System.nanoTime() - start) / 1_000_000;
-            var result = new AgentResult(sid, "Hook cancelled: " + c.reason(),
+            var result = new AgentResult(sid, PromptRegistry.get("agent.hook_cancelled", c.reason()),
                 ChatMessageConverter.toDomainMessages(chatMemory.messages()),
                 new ExecutionMetrics(durationMs, 0, 0, 0),
                 StopReason.INTERRUPTED);
@@ -561,7 +566,7 @@ public class Agent {
                 log.debug("beforeModelCall hook cancelled — reason={}", c.reason());
                 phase = AgentPhase.FAILED;
                 var durationMs = (System.nanoTime() - start) / 1_000_000;
-                var result = new AgentResult(sid, "Hook cancelled: " + c.reason(),
+                var result = new AgentResult(sid, PromptRegistry.get("agent.hook_cancelled", c.reason()),
                     ChatMessageConverter.toDomainMessages(chatMemory.messages()),
                     new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
                     StopReason.INTERRUPTED);
@@ -583,7 +588,7 @@ public class Agent {
                 } catch (Exception e) {
                     phase = AgentPhase.FAILED;
                     var durationMs = (System.nanoTime() - start) / 1_000_000;
-                    var result = new AgentResult(sid, "LLM-Fehler: " + e.getMessage(),
+                    var result = new AgentResult(sid, PromptRegistry.get("agent.llm_error", e.getMessage()),
                         ChatMessageConverter.toDomainMessages(chatMemory.messages()),
                         new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
                         StopReason.ERROR);
@@ -611,7 +616,7 @@ public class Agent {
                     log.debug("afterModelCall hook cancelled — reason={}", c.reason());
                     phase = AgentPhase.FAILED;
                     var durationMs = (System.nanoTime() - start) / 1_000_000;
-                    var result = new AgentResult(sid, "Hook cancelled: " + c.reason(),
+                    var result = new AgentResult(sid, PromptRegistry.get("agent.hook_cancelled", c.reason()),
                         ChatMessageConverter.toDomainMessages(chatMemory.messages()),
                         new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
                         StopReason.INTERRUPTED);
@@ -778,7 +783,7 @@ public class Agent {
         var durationMs = (System.nanoTime() - start) / 1_000_000;
         var result = new AgentResult(
             sid,
-            "Maximale Iterationen erreicht",
+            PromptRegistry.getOrDefault("agent.max_iterations", "Maximum iterations reached"),
             ChatMessageConverter.toDomainMessages(chatMemory.messages()),
             new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
             StopReason.MAX_ITERATIONS
@@ -1067,6 +1072,38 @@ public class Agent {
             if (phase == AgentPhase.FAILED) {
                 throw new RuntimeException("HITL rejected");
             }
+        }
+    }
+
+    public ChatModel getCurrentModel() {
+        if (currentTier == ModelTier.ADVANCED && advancedModel != null) {
+            return advancedModel;
+        }
+        return model;
+    }
+
+    public void setAdvancedModel(ChatModel advancedModel) {
+        this.advancedModel = advancedModel;
+    }
+
+    public void setSimpleModel(ChatModel simpleModel) {
+        this.simpleModel = simpleModel;
+    }
+
+    public void setModelTier(ModelTier tier) {
+        this.currentTier = tier;
+    }
+
+    public ModelTier getModelTier() {
+        return currentTier;
+    }
+
+    public void switchTier(ModelTier tier) {
+        this.currentTier = tier;
+        if (tier == ModelTier.ADVANCED && advancedModel != null) {
+            log.debug("Switched to ADVANCED model tier");
+        } else {
+            log.debug("Switched to SIMPLE model tier");
         }
     }
 }

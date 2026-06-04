@@ -2,11 +2,17 @@ package de.augmentia.strandsagents.quarkus.service;
 
 import de.augmentia.strandsagents.core.*;
 import de.augmentia.strandsagents.core.agent.MockChatModel;
+import de.augmentia.strandsagents.core.prompt.PromptRegistry;
 import de.augmentia.strandsagents.core.agent.MockStreamingChatModel;
 import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.agent.AgentFactory;
 import de.augmentia.strandsagents.core.agent.StreamingAgent;
+import de.augmentia.strandsagents.core.config.ChatModelConfig;
 import de.augmentia.strandsagents.core.config.ModelFactory;
+import de.augmentia.strandsagents.core.config.ModelProviderType;
+import de.augmentia.strandsagents.core.config.ModelTier;
+import de.augmentia.strandsagents.core.config.TieredModelConfig;
+import de.augmentia.strandsagents.core.agent.RoutingAgent;
 import de.augmentia.strandsagents.core.conversation.SummarizingConversationManager;
 import de.augmentia.strandsagents.core.logging.FileLlmLogger;
 import de.augmentia.strandsagents.core.logging.LoggingChatModel;
@@ -64,8 +70,10 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
     private static final Logger log = LoggerFactory.getLogger(AgentService.class);
     private static final String TOOLS_PLACEHOLDER = "{{tools}}";
     private static final String SKILLS_PLACEHOLDER = "{{skills}}";
-    static final String DEFAULT_SYSTEM_PROMPT = "You are a helpful general agent. "
-        + "Use the selected tools and skills when they are relevant, and explain important results clearly.";
+    static String defaultSystemPrompt() {
+        return PromptRegistry.getOrDefault("agent_service.default_system_prompt",
+            "You are a helpful general agent. Use the selected tools and skills when they are relevant, and explain important results clearly.");
+    }
 
     @Inject
     SecretService secretService;
@@ -170,7 +178,8 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
     }
 
     public ChatResponse initAgent(AgentInitRequest req) {
-        return initAgent(req, UUID.randomUUID().toString());
+        var session = sessionManager.createSession("default", Map.of());
+        return initAgent(req, session.sessionId());
     }
 
     public ChatResponse reinitAgent(AgentInitRequest req) {
@@ -250,11 +259,59 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
 
         var systemPrompt = buildSystemPrompt(req.systemPrompt, selectedTools, selectedSkills);
         Agent agent;
-        if (streamingModel != null) {
-            //TODO configurable
+        var effectiveTier = req.modelTier != null && !req.modelTier.isBlank()
+            ? ModelTier.fromString(req.modelTier) : null;
+
+        if (effectiveTier != null) {
+            var tieredConfig = injectApiKeys(TieredModelConfig.fromEnv());
+            if (req.simpleProvider != null || req.simpleModel != null || req.advancedProvider != null || req.advancedModel != null) {
+                var simpleBase = tieredConfig.simple();
+                var advancedBase = tieredConfig.advanced();
+                tieredConfig = new TieredModelConfig(
+                    req.simpleProvider != null
+                        ? new ChatModelConfig(
+                            ModelProviderType.fromString(req.simpleProvider),
+                            simpleBase.apiKey(), simpleBase.baseUrl(),
+                            req.simpleModel != null ? req.simpleModel : simpleBase.modelName(),
+                            simpleBase.temperature(), simpleBase.maxRetries(), simpleBase.ollamaBaseUrl())
+                        : simpleBase,
+                    req.advancedProvider != null
+                        ? new ChatModelConfig(
+                            ModelProviderType.fromString(req.advancedProvider),
+                            advancedBase.apiKey(), advancedBase.baseUrl(),
+                            req.advancedModel != null ? req.advancedModel : advancedBase.modelName(),
+                            advancedBase.temperature(), advancedBase.maxRetries(), advancedBase.ollamaBaseUrl())
+                        : advancedBase,
+                    effectiveTier
+                );
+            }
+            var simpleModelTier = ModelFactory.createChatModel(ModelTier.SIMPLE, tieredConfig);
+            var advancedModelTier = ModelFactory.createChatModel(ModelTier.ADVANCED, tieredConfig);
+
+            var wrappedSimple = wrapModel(simpleModelTier);
+            var wrappedAdvanced = wrapModel(advancedModelTier);
+
+            var resilienceConfig = new ResilienceConfig(
+                new RetryConfig(3, 1000, 2.0),
+                new CircuitBreakerConfig(0.5f, 10L, 30L)
+            );
+            SummarizingConversationManager conversationManager = new SummarizingConversationManager(
+                wrappedSimple, 2048);
+
+            if (effectiveTier == ModelTier.ROUTING) {
+                agent = new RoutingAgent(wrappedSimple, wrappedAdvanced, selectedTools, new ToolExecutor(),
+                    conversationManager, sessionManager, null, resilienceConfig, plugins);
+                ((RoutingAgent) agent).resolveRoutingTier(systemPrompt);
+            } else {
+                agent = new Agent(wrappedSimple, selectedTools, new ToolExecutor(),
+                    conversationManager, sessionManager, null, plugins);
+                agent.setAdvancedModel(wrappedAdvanced);
+                agent.setModelTier(effectiveTier);
+            }
+        } else if (streamingModel != null) {
             ResilienceConfig resilienceConfig = new ResilienceConfig(
-                    new RetryConfig(3, 1000, 2.0), // 3 retries, starting at 1s, doubling each time
-                    new CircuitBreakerConfig(0.5f, 10L, 30L) // 50% failure rate, 10s window, 30s half-open
+                    new RetryConfig(3, 1000, 2.0),
+                    new CircuitBreakerConfig(0.5f, 10L, 30L)
             );
             SummarizingConversationManager conversationManager = new SummarizingConversationManager(
                     ModelFactory.createOpenAiFromEnv(), 2048);
@@ -505,8 +562,7 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
         agent.addHook(cpHook);
         cpHook.setAgent(agent);
 
-        agent.setSystemPrompt("You are a highly capable and secure assistant. " +
-                "Always verify actions with the user when using tools.");
+        agent.setSystemPrompt(PromptRegistry.get("agent_service.demo_system_prompt"));
 
         var start = System.nanoTime();
         var result = agent.execute(req.prompt);
@@ -654,7 +710,7 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
     static String buildSystemPrompt(String requestedPrompt, ToolRegistry selectedTools, List<Skill> selectedSkills) {
         var basePrompt = requestedPrompt != null && !requestedPrompt.isBlank()
             ? requestedPrompt.strip()
-            : DEFAULT_SYSTEM_PROMPT;
+            : defaultSystemPrompt();
         var toolSection = describeTools(selectedTools);
         var skillSection = describeSkills(selectedSkills);
         var hasToolsPlaceholder = basePrompt.contains(TOOLS_PLACEHOLDER);
@@ -666,17 +722,17 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
 
         var appended = new StringBuilder(prompt);
         if (!hasToolsPlaceholder) {
-            appended.append("\n\nSelected tools:\n").append(toolSection);
+            appended.append("\n\n").append(PromptRegistry.get("agent_service.tools_section_header")).append("\n").append(toolSection);
         }
         if (!hasSkillsPlaceholder) {
-            appended.append("\n\nSelected skills:\n").append(skillSection);
+            appended.append("\n\n").append(PromptRegistry.get("agent_service.skills_section_header")).append("\n").append(skillSection);
         }
         return appended.toString();
     }
 
     private static String describeTools(ToolRegistry selectedTools) {
         if (selectedTools == null || selectedTools.size() == 0) {
-            return "- No tools selected.";
+            return PromptRegistry.get("agent_service.no_tools");
         }
         return selectedTools.getToolNames().stream()
             .sorted()
@@ -693,7 +749,7 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
 
     private static String describeSkills(List<Skill> selectedSkills) {
         if (selectedSkills == null || selectedSkills.isEmpty()) {
-            return "- No skills selected.";
+            return PromptRegistry.get("agent_service.no_skills");
         }
         return selectedSkills.stream()
             .sorted(Comparator.comparing(Skill::name))
@@ -732,6 +788,12 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
     }
 
     private ChatModel createModel() {
+        // Try multi-provider tiered config first
+        var tieredConfig = injectApiKeys(TieredModelConfig.fromEnv());
+        if (!isDefaultOpenAiFallback(tieredConfig.simple())) {
+            return ModelFactory.createChatModel(ModelTier.SIMPLE, tieredConfig);
+        }
+        // Fallback to classic OpenAI + vault
         try {
             var apiKey = secretService.getOpenAiApiKey();
             if (apiKey != null && !apiKey.isBlank()) {
@@ -746,6 +808,12 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
     }
 
     private dev.langchain4j.model.chat.StreamingChatModel findStreamingModel() {
+        // Try multi-provider tiered config first
+        var tieredConfig = injectApiKeys(TieredModelConfig.fromEnv());
+        if (!isDefaultOpenAiFallback(tieredConfig.simple())) {
+            return ModelFactory.createStreamingChatModel(ModelTier.SIMPLE, tieredConfig);
+        }
+        // Fallback to classic OpenAI + vault
         try {
             var apiKey = secretService.getOpenAiApiKey();
             if (apiKey != null && !apiKey.isBlank()) {
@@ -754,6 +822,28 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
         } catch (Exception e) {
         }
         return null;
+    }
+
+    private TieredModelConfig injectApiKeys(TieredModelConfig config) {
+        var simple = config.simple();
+        var advanced = config.advanced();
+        if (simple.apiKey() != null && advanced.apiKey() != null) return config;
+
+        var fallbackKey = secretService.getOpenAiApiKey();
+        if (fallbackKey == null || fallbackKey.isBlank()) return config;
+
+        var newSimple = simple.apiKey() != null ? simple : simple.withApiKey(fallbackKey);
+        var newAdvanced = advanced.apiKey() != null ? advanced : advanced.withApiKey(fallbackKey);
+        if (newSimple == simple && newAdvanced == advanced) return config;
+        return new TieredModelConfig(newSimple, newAdvanced, config.defaultTier());
+    }
+
+    private static boolean isDefaultOpenAiFallback(ChatModelConfig config) {
+        // Check if config is the default OpenAI fallback (no provider/model explicitly set)
+        return config.provider() == ModelProviderType.OPENAI
+            && config.modelName() == null
+            && config.apiKey() == null
+            && config.baseUrl() == null;
     }
 
     private ChatModel wrapModel(ChatModel m) {

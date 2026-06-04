@@ -1,5 +1,6 @@
 package de.augmentia.strandsagents.core.logging;
 
+import de.augmentia.strandsagents.core.prompt.PromptRegistry;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -32,7 +33,7 @@ public class LoggingChatModel implements ChatModel {
     private static ChatResponse errorResponse(RuntimeException e) {
         return ChatResponse.builder()
             .aiMessage(dev.langchain4j.data.message.AiMessage.from(
-                "[LLM error: " + e.getMessage() + "]"))
+                PromptRegistry.get("logging_chat_model.error_template", e.getMessage())))
             .build();
     }
 }

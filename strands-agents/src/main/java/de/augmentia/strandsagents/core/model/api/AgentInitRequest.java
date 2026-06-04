@@ -14,4 +14,9 @@ public class AgentInitRequest {
     public Boolean mcpIngestEnabled;
     public String capabilityDirs;
     public String sessionId;
+    public String modelTier;
+    public String simpleProvider;
+    public String advancedProvider;
+    public String simpleModel;
+    public String advancedModel;
 }

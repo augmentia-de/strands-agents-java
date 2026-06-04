@@ -1,5 +1,6 @@
 package de.augmentia.strandsagents.core.agent;
 
+import de.augmentia.strandsagents.core.prompt.PromptRegistry;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
@@ -20,10 +21,10 @@ public class MockChatModel implements ChatModel {
     private final String responseTemplate;
 
     /**
-     * Constructs a default MockChatModel that prefixes responses with "Mock antwortet: ".
+     * Constructs a default MockChatModel that uses the configured prompt template.
      */
     public MockChatModel() {
-        this("Mock antwortet: %s");
+        this(PromptRegistry.getOrDefault("mock_chat_model.template", "Mock response: %s"));
     }
 
     /**

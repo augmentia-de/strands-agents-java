@@ -1,5 +1,6 @@
 package de.augmentia.strandsagents.core.structured;
 
+import de.augmentia.strandsagents.core.prompt.PromptRegistry;
 import java.lang.reflect.ParameterizedType;
 import java.util.List;
 
@@ -9,15 +10,17 @@ public record StructuredOutputConfig(
     String jsonSchema,
     String forcePrompt
 ) {
-    private static final String DEFAULT_FORCE_PROMPT =
-        "You must format the previous response as structured output.";
+    private static String defaultForcePrompt() {
+        return PromptRegistry.getOrDefault("structured_output.force_prompt",
+            "You must format the previous response as structured output.");
+    }
 
     public static StructuredOutputConfig staticModel(Class<?> outputClass) {
         return new StructuredOutputConfig(
             StructuredOutputMode.STATIC,
             outputClass,
             null,
-            DEFAULT_FORCE_PROMPT
+            defaultForcePrompt()
         );
     }
 
@@ -35,7 +38,7 @@ public record StructuredOutputConfig(
             StructuredOutputMode.DYNAMIC,
             null,
             jsonSchema,
-            DEFAULT_FORCE_PROMPT
+            defaultForcePrompt()
         );
     }
 

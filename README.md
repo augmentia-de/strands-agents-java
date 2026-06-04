@@ -45,7 +45,7 @@ What is **not implemented at all**:
 
 - Java 21 (JDK) with `--enable-preview`
 - Maven 3.9+
-- Optional: OpenAI API key (`OPENAI_API_KEY`) for real LLM calls
+- Optional: OpenAI-compatible API key (`OPENAI_API_KEY`, `SIMPLE_API_KEY`, or via Vault)
 
 ---
 
@@ -231,20 +231,116 @@ strands-agents-java (parent)
 
 ## Configuration
 
-| Environment variable      | Property                        | Default                     | Description                            |
-|---------------------------|---------------------------------|-----------------------------|----------------------------------------|
-| `OPENAI_API_KEY`          | —                               | —                           | OpenAI API key                         |
-| `OPENAI_MODEL`          | —                               | `gpt-4o`                    | Model name                             |
-| `LLM_BASE_URL`            | —                               | `https://api.openai.com`    | API base URL                           |
-| `STRANDS_SKILLS_DIR`      | `strands.agent.skills.dir`      | `skills`                    | Skills directory                       |
-| `STRANDS_SESSION_DIR`     | `strands.agent.session.dir`     | `.sessions`                 | Session storage directory              |
-| `STRANDS_LLM_LOG_ENABLED` | `strands.agent.llm-log.enabled` | `true`                      | Enable LLM call logging                |
-| `STRANDS_LLM_LOG_PATH`    | `strands.agent.llm-log.path`    | `logs/llm-calls.log`        | LLM log file path                      |
-| `STRANDS_AGENT_TOOLS`     | `strands.agent.tools`           | —                           | Comma-separated extra tool class names |
-| `STRANDS_MCP_CONFIG`      | `strands.agent.mcp.config`      | `config/MCP_SERVER_CONFIG.json` | Path to MCP server config JSON    |
-| `VAULT_ADDR`              | --                              | `--`                        | HashiCorp Vault adress                 |
-| `VAULT_TOKEN`             | --                              | `--`                        | HashiCorp Vault token                  |
+### LLM / Model
 
+#### Single-Provider (legacy, falls back to this if no multi-tier is configured)
+
+| Env variable                 | Property (application.properties) | Default                     | Description                          |
+|------------------------------|-----------------------------------|-----------------------------|--------------------------------------|
+| `OPENAI_API_KEY`             | —                                 | —                           | OpenAI-compatible API key            |
+| `OPENAI_BASE_URL`            | —                                 | `https://api.openai.com/v1` | API base URL                         |
+| `OPENAI_MODEL`               | —                                 | `gpt-4o`                    | Model name                           |
+| `LLM_TEMPERATURE`            | `strands.agent.temperature`       | `0.7`                       | LLM temperature                      |
+| `LLM_MAX_RETRIES`            | —                                 | `3`                         | Max retries on LLM call failure      |
+| —                            | `strands.agent.max-tool-iterations` | `10`                      | Max tool-call iterations in one turn |
+
+#### Multi-Tier (optional, overrides single-provider)
+
+Each tier can use a different provider. Prefix: `SIMPLE_` / `ADVANCED_`.
+
+| Env variable                 | Description                                     |
+|------------------------------|-------------------------------------------------|
+| `SIMPLE_PROVIDER`            | Provider for the simple tier (`openai`, `ollama`, `openai-compatible`) |
+| `SIMPLE_MODEL`               | Model name for the simple tier (e.g. `gpt-4o-mini`, `llama3`) |
+| `SIMPLE_API_KEY`             | API key for simple tier (falls back to `OPENAI_API_KEY`) |
+| `SIMPLE_BASE_URL`            | Base URL for simple tier                        |
+| `SIMPLE_OLLAMA_BASE_URL`     | Ollama base URL (only for `SIMPLE_PROVIDER=ollama`) |
+| `ADVANCED_PROVIDER`          | Provider for the advanced tier                  |
+| `ADVANCED_MODEL`             | Model name for the advanced tier (e.g. `gpt-4o`) |
+| `ADVANCED_API_KEY`           | API key for advanced tier                       |
+| `ADVANCED_BASE_URL`          | Base URL for advanced tier                      |
+| `LLM_DEFAULT_TIER`           | `simple`, `advanced`, or `routing`              |
+
+**Fallback chain per tier:**
+- SIMPLE: `SIMPLE_*` env vars → `OPENAI_*` env vars → Vault → error
+- ADVANCED: `ADVANCED_*` env vars → SIMPLE values → `OPENAI_*` → Vault → error
+
+**Routing tier** (`LLM_DEFAULT_TIER=routing`): at init time, the simple model classifies the user goal and switches to the advanced model if complex reasoning is detected.
+
+### Agent
+
+| Env variable                    | Property (application.properties)              | Default       | Description                              |
+|---------------------------------|------------------------------------------------|---------------|------------------------------------------|
+| `STRANDS_SKILLS_DIR`            | `strands.agent.skills.dir`                     | `skills`      | Skills directory                         |
+| —                               | `strands.agent.skills.initial`                 | —             | Comma-separated skills to activate at startup (max 3) |
+| `STRANDS_SKILLS_SEARCH`         | `strands.agent.skills.search`                  | `false`       | Enable LLM-driven skill-search tool      |
+| `STRANDS_SESSION_DIR`           | `strands.agent.session.dir`                    | `.sessions`   | Session persistence directory            |
+| `STRANDS_LLM_LOG_ENABLED`       | `strands.agent.llm-log.enabled`                | `true`        | Enable LLM call logging                  |
+| `STRANDS_LLM_LOG_PATH`          | `strands.agent.llm-log.path`                   | `logs/llm-calls.log` | LLM log file path                  |
+| `STRANDS_AGENT_TOOLS`           | `strands.agent.tools`                          | —             | Comma-separated extra tool class names   |
+| —                               | `strands.agent.hitl.tools`                     | —             | Tools requiring human-in-the-loop approval |
+| `STRANDS_AGENT_BASH_ALLOW`      | `strands.agent.bash.allow`                     | `false`       | Allow `BashTool` execution               |
+| `STRANDS_AGENT_HTTP_ALLOW_PRIVATE` | `strands.agent.http.allow-private`          | `false`       | Allow HTTP tool on private IPs           |
+| `STRANDS_AGENT_WORKSPACE`       | `strands.agent.workspace`                      | —             | Working directory for file operations    |
+| `STRANDS_CAPABILITIES_DIRS`     | `strands.agent.capabilities.dirs`              | —             | Additional capability/skill directories  |
+| `STRANDS_MCP_CONFIG`            | `strands.agent.mcp.config`                     | `config/MCP_SERVER_CONFIG.json` | MCP server JSON config path      |
+| `STRANDS_MCP_INGEST`            | `strands.agent.mcp.ingest`                     | `false`       | Ingest skills from MCP servers           |
+
+### Vault (HashiCorp Vault)
+
+| Env variable   | Description                                     |
+|----------------|-------------------------------------------------|
+| `VAULT_ADDR`   | Vault server URL (e.g. `http://localhost:8200`) |
+| `VAULT_TOKEN`  | Vault authentication token                      |
+| `VAULT_MOUNT_PATH` | Vault secrets mount path (default: `secret`) |
+
+Expected paths: `secret/openai` (key `api_key`), `secret/tavily` (key `api_key`).
+
+### Web Search
+
+| Env variable    | Description                       |
+|-----------------|-----------------------------------|
+| `TAVILY_API_KEY` | Tavily Search API key (https://tavily.com) |
+
+### API Key Vault (built-in AES-encrypted key store)
+
+| Env variable        | Description                                   |
+|---------------------|-----------------------------------------------|
+| `JSTRANDS_KEY_PATH` | Path to the encrypted key store JSON file     |
+
+### A2A (Agent-to-Agent Protocol)
+
+| Env variable  | Property    | Default                  | Description                          |
+|---------------|-------------|--------------------------|--------------------------------------|
+| `AGENT_URL`   | `agent.url` | `http://localhost:8080`   | A2A agent endpoint URL               |
+
+### Prompts (centralised YAML-based prompt management)
+
+All LLM prompts are externalised into `strands-agents/src/main/resources/prompts.yaml`.  
+To override prompts at runtime without rebuilding:
+
+| Property (application.properties)       | Description                                      |
+|-----------------------------------------|--------------------------------------------------|
+| `strands.agent.prompts.override-dir`    | Directory with `.yaml` override files (see below) |
+
+Override files use the same YAML structure and are merged on top of the built-in prompts:
+
+```yaml
+prompts:
+  routing_agent.classifier: "Your custom classifier prompt..."
+  agent.llm_error: "Custom error message: %s"
+```
+
+Currently managed prompts (29 keys): `routing_agent.*`, `cot_planner.*`, `llm_router.system`, `structured_output.force_prompt`, `summarizing.*`, `guardrail_plugin.fallback`, `capability_search_tool.system`, `mock_chat_model.*`, `web_search_tool.mock_result`, `logging_chat_model.error_template`, `agent.*`, `agent_service.*`, `agent_skills_plugin.*`.
+
+### Testing / Chaos Engineering
+
+| Env variable                           | Description                                      |
+|----------------------------------------|--------------------------------------------------|
+| `RANDOM_TOOL_ERRORS_ENABLED`           | Enable random tool failure simulation            |
+| `RANDOM_TOOL_TIMEOUT_PROBABILITY`      | Probability of simulated tool timeout            |
+| `RANDOM_TOOL_EXCEPTION_PROBABILITY`    | Probability of simulated tool exception          |
+| `RANDOM_TOOL_INVALID_JSON_PROBABILITY` | Probability of simulated invalid JSON response   |
 
 ---
 

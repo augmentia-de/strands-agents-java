@@ -1,12 +1,49 @@
 package de.augmentia.strandsagents.core.config;
 
-import de.augmentia.strandsagents.core.secret.SecretProvider;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class ModelFactory {
+
+    private static final Map<ModelProviderType, ModelProvider> providers = new ConcurrentHashMap<>();
+
+    static {
+        register(ModelProviderType.OPENAI, new OpenAiProvider());
+        register(ModelProviderType.OLLAMA, new OllamaProvider());
+        register(ModelProviderType.OPENAI_COMPATIBLE, new OpenAiCompatibleProvider());
+    }
+
+    public static void register(ModelProviderType type, ModelProvider provider) {
+        providers.put(type, provider);
+    }
+
+    // ── Tier-based API (new) ──
+
+    public static ChatModel createChatModel(ModelTier tier, TieredModelConfig tieredConfig) {
+        var config = tieredConfig.forTier(tier);
+        return provider(config.provider()).createChatModel(config);
+    }
+
+    public static StreamingChatModel createStreamingChatModel(ModelTier tier, TieredModelConfig tieredConfig) {
+        var config = tieredConfig.forTier(tier);
+        var streamingProvider = provider(config.provider());
+        var result = streamingProvider.createStreamingChatModel(config);
+        if (result != null) return result;
+        // Fallback: wrap sync model in bridge
+        var syncModel = streamingProvider.createChatModel(config);
+        return new SyncToStreamingBridge(syncModel);
+    }
+
+    public static ChatModel createChatModel(ChatModelConfig config) {
+        return provider(config.provider()).createChatModel(config);
+    }
+
+    // ── BC: Old OpenAI-specific API ──
 
     public static ChatModel createOpenAiFromEnv(String api_key) {
         LlmConfig config = LlmConfig.fromEnv();
@@ -19,25 +56,16 @@ public class ModelFactory {
     }
 
     public static ChatModel createOpenAi(LlmConfig config) {
-        var builder = OpenAiChatModel.builder()
-                .apiKey(config.apiKey());
-
-        if (config.baseUrl() != null && !config.baseUrl().isBlank()) {
-            builder.baseUrl(config.baseUrl());
-        }
-        var modelName = config.modelName();
-        if (modelName == null || modelName.isBlank()) {
-            modelName = "no-model";
-        }
-        builder.modelName(modelName);
-        if (config.temperature() != null) {
-            builder.temperature(config.temperature());
-        }
-        if (config.maxRetries() != null) {
-            builder.maxRetries(config.maxRetries());
-        }
-
-        return builder.build();
+        var c = new ChatModelConfig(
+            ModelProviderType.OPENAI,
+            config.apiKey(),
+            config.baseUrl(),
+            config.modelName(),
+            config.temperature(),
+            config.maxRetries(),
+            null
+        );
+        return provider(ModelProviderType.OPENAI).createChatModel(c);
     }
 
     public static StreamingChatModel createOpenAiStreamingFromEnv(String api_key) {
@@ -46,21 +74,106 @@ public class ModelFactory {
         return createOpenAiStreaming(config);
     }
     public static StreamingChatModel createOpenAiStreaming(LlmConfig config) {
-        var builder = OpenAiStreamingChatModel.builder()
-                .apiKey(config.apiKey());
+        var c = new ChatModelConfig(
+            ModelProviderType.OPENAI,
+            config.apiKey(),
+            config.baseUrl(),
+            config.modelName(),
+            config.temperature(),
+            config.maxRetries(),
+            null
+        );
+        var streaming = provider(ModelProviderType.OPENAI).createStreamingChatModel(c);
+        if (streaming != null) return streaming;
+        var syncModel = provider(ModelProviderType.OPENAI).createChatModel(c);
+        return new SyncToStreamingBridge(syncModel);
+    }
 
-        if (config.baseUrl() != null && !config.baseUrl().isBlank()) {
-            builder.baseUrl(config.baseUrl());
-        }
-        var modelName = config.modelName();
-        if (modelName == null || modelName.isBlank()) {
-            modelName = "gpt-4o";
-        }
-        builder.modelName(modelName);
-        if (config.temperature() != null) {
-            builder.temperature(config.temperature());
+    private static ModelProvider provider(ModelProviderType type) {
+        var p = providers.get(type);
+        if (p == null) throw new IllegalStateException("No ModelProvider registered for " + type);
+        return p;
+    }
+
+    // ── Provider Implementations ──
+
+    static class OpenAiProvider implements ModelProvider {
+        @Override
+        public ChatModel createChatModel(ChatModelConfig config) {
+            var builder = OpenAiChatModel.builder();
+            if (config.apiKey() != null) builder.apiKey(config.apiKey());
+            if (config.baseUrl() != null && !config.baseUrl().isBlank()) builder.baseUrl(config.baseUrl());
+            builder.modelName(config.modelName() != null && !config.modelName().isBlank()
+                ? config.modelName() : "gpt-4o-mini");
+            if (config.temperature() != null) builder.temperature(config.temperature());
+            if (config.maxRetries() != null) builder.maxRetries(config.maxRetries());
+            return builder.build();
         }
 
-        return builder.build();
+        @Override
+        public StreamingChatModel createStreamingChatModel(ChatModelConfig config) {
+            var builder = OpenAiStreamingChatModel.builder();
+            if (config.apiKey() != null) builder.apiKey(config.apiKey());
+            if (config.baseUrl() != null && !config.baseUrl().isBlank()) builder.baseUrl(config.baseUrl());
+            builder.modelName(config.modelName() != null && !config.modelName().isBlank()
+                ? config.modelName() : "gpt-4o");
+            if (config.temperature() != null) builder.temperature(config.temperature());
+            return builder.build();
+        }
+    }
+
+    static class OpenAiCompatibleProvider implements ModelProvider {
+        @Override
+        public ChatModel createChatModel(ChatModelConfig config) {
+            var builder = OpenAiChatModel.builder();
+            if (config.apiKey() != null) builder.apiKey(config.apiKey());
+            var baseUrl = config.baseUrl() != null && !config.baseUrl().isBlank()
+                ? config.baseUrl() : "http://localhost:8080/v1";
+            builder.baseUrl(baseUrl);
+            builder.modelName(config.modelName() != null && !config.modelName().isBlank()
+                ? config.modelName() : "default");
+            if (config.temperature() != null) builder.temperature(config.temperature());
+            if (config.maxRetries() != null) builder.maxRetries(config.maxRetries());
+            return builder.build();
+        }
+
+        @Override
+        public StreamingChatModel createStreamingChatModel(ChatModelConfig config) {
+            var builder = OpenAiStreamingChatModel.builder();
+            if (config.apiKey() != null) builder.apiKey(config.apiKey());
+            var baseUrl = config.baseUrl() != null && !config.baseUrl().isBlank()
+                ? config.baseUrl() : "http://localhost:8080/v1";
+            builder.baseUrl(baseUrl);
+            builder.modelName(config.modelName() != null && !config.modelName().isBlank()
+                ? config.modelName() : "default");
+            if (config.temperature() != null) builder.temperature(config.temperature());
+            return builder.build();
+        }
+    }
+
+    static class OllamaProvider implements ModelProvider {
+        @Override
+        public ChatModel createChatModel(ChatModelConfig config) {
+            var ollamaBaseUrl = config.ollamaBaseUrl() != null && !config.ollamaBaseUrl().isBlank()
+                ? config.ollamaBaseUrl() : "http://localhost:11434";
+            var modelName = config.modelName() != null && !config.modelName().isBlank()
+                ? config.modelName() : "llama3";
+            return dev.langchain4j.model.ollama.OllamaChatModel.builder()
+                .baseUrl(ollamaBaseUrl)
+                .modelName(modelName)
+                .build();
+        }
+
+        @Override
+        public StreamingChatModel createStreamingChatModel(ChatModelConfig config) {
+            var ollamaBaseUrl = config.ollamaBaseUrl() != null && !config.ollamaBaseUrl().isBlank()
+                ? config.ollamaBaseUrl() : "http://localhost:11434";
+            var modelName = config.modelName() != null && !config.modelName().isBlank()
+                ? config.modelName() : "llama3";
+            return dev.langchain4j.model.ollama.OllamaStreamingChatModel.builder()
+                .baseUrl(ollamaBaseUrl)
+                .modelName(modelName)
+                .build();
+        }
     }
 }

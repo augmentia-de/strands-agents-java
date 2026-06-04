@@ -319,6 +319,12 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
       <h3 data-toggle="system-prompt">System Prompt &#9662;</h3>
       <div id="system-prompt-list">
         <div class="prompt-config">
+          <label for="llm-tier">LLM Tier</label>
+          <select id="llm-tier">
+            <option value="simple">Simple (fast/cheap)</option>
+            <option value="advanced">Advanced (powerful)</option>
+            <option value="routing">Routing (auto-detect)</option>
+          </select>
           <label for="system-prompt">System Prompt</label>
           <textarea id="system-prompt" rows="8">You are a helpful general agent. Use the selected tools and skills when they are relevant, and explain important results clearly.
 

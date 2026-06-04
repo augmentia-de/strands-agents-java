@@ -85,7 +85,7 @@ public class FileSessionManager implements SessionManager {
                 .forEach(f -> {
                     try {
                         var session = mapper.readValue(f.toFile(), Session.class);
-                        if (session.agentName().equals(agentName)) {
+                        if (agentName != null ? agentName.equals(session.agentName()) : session.agentName() == null) {
                             results.add(session);
                         }
                     } catch (IOException ignored) {

@@ -2,7 +2,7 @@ package de.augmentia.strandsagents.core.plugin.guardrail;
 
 import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.plugin.Plugin;
-
+import de.augmentia.strandsagents.core.prompt.PromptRegistry;
 import java.util.List;
 
 public class GuardrailPlugin implements Plugin {
@@ -14,7 +14,8 @@ public class GuardrailPlugin implements Plugin {
     private Agent agent;
 
     public GuardrailPlugin(List<Guardrail> inputGuardrails, List<Guardrail> outputGuardrails) {
-        this(inputGuardrails, outputGuardrails, BlockAction.FALLBACK, "Diese Anfrage kann ich nicht bearbeiten.");
+        this(inputGuardrails, outputGuardrails, BlockAction.FALLBACK,
+            PromptRegistry.getOrDefault("guardrail_plugin.fallback", "I cannot process this request."));
     }
 
     public GuardrailPlugin(List<Guardrail> inputGuardrails, List<Guardrail> outputGuardrails,

@@ -92,7 +92,7 @@ class ConversationManagerTest {
         assertThat(pruned).isNotEmpty();
         assertThat(pruned.get(0)).isInstanceOf(SystemMessage.class);
         var summary = (SystemMessage) pruned.get(0);
-        assertThat(summary.content()).startsWith("Zusammenfassung");
+        assertThat(summary.content()).startsWith("Summary of the previous conversation:");
     }
 
     @Test

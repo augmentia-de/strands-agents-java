@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
+import de.augmentia.strandsagents.core.prompt.PromptRegistry;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
@@ -35,26 +36,8 @@ public class CoTPlanner implements Planner {
 
     @Override
     public Plan createPlan(String goal, List<String> availableToolNames) {
-        var systemPrompt = """
-            You are a planning assistant. Break down complex goals into individual, executable steps.
-            
-            Each step must be assigned to exactly ONE available tool.
-            
-            Available tools: %s
-            
-            Respond ONLY with a JSON array. No explanations, no markdown.
-            Each object in the array has the following fields:
-            - "id": unique identifier (e.g. "step-1")
-            - "description": description of the step
-            - "toolName": name of the tool to use (from the list of available tools)
-            - "argumentsTemplate": placeholder for tool arguments, e.g. "${value}" 
-            - "dependsOn": array of IDs this step depends on (empty array if none)
-            - "optional": true/false
-            
-            If no tool is needed for a step, set "toolName" to "none".
-            """.formatted(formatToolNames(availableToolNames));
-
-        var userPrompt = "Create a plan for the following goal:\n%s".formatted(goal);
+        var systemPrompt = PromptRegistry.get("cot_planner.create_plan.system", formatToolNames(availableToolNames));
+        var userPrompt = PromptRegistry.get("cot_planner.create_plan.user", goal);
 
         var response = model.chat(ChatRequest.builder()
             .messages(List.of(
@@ -96,30 +79,8 @@ public class CoTPlanner implements Planner {
 
     @Override
     public Plan revise(Plan plan, StepResult failure, String feedback) {
-        var systemPrompt = """
-            A previous plan has failed. Create a REVISED plan.
-            
-            Respond ONLY with a JSON array. Each object has:
-            - "id": unique identifier
-            - "description": description of the step
-            - "toolName": tool name or "none"
-            - "argumentsTemplate": arguments
-            - "dependsOn": array of dependencies
-            - "optional": true/false
-            """;
-
-        var userPrompt = """
-            Original goal: %s
-            
-            Failed step: %s
-            Error: %s
-            
-            Feedback: %s
-            
-            Previous context: %s
-            
-            Create a new, corrected plan.
-            """.formatted(
+        var systemPrompt = PromptRegistry.get("cot_planner.revise.system");
+        var userPrompt = PromptRegistry.get("cot_planner.revise.user",
                 plan.goal(),
                 plan.steps().get(Math.min(plan.currentStep(), plan.steps().size() - 1)),
                 failure.error(),
@@ -145,15 +106,7 @@ public class CoTPlanner implements Planner {
 
     @Override
     public boolean isComplete(Plan plan, String finalOutput) {
-        var prompt = """
-            Check whether the following goal has been achieved.
-            
-            Goal: %s
-            
-            Result: %s
-            
-            Answer exclusively with "true" or "false".
-            """.formatted(plan.goal(), finalOutput);
+        var prompt = PromptRegistry.get("cot_planner.is_complete.user", plan.goal(), finalOutput);
 
         var response = model.chat(ChatRequest.builder()
             .messages(List.of(

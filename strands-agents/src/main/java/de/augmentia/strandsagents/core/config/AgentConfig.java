@@ -4,6 +4,7 @@ package de.augmentia.strandsagents.core.config;
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.agent.Agent;
+import de.augmentia.strandsagents.core.agent.RoutingAgent;
 import de.augmentia.strandsagents.core.conversation.ConversationManager;
 import de.augmentia.strandsagents.sessions.SessionManager;
 import de.augmentia.strandsagents.core.logging.FileLlmLogger;
@@ -32,7 +33,9 @@ public record AgentConfig(
     Path skillsDir,
     List<String> initialSkills,
     StructuredOutputConfig structuredOutputConfig,
-    Path llmLogPath
+    Path llmLogPath,
+    TieredModelConfig tieredConfig,
+    ModelTier modelTier
 ) {
     public static final int DEFAULT_MAX_ITERATIONS = 10;
 
@@ -66,6 +69,43 @@ public record AgentConfig(
         return createAgent(model);
     }
 
+    public Agent createTieredAgent() {
+        var effectiveRegistry = toolRegistry != null ? toolRegistry : new ToolRegistry();
+        var effectivePlugins = plugins != null ? plugins : List.<Plugin>of();
+        var tc = resolveTieredConfig();
+        var simpleModel = ModelFactory.createChatModel(ModelTier.SIMPLE, tc);
+        var advancedModel = ModelFactory.createChatModel(ModelTier.ADVANCED, tc);
+        var defaultTier = modelTier != null ? modelTier : tc.defaultTier();
+
+        if (llmLogPath != null) {
+            var logger = new FileLlmLogger(llmLogPath);
+            simpleModel = new LoggingChatModel(simpleModel, logger);
+            Runtime.getRuntime().addShutdownHook(new Thread(logger::close));
+        }
+
+        Agent agent;
+        if (defaultTier == ModelTier.ROUTING) {
+            agent = new RoutingAgent(simpleModel, advancedModel, effectiveRegistry, new ToolExecutor(),
+                conversationManager, sessionManager, chatMemoryStore, resilienceConfig, effectivePlugins);
+        } else {
+            agent = new Agent(simpleModel, effectiveRegistry, new ToolExecutor(),
+                conversationManager, sessionManager, chatMemoryStore, resilienceConfig, effectivePlugins);
+            agent.setAdvancedModel(advancedModel);
+            agent.setModelTier(defaultTier);
+        }
+        if (systemPrompt != null && !systemPrompt.isBlank()) {
+            agent.setSystemPrompt(systemPrompt);
+        }
+        if (structuredOutputConfig != null) {
+            agent.setStructuredOutputConfig(structuredOutputConfig);
+        }
+        return agent;
+    }
+
+    private TieredModelConfig resolveTieredConfig() {
+        return tieredConfig != null ? tieredConfig : TieredModelConfig.fromEnv();
+    }
+
     public static class Builder {
         private String name = "unnamed";
         private String modelName = "gpt-4o";
@@ -81,6 +121,8 @@ public record AgentConfig(
         private List<String> initialSkills = List.of();
         private StructuredOutputConfig structuredOutputConfig = null;
         private Path llmLogPath = null;
+        private TieredModelConfig tieredConfig = null;
+        private ModelTier modelTier = null;
 
         public Builder name(String name) { this.name = name; return this; }
         public Builder modelName(String modelName) { this.modelName = modelName; return this; }
@@ -98,11 +140,13 @@ public record AgentConfig(
         public Builder structuredOutputModel(Class<?> modelClass) { this.structuredOutputConfig = StructuredOutputConfig.staticModel(modelClass); return this; }
         public Builder structuredOutputSchema(String jsonSchema) { this.structuredOutputConfig = StructuredOutputConfig.dynamicSchema(jsonSchema); return this; }
         public Builder logLlmCalls(Path path) { this.llmLogPath = path; return this; }
+        public Builder tieredConfig(TieredModelConfig tieredConfig) { this.tieredConfig = tieredConfig; return this; }
+        public Builder modelTier(ModelTier modelTier) { this.modelTier = modelTier; return this; }
 
         public AgentConfig build() {
             return new AgentConfig(name, modelName, systemPrompt, toolRegistry, maxIterations,
                 conversationManager, sessionManager, chatMemoryStore, resilienceConfig, plugins, skillsDir,
-                initialSkills, structuredOutputConfig, llmLogPath);
+                initialSkills, structuredOutputConfig, llmLogPath, tieredConfig, modelTier);
         }
     }
 }

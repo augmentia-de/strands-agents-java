@@ -1,5 +1,9 @@
 # DSGVO/GDPR-Compliance-Modul für Strands Agents
 
+> **Status:** Spezifikation — vollständig kompatibel mit dem aktuellen Code (Stand Juni 2026).  
+> Alle beschriebenen Core-Schnittstellen (`AgentHook`, `Plugin`, `AgentTool`, `SessionManager`) sind unverändert vorhanden.  
+> Die Implementierung erfolgt als optionales Maven-Modul `strands-agents-gdpr` ohne Änderungen am Core.
+
 ## Architekturüberblick
 
 Ein unabhängiges Maven-Modul `strands-agents-gdpr` stellt DSGVO-Funktionen bereit, die ohne Änderungen am Core in jede bestehende Augmentia-Installation integriert werden können.
@@ -184,6 +188,11 @@ public interface AgentTool<P> {
 
 ### 2.2 PiiAnonymizerHook – PII-Filterung vor LLM-Call
 
+> **Hinweis zur In-Place-Mutation:** Der `BeforeModelCallContext` erhält dieselbe `List<Message>`-Referenz wie die Agent-internen `domainMessages`.  
+> `messages.set(i, maskiertesMessage)` ändert die Liste direkt — die maskierten Nachrichten gehen an das LLM,  
+> während die Original-Nachrichten (mit PII) im Session-History (`chatMemory`) erhalten bleiben.  
+> Dies ist das gewünschte Verhalten: LLM sieht keine PII, Export (Art. 20) enthält die Originaldaten.
+
 ```java
 package de.augmentia.strandsagents.extensions.gdpr;
 
@@ -229,7 +238,7 @@ public class PiiAnonymizerHook implements AgentHook {
 
         for (int i = 0; i < messages.size(); i++) {
             var msg = messages.get(i);
-            var content = msg.text();
+            var content = msg.content();
             if (content == null) continue;
 
             var sanitized = maskPii(content);
@@ -272,8 +281,8 @@ public class PiiAnonymizerHook implements AgentHook {
     }
 
     @SuppressWarnings("unchecked")
-    private <T extends Message> T maskMessage(T original, String sanitized) {
-        // Message-Typen sind Records → with-Syntax für Kopie mit geändertem content
+    private <T extends Message> T createMaskedMessage(T original, String sanitized) {
+        // Message-Typen sind Records → Konstruktor für Kopie mit geändertem content
         return switch (original) {
             case UserMessage m -> (T) new UserMessage(m.id(), m.timestamp(), sanitized, m.metadata());
             case SystemMessage m -> (T) new SystemMessage(m.id(), m.timestamp(), sanitized, m.metadata());
