@@ -1,0 +1,348 @@
+{#include base}{#body}
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #e0e0e0; height: 100dvh; overflow: hidden; }
+#app { display: flex; height: 100dvh; }
+
+#sidebar {
+  width: 300px; min-width: 300px;
+  background: #16213e; padding: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  overflow-y: auto; border-right: 1px solid #0f3460;
+}
+#sidebar h2 { font-size: 18px; color: #e94560; margin-bottom: 6px; }
+#sidebar h3 { font-size: 14px; color: #a0a0c0; padding: 8px 0; }
+#sidebar a { color: #a0a0c0; text-decoration: none; padding: 8px 0; display: block; }
+#sidebar a:hover { color: #e0e0ff; }
+
+#main {
+  flex: 1; padding: 24px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 20px;
+}
+#main h1 { font-size: 22px; color: #e0e0e0; }
+
+/* ── Login ── */
+.login-box {
+  background: #16213e; border-radius: 12px; padding: 24px;
+  max-width: 440px; display: flex; flex-direction: column; gap: 14px;
+}
+.login-box label { font-size: 13px; color: #a0a0c0; }
+.login-box input[type="password"],
+.login-box input[type="text"] {
+  background: #0f3460; border: 1px solid #1a4a7a; color: #e0e0e0;
+  padding: 10px 12px; border-radius: 8px; font-size: 14px; font-family: monospace;
+  width: 100%; min-height: 44px;
+}
+.login-box input:focus { outline: none; border-color: #e94560; }
+.btn {
+  padding: 10px 18px; border: none; border-radius: 8px; cursor: pointer;
+  font-size: 14px; font-weight: 500; transition: all 0.15s; min-height: 44px;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: #e94560; color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #ff6b81; }
+.btn-secondary { background: #0f3460; color: #a0a0c0; }
+.btn-secondary:hover:not(:disabled) { background: #1a4a7a; color: #e0e0e0; }
+.btn-success { background: #2a7a3c; color: #fff; }
+.btn-success:hover:not(:disabled) { background: #3a9a4c; }
+
+/* ── Key List ── */
+.key-list { display: flex; flex-direction: column; gap: 6px; }
+.key-row {
+  display: flex; align-items: center; gap: 10px;
+  background: #16213e; padding: 10px 14px; border-radius: 8px;
+  font-family: monospace; font-size: 13px;
+}
+.key-row .key-name { color: #e94560; font-weight: 600; min-width: 180px; }
+.key-row .key-value { color: #e0e0e0; flex: 1; word-break: break-all; }
+.key-row .key-delete {
+  background: none; border: none; color: #e94560; cursor: pointer;
+  font-size: 18px; padding: 4px 8px; min-height: 36px; min-width: 36px;
+  border-radius: 6px;
+}
+.key-row .key-delete:hover { background: #2a1a2e; }
+.key-row .key-masked { color: #666; font-style: italic; }
+
+/* ── Add Form ── */
+.add-form {
+  display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;
+  background: #16213e; padding: 16px; border-radius: 12px;
+}
+.add-form .field { display: flex; flex-direction: column; gap: 4px; }
+.add-form label { font-size: 12px; color: #a0a0c0; }
+.add-form input {
+  background: #0f3460; border: 1px solid #1a4a7a; color: #e0e0e0;
+  padding: 10px 12px; border-radius: 8px; font-size: 14px; font-family: monospace;
+  min-height: 44px; min-width: 200px;
+}
+.add-form input:focus { outline: none; border-color: #e94560; }
+
+/* ── Actions ── */
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.actions .btn { min-width: 140px; }
+#message {
+  padding: 10px 14px; border-radius: 8px; font-size: 13px; display: none;
+}
+.msg-success { background: #1a3a2c; color: #4caf50; display: block !important; }
+.msg-error { background: #3a1a2e; color: #e94560; display: block !important; }
+.msg-info { background: #1a2a3e; color: #4a9aff; display: block !important; }
+
+.status-pending { color: #ffa500; }
+.status-ready { color: #4caf50; }
+.status-error { color: #e94560; }
+.status-inactive { color: #888; }
+.empty { font-size: 13px; color: #666; padding: 12px 0; }
+</style>
+
+<div id="app">
+  <aside id="sidebar">
+    <h2>Strands Agent</h2>
+    <a href="/">&#8592; Back to Chat</a>
+    <h3>Key Vault</h3>
+    <p style="font-size:12px;color:#666;">
+      PBE-encrypted key file.<br>
+      Entries are stored as JSON in<br>
+      an AES-GCM-encrypted file.
+    </p>
+  </aside>
+
+  <div id="main">
+    <h1>&#128273; Key Vault</h1>
+
+    <div id="login-section" class="login-box">
+      <label for="vault-password">Password to open the vault</label>
+      <input type="password" id="vault-password" placeholder="Password">
+      <button id="open-btn" class="btn btn-primary">&#128274; Open</button>
+      <p id="login-status" class="status-inactive">Enter the password to open the vault.</p>
+    </div>
+
+    <div id="vault-section" style="display:none">
+      <div id="message"></div>
+
+      <h3 style="font-size:16px;color:#a0a0c0;">Saved Keys</h3>
+      <div id="key-list" class="key-list">
+        <p class="empty">No entries.</p>
+      </div>
+
+      <h3 style="font-size:16px;color:#a0a0c0;margin-top:8px;">Add / Overwrite Key</h3>
+      <div class="add-form">
+        <div class="field">
+          <label for="key-name">Name</label>
+          <input type="text" id="key-name" placeholder="e.g. OPENAI_API_KEY">
+        </div>
+        <div class="field">
+          <label for="key-value">Value</label>
+          <input type="text" id="key-value" placeholder="sk-...">
+        </div>
+        <button id="add-btn" class="btn btn-success">+ Add</button>
+      </div>
+
+      <h3 style="font-size:16px;color:#a0a0c0;margin-top:8px;">Delete Key</h3>
+      <div class="add-form">
+        <div class="field">
+          <label for="delete-key-name">Name</label>
+          <input type="text" id="delete-key-name" placeholder="e.g. OPENAI_API_KEY">
+        </div>
+        <button id="delete-btn" class="btn btn-primary">Delete</button>
+      </div>
+
+      <h3 style="font-size:16px;color:#a0a0c0;margin-top:8px;">Actions</h3>
+      <div class="actions">
+        <button id="reload-btn" class="btn btn-secondary">&#128260; Reload (als Env setzen)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var state = {
+  password: '',
+  keys: []
+};
+
+function showMessage(text, type) {
+  var el = document.getElementById('message');
+  el.textContent = text;
+  el.className = 'msg-' + (type || 'info');
+}
+
+function renderKeyList() {
+  var list = document.getElementById('key-list');
+  if (state.keys.length === 0) {
+    list.innerHTML = '<p class="empty">No entries.</p>';
+    return;
+  }
+  list.innerHTML = '';
+  for (var i = 0; i < state.keys.length; i++) {
+    var row = document.createElement('div');
+    row.className = 'key-row';
+    row.innerHTML =
+      '<span class="key-name">' + escapeHtml(state.keys[i]) + '</span>' +
+      '<span class="key-value key-masked">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</span>';
+    list.appendChild(row);
+  }
+}
+
+function escapeHtml(s) {
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function enterVault(data) {
+  state.keys = data.keys || [];
+  document.getElementById('login-section').style.display = 'none';
+  document.getElementById('vault-section').style.display = 'flex';
+  document.getElementById('vault-section').style.flexDirection = 'column';
+  document.getElementById('vault-section').style.gap = '16px';
+  renderKeyList();
+  showMessage('Vault opened: ' + state.keys.length + ' entries', 'info');
+}
+
+async function checkStatus() {
+  try {
+    var resp = await fetch('/api/vault/status');
+    var data = await resp.json();
+    if (!data.exists) {
+      document.getElementById('login-status').textContent = 'No vault file found. Create new one with password.';
+      document.getElementById('open-btn').textContent = '+ Create new';
+    } else {
+      document.getElementById('login-status').textContent = 'Vault file exists. Enter password to open.';
+      document.getElementById('open-btn').textContent = '\uD83D\uDD10 Open';
+    }
+  } catch (err) {
+    document.getElementById('login-status').textContent = 'Error: ' + err.message;
+    document.getElementById('login-status').className = 'status-error';
+  }
+}
+
+document.getElementById('open-btn').addEventListener('click', async function() {
+  var password = document.getElementById('vault-password').value.trim();
+  if (!password) {
+    showMessage('Please enter password', 'error');
+    return;
+  }
+  state.password = password;
+  var btn = document.getElementById('open-btn');
+  btn.disabled = true;
+  btn.textContent = '\u23f3 Opening...';
+
+  try {
+    var resp = await fetch('/api/vault/authenticate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
+    });
+    if (!resp.ok) {
+      var data = await resp.json();
+      showMessage(data.error || 'Error opening', 'error');
+      btn.disabled = false;
+      btn.textContent = '\uD83D\uDD10 Open';
+      return;
+    }
+    var data = await resp.json();
+    enterVault(data);
+  } catch (err) {
+    showMessage('Error: ' + err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '\uD83D\uDD10 Open';
+  }
+});
+
+document.getElementById('add-btn').addEventListener('click', async function() {
+  var name = document.getElementById('key-name').value.trim();
+  var val = document.getElementById('key-value').value.trim();
+  if (!name || !val) {
+    showMessage('Name and value must not be empty', 'error');
+    return;
+  }
+  var btn = document.getElementById('add-btn');
+  btn.disabled = true;
+  btn.textContent = '\u23f3 Saving...';
+  try {
+    var resp = await fetch('/api/vault/write', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: state.password, key: name, value: val })
+    });
+    var data = await resp.json();
+    if (!resp.ok) {
+      showMessage(data.error || 'Error saving', 'error');
+    } else {
+      var s = new Set(state.keys);
+      s.add(name);
+      state.keys = Array.from(s).sort();
+      renderKeyList();
+      showMessage('Key "' + name + '" saved \u2705', 'success');
+    }
+  } catch (err) {
+    showMessage('Fehler: ' + err.message, 'error');
+  }
+  document.getElementById('key-name').value = '';
+  document.getElementById('key-value').value = '';
+  document.getElementById('key-name').focus();
+  btn.disabled = false;
+  btn.textContent = '+ Add';
+});
+
+document.getElementById('delete-btn').addEventListener('click', async function() {
+  var name = document.getElementById('delete-key-name').value.trim();
+  if (!name) {
+    showMessage('Enter name to delete', 'error');
+    return;
+  }
+  var btn = document.getElementById('delete-btn');
+  btn.disabled = true;
+  btn.textContent = '\u23f3 Deleting...';
+  try {
+    var resp = await fetch('/api/vault/write', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: state.password, key: name, value: '' })
+    });
+    var data = await resp.json();
+    if (!resp.ok) {
+      showMessage(data.error || 'Error deleting', 'error');
+    } else {
+      state.keys = state.keys.filter(function(k) { return k !== name; });
+      renderKeyList();
+      showMessage('Key "' + name + '" deleted \u2705', 'success');
+    }
+  } catch (err) {
+    showMessage('Fehler: ' + err.message, 'error');
+  }
+  document.getElementById('delete-key-name').value = '';
+  btn.disabled = false;
+  btn.textContent = 'Delete';
+});
+
+document.getElementById('reload-btn').addEventListener('click', async function() {
+  if (!state.password) {
+    showMessage('No password. Please open vault again.', 'error');
+    return;
+  }
+  var btn = document.getElementById('reload-btn');
+  btn.disabled = true;
+  btn.textContent = '\u23f3 Reload...';
+  try {
+    var resp = await fetch('/api/vault/reload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: state.password })
+    });
+    var data = await resp.json();
+    if (!resp.ok) {
+      showMessage(data.error || 'Error reloading', 'error');
+    } else {
+      showMessage(data.applied + ' Keys set as system properties \u2705', 'success');
+    }
+  } catch (err) {
+    showMessage('Error: ' + err.message, 'error');
+  }
+  btn.disabled = false;
+  btn.textContent = '\uD83D\uDD04 Reload (als Env setzen)';
+});
+
+checkStatus();
+</script>
+{/body}{/include}
