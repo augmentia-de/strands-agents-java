@@ -11,7 +11,9 @@ var state = {
   isInitialized: false,
   streamingMsg: null,
   messages: [],
-  toolCallData: {}
+  toolCallData: {},
+  abortController: null,
+  isStreaming: false
 };
 
 document.getElementById('session-id').textContent = state.sessionId.slice(0, 8) + '...';
@@ -625,15 +627,21 @@ async function reinitAgent() {
 async function sendMessage() {
   var input = document.getElementById('prompt-input');
   var btn = document.getElementById('send-btn');
+  var cancelBtn = document.getElementById('cancel-btn');
   var prompt = input.value.trim();
   if (!prompt) return;
 
   input.value = '';
   input.style.height = 'auto';
+  input.disabled = true;
   btn.disabled = true;
 
   addMessage('user', prompt);
   addTyping();
+
+  state.isStreaming = true;
+  state.abortController = new AbortController();
+  cancelBtn.style.display = '';
 
   try {
     var resp = await fetch('/api/chat/stream', {
@@ -644,7 +652,8 @@ async function sendMessage() {
         sessionId: state.sessionId,
         tools: state.currentTools.length > 0 ? state.currentTools : undefined,
         skills: state.currentSkills.length > 0 ? state.currentSkills : undefined
-      })
+      }),
+      signal: state.abortController.signal
     });
 
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -742,17 +751,41 @@ async function sendMessage() {
 
     state.streamingMsg = null;
   } catch (err) {
-    removeTyping();
-    if (state.streamingMsg) {
-      state.streamingMsg.querySelector('.msg-content').textContent = 'Error: ' + err.message;
-      state.streamingMsg = null;
+    if (err.name === 'AbortError') {
+      // User cancelled — stream was aborted, backend was notified
     } else {
-      addMessage('agent', 'Error: ' + err.message);
+      removeTyping();
+      if (state.streamingMsg) {
+        state.streamingMsg.querySelector('.msg-content').textContent = 'Error: ' + err.message;
+        state.streamingMsg = null;
+      } else {
+        addMessage('agent', 'Error: ' + err.message);
+      }
     }
+  } finally {
+    state.isStreaming = false;
+    state.abortController = null;
+    cancelBtn.style.display = 'none';
   }
 
+  input.disabled = false;
   btn.disabled = false;
   input.focus();
+}
+
+/* ── Cancel Streaming ── */
+function cancelMessage() {
+  var ac = state.abortController;
+  if (ac) {
+    ac.abort();
+  }
+  // Also tell backend to cancel the LLM call
+  fetch('/api/chat/cancel', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId: state.sessionId })
+  }).catch(function() {});
+  addMessage('system', '⏹ Generation cancelled');
 }
 
 /* ── Service Worker ── */
@@ -794,6 +827,7 @@ window.onload = function() {
     }
   });
   document.getElementById('send-btn').addEventListener('click', sendMessage);
+  document.getElementById('cancel-btn').addEventListener('click', cancelMessage);
   document.getElementById('new-session-btn').addEventListener('click', newSession);
   document.getElementById('mcp-connect-btn').addEventListener('click', connectMcpServer);
   document.getElementById('menu-btn').addEventListener('click', toggleDrawer);

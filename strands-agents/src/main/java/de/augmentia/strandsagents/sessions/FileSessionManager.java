@@ -11,8 +11,10 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileLock;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,8 +30,32 @@ public class FileSessionManager implements SessionManager {
         this.mapper = createMapper();
         try {
             Files.createDirectories(baseDir);
+            ensureWritable(baseDir);
         } catch (IOException e) {
-            throw new RuntimeException("Session-Verzeichnis kann nicht erstellt werden: " + baseDir, e);
+            throw new RuntimeException("Session directory cannot be created: " + baseDir, e);
+        }
+    }
+
+    private static void ensureWritable(Path dir) {
+        if (Files.isWritable(dir)) return;
+
+        // Try to set 777 on POSIX systems (common with Docker bind mounts)
+        try {
+            var perms = EnumSet.of(
+                PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,
+                PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_WRITE, PosixFilePermission.GROUP_EXECUTE,
+                PosixFilePermission.OTHERS_READ, PosixFilePermission.OTHERS_WRITE, PosixFilePermission.OTHERS_EXECUTE);
+            Files.setPosixFilePermissions(dir, perms);
+        } catch (Exception ignored) {
+            // Non-POSIX filesystem or permission change failed — will fail on write with a clear error
+        }
+
+        // Verify write access
+        if (!Files.isWritable(dir)) {
+            throw new RuntimeException(
+                "Session directory is not writable: " + dir.toAbsolutePath()
+                + ". Ensure the directory exists with write permission for the container user "
+                + "(e.g. 'chmod 777 " + dir.toAbsolutePath() + "').");
         }
     }
 

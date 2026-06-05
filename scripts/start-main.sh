@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # ---- API-Keys laden ----
-if [ -f "$SCRIPT_DIR/set_keys.sh" ]; then
-    source "$SCRIPT_DIR/set_keys.sh"
+if [ -f "$SCRIPT_DIR/scripts/set_keys.sh" ]; then
+    source "$SCRIPT_DIR/scripts/set_keys.sh"
 fi
 
 # ---- Config (Überschreibbar via env) ----

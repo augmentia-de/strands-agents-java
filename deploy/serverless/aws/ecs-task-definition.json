@@ -1,0 +1,53 @@
+{
+  "family": "strands-agent",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/strands-agent-task-role",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/strands-agent-execution-role",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "containerDefinitions": [
+    {
+      "name": "strands-agent",
+      "image": "ACCOUNT_ID.dkr.ecr.eu-central-1.amazonaws.com/strands/strands-agent:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8082,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "QUARKUS_HTTP_PORT", "value": "8082" }
+      ],
+      "secrets": [
+        {
+          "name": "OPENAI_API_KEY",
+          "valueFrom": "arn:aws:ssm:eu-central-1:ACCOUNT_ID:parameter/strands-agent/openai-api-key"
+        },
+        {
+          "name": "VAULT_ADDR",
+          "valueFrom": "arn:aws:ssm:eu-central-1:ACCOUNT_ID:parameter/strands-agent/vault-addr"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/strands-agent",
+          "awslogs-region": "eu-central-1",
+          "awslogs-stream-prefix": "strands-agent"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8082/q/health/ready || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 10
+      },
+      "ulimits": [
+        { "name": "nofile", "softLimit": 65536, "hardLimit": 65536 }
+      ]
+    }
+  ]
+}

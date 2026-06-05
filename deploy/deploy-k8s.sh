@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # Zentrale Keys einbinden (falls vorhanden)
-[[ -f "$(dirname "$0")/../../../set_keys.sh" ]] && source "$(dirname "$0")/../../../set_keys.sh"
+[[ -f "$(dirname "$0")/../scripts/set_keys.sh" ]] && source "$(dirname "$0")/../scripts/set_keys.sh"
 
 # ── Konfiguration ──────────────────────────────────────────
 NAMESPACE="${NAMESPACE:-strands}"
@@ -25,7 +25,7 @@ check_kubectl() {
 }
 
 deploy() {
-    local k8s_dir="$(dirname "$0")/../k8s"
+    local k8s_dir="$(dirname "$0")/k8s"
 
     # Namespace anlegen
     kubectl create ns "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -

@@ -10,13 +10,12 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 # Zentrale Keys einbinden
-SET_KEYS="$SCRIPT_DIR/set_keys.sh"
-echo $SCRIPT_DIR
+SET_KEYS="$PROJECT_ROOT/deploy/serverless/set_keys.sh"
 [[ -f "$SET_KEYS" ]] && source "$SET_KEYS"
 
 echo
 # Cloud Credentials einbinden
-CLOUD_CREDS="$SCRIPT_DIR/set_cloud_credentials.sh"
+CLOUD_CREDS="$PROJECT_ROOT/deploy/serverless/set_cloud_credentials.sh"
 [[ -f "$CLOUD_CREDS" ]] && source "$CLOUD_CREDS"
 
 # ── Konfiguration ──────────────────────────────────────────

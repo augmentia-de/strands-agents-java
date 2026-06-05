@@ -170,7 +170,6 @@
                     <configuration>
                         <release>21</release>
                         <compilerArgs>
-                            <arg>--enable-preview</arg>
                             <arg>-parameters</arg>
                         </compilerArgs>
                     </configuration>
@@ -183,7 +182,6 @@
                         <systemPropertyVariables>
                             <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         </systemPropertyVariables>
-                        <argLine>--enable-preview</argLine>
                     </configuration>
                 </plugin>
                 <plugin>

@@ -89,6 +89,7 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
     private SSEChannel sseChannel;
 
     private final ConcurrentHashMap<String, InitializedSession> initializedAgents = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, StreamingAgent> activeStreams = new ConcurrentHashMap<>();
 
     private record InitializedSession(
         Agent agent,
@@ -474,6 +475,7 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
             }
         };
         agent.addEventListener(listener);
+        activeStreams.put(req.sessionId, agent);
         try {
             var result = agent.executeStreaming(req.sessionId, req.prompt, onToken);
             if (sseChannel != null) {
@@ -485,6 +487,7 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
             resp.thinking = agent.getLastThinking();
             if (onComplete != null) onComplete.accept(resp);
         } finally {
+            activeStreams.remove(req.sessionId);
             agent.removeEventListener(listener);
         }
     }
@@ -506,6 +509,13 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
         var session = initializedAgents.remove(sessionId);
         if (session != null) {
             session.close();
+        }
+    }
+
+    public void cancelExecution(String sessionId) {
+        var stream = activeStreams.get(sessionId);
+        if (stream != null) {
+            stream.cancelStreaming();
         }
     }
 

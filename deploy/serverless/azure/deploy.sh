@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 # Zentrale Keys einbinden
-[[ -f "$PROJECT_ROOT/set_keys.sh" ]] && source "$PROJECT_ROOT/set_keys.sh"
+[[ -f "$PROJECT_ROOT/scripts/set_keys.sh" ]] && source "$PROJECT_ROOT/scripts/set_keys.sh"
 
 # ── Konfiguration ──────────────────────────────────────────
 RESOURCE_GROUP="${RESOURCE_GROUP:-${AZURE_RESOURCE_GROUP:-strands-agent-rg}}"

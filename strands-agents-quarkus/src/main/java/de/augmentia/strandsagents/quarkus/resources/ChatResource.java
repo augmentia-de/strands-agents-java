@@ -169,6 +169,16 @@ public class ChatResource {
     }
 
     @POST
+    @Path("/chat/cancel")
+    public Response cancelChat(Map<String, String> body) {
+        var sessionId = body != null ? body.get("sessionId") : null;
+        if (sessionId != null) {
+            agentService.cancelExecution(sessionId);
+        }
+        return Response.ok(Map.of("cancelled", true)).build();
+    }
+
+    @POST
     @Path("/agent/release")
     public Response releaseSession(Map<String, String> body) {
         var sessionId = body != null ? body.get("sessionId") : null;

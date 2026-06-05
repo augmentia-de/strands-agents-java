@@ -1,19 +1,18 @@
 #!/usr/bin/env bash
 # ============================================================
-# build-image.sh — Docker-native Image-Build (JVM oder Native)
+# build.sh — Docker-Image-Build (JVM, Native, Lambda)
 # ============================================================
 # Usage:
-#   ./build-image.sh                          # JVM :latest
-#   ./build-image.sh --native                 # Native :latest
-#   ./build-image.sh --tag v1.0 --push gcr.io/my-project/strands-agent
+#   ./scripts/build.sh                          # JVM :latest
+#   ./scripts/build.sh --native                 # Native :latest
+#   ./scripts/build.sh --lambda                 # Native + Lambda-Adapter
+#   ./scripts/build.sh --native --tag v1.0      # Native mit Tag
+#   ./scripts/build.sh --jvm --push gcr.io/my-project/agent
 # ============================================================
 set -euo pipefail
 
-# Zentrale Keys einbinden (falls vorhanden)
-[[ -f "$(dirname "$0")/set_keys.sh" ]] && source "$(dirname "$0")/set_keys.sh"
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 MODE="jvm"
 TAG="latest"
@@ -23,12 +22,14 @@ SERVICE="strands-agent"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --jvm)      MODE="jvm"; shift ;;
         --native)   MODE="native"; shift ;;
         --lambda)   MODE="lambda"; shift ;;
         --tag)      TAG="$2"; shift 2 ;;
         --push)     PUSH="yes"; IMAGE_NAME="$2"; shift 2 ;;
         --service)  SERVICE="$2"; shift 2 ;;
-        *)          echo "Unbekannt: $1"; exit 1 ;;
+        --help|-h)  sed -n 's/^# //p; /^set -e/q' "$0"; exit 0 ;;
+        *)          echo "Unbekannt: $1 (--help für Hilfe)"; exit 1 ;;
     esac
 done
 
@@ -40,10 +41,10 @@ cd "$PROJECT_ROOT"
 case "$MODE" in
     native)
         DOCKERFILE="strands-agents-quarkus/src/main/docker/Dockerfile.native"
-        LABEL="Native (UBI Minimal)"
+        LABEL="Native (GraalVM/Mandrel)"
         ;;
     lambda)
-        info "Schritt 1/2: Native-Base-Image …"
+        info "Schritt 1/2: Native-Base-Image bauen …"
         docker build -f "strands-agents-quarkus/src/main/docker/Dockerfile.native" \
             -t "strands-agent-native:latest" .
         DOCKERFILE="strands-agents-quarkus/src/main/docker/Dockerfile.lambda"

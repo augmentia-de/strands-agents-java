@@ -1,0 +1,48 @@
+name: SECURITY_INCIDENT_TRIAGE
+start: intake
+steps:
+  intake:
+    role: intake_agent
+    in:
+      context.incident_report: incident
+    out:
+      incident_id: string
+      details: string
+    next: classify
+  classify:
+    role: classifier
+    in:
+      intake.incident_id: incident_id
+      intake.details: details
+    out:
+      severity: string  # expected values: low, high
+    next: severity_gate
+  severity_gate:
+    type: switch
+    in:
+      classify.severity: severity
+    next:
+      low: auto_response
+      high: expert_review
+  auto_response:
+    role: auto_responder
+    in:
+      classify.severity: severity
+    out:
+      response_action: string
+    next: resolve
+  expert_review:
+    role: expert
+    in:
+      classify.severity: severity
+    out:
+      review_notes: string
+    next: resolve
+  resolve:
+    role: resolver
+    in:
+      auto_response.response_action: response_action
+      expert_review.review_notes: review_notes
+    out:
+      resolution_summary: string
+      resolved: boolean
