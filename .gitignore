@@ -26,3 +26,4 @@ set_keys.sh
 
 # Cloud deployment credentials
 deploy/cloud/scripts/set_cloud_credentials.sh
+/config/api-key.enc

@@ -66,9 +66,6 @@
                     </to>
                     <container>
                         <mainClass>de.augmentia.strandsagents.examples.Main</mainClass>
-                        <jvmFlags>
-                            <jvmFlag>--enable-preview</jvmFlag>
-                        </jvmFlags>
                         <environment>
                             <OPENAI_API_KEY>placeholder</OPENAI_API_KEY>
                         </environment>
