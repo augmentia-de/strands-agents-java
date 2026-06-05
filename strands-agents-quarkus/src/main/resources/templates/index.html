@@ -242,6 +242,12 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   align-self: flex-end; min-height: 44px;
 }
 #send-btn:hover:not(:disabled) { background: #ff6b81; }
+#cancel-btn {
+  background: #e94560; color: #fff; padding: 10px 16px;
+  border-radius: 20px; font-size: 18px; font-weight: 600;
+  align-self: flex-end; min-height: 44px; line-height: 1;
+}
+#cancel-btn:hover { background: #ff6b81; }
 
 /* ── Session List ── */
 .session-list-item {
@@ -447,6 +453,7 @@ Available skills:
     <div id="memory-bar"></div>
     <div id="input-area">
       <textarea id="prompt-input" rows="1" placeholder="Initialize first, then enter message..." disabled></textarea>
+      <button id="cancel-btn" style="display:none" aria-label="Stop generation">⏹</button>
       <button id="send-btn" disabled>Send</button>
     </div>
   </main>

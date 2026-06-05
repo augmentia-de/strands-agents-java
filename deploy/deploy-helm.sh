@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # Zentrale Keys einbinden (falls vorhanden)
-[[ -f "$(dirname "$0")/../../../set_keys.sh" ]] && source "$(dirname "$0")/../../../set_keys.sh"
+[[ -f "$(dirname "$0")/../scripts/set_keys.sh" ]] && source "$(dirname "$0")/../scripts/set_keys.sh"
 
 # ── Konfiguration ──────────────────────────────────────────
 NAMESPACE="${NAMESPACE:-strands}"
@@ -26,7 +26,7 @@ check_helm() {
 }
 
 deploy() {
-    local chart_dir="$(dirname "$0")/../../helm/strands-agent"
+    local chart_dir="$(dirname "$0")/helm/strands-agent"
 
     helm upgrade --install "$HELM_RELEASE" "$chart_dir" \
         --namespace "$NAMESPACE" --create-namespace \

@@ -1,0 +1,39 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto21
+    commands:
+      - echo "Installing dependencies..."
+
+  pre_build:
+    commands:
+      - echo "Logging into ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - REGISTRY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+
+  build:
+    commands:
+      - echo "Building container image (native)..."
+      - docker build -f strands-agents-quarkus/src/main/docker/Dockerfile.native -t $REGISTRY/strands/strands-agent:$IMAGE_TAG .
+      - docker push $REGISTRY/strands/strands-agent:$IMAGE_TAG
+      - echo "Container image built and pushed: $IMAGE_TAG"
+
+  post_build:
+    commands:
+      - echo "Writing imagedefinitions.json..."
+      - printf '[{"name":"strands-agent","imageUri":"%s.dkr.ecr.%s.amazonaws.com/strands/strands-agent:%s"}]' $AWS_ACCOUNT_ID $AWS_DEFAULT_REGION $IMAGE_TAG > imagedefinitions.json
+      - cat imagedefinitions.json
+
+artifacts:
+  files:
+    - imagedefinitions.json
+    - deploy/serverless/aws/ecs-task-definition.json
+  discard-paths: no
+
+cache:
+  paths:
+    - '/root/.m2/**/*'

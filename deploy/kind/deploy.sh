@@ -27,9 +27,9 @@ fi
 
 # ---- 2. API-Key laden ----
 echo ""
-echo ">>> [2/6] API-Key aus set_keys.sh laden ..."
-if [ -f "${SCRIPT_DIR}/set_keys.sh" ]; then
-    source "${SCRIPT_DIR}/set_keys.sh"
+echo ">>> [2/6] API-Key aus scripts/set_keys.sh laden ..."
+if [ -f "${SCRIPT_DIR}/scripts/set_keys.sh" ]; then
+    source "${SCRIPT_DIR}/scripts/set_keys.sh"
 fi
 if [ -z "${OPENAI_API_KEY:-}" ]; then
     echo "  Fehler: OPENAI_API_KEY nicht gesetzt."

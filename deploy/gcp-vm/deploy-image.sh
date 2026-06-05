@@ -8,7 +8,7 @@ PROJECT_ID=$(gcloud config get-value project)
 echo "=== Checking Native Image ==="
 if ! docker image inspect strands-agents-quarkus:latest >/dev/null 2>&1; then
   echo "Error: strands-agents-quarkus:latest image not found."
-  echo "Please run ./build-native-image.sh first."
+  echo "Please run ./scripts/build.sh --native first."
   exit 1
 fi
 

@@ -123,6 +123,8 @@ public class Agent {
     private HookRegistry hookRegistry;
     private final ChatMemoryStore chatMemoryStore;
     private volatile String lastThinking;
+    private volatile boolean cancelled = false;
+    private volatile Thread executionThread;
 
     /**
      * Constructs an Agent with only a chat model and default components.
@@ -474,6 +476,9 @@ public class Agent {
 
     private AgentResult executeLoop(String sid, String prompt, Map<String, Object> contextVariables) {
         log.debug("executeLoop start — sessionId={}", sid);
+        cancelled = false;
+        executionThread = Thread.currentThread();
+        try {
         var start = System.nanoTime();
         int totalInputTokens = 0;
         int totalOutputTokens = 0;
@@ -507,6 +512,7 @@ public class Agent {
 
         for (int iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
             checkPaused();
+            if (cancelled) throw new RuntimeException("Agent execution cancelled by user");
 
             log.debug("Iteration {}/{} — chatMemory messages={}",
                 iteration + 1, MAX_TOOL_ITERATIONS, chatMemory.messages().size());
@@ -796,6 +802,9 @@ public class Agent {
             result.metrics(), result.stopReason(), result.structuredOutput());
         fire(new AgentFinishedEvent(sid, Instant.now(), modifiedResult.finalAnswer()));
         return modifiedResult;
+        } finally {
+            executionThread = null;
+        }
     }
 
     private AgentResult runInputGuardrails(List<Message> domainMessages) {
@@ -1053,6 +1062,15 @@ public class Agent {
             pauseCondition.signalAll();
         } finally {
             pauseLock.unlock();
+        }
+    }
+
+    public void cancel() {
+        cancelled = true;
+        reject("Cancelled by user");
+        var t = executionThread;
+        if (t != null) {
+            t.interrupt();
         }
     }
 

@@ -25,6 +25,7 @@ public class StreamingModelBridge implements ChatModel {
     private final StreamingChatModel streamingModel;
     private final Consumer<String> tokenConsumer;
     private static final long DEFAULT_TIMEOUT_SECONDS = 120;
+    private volatile CompletableFuture<ChatResponse> pendingFuture;
 
     /**
      * Constructs a new StreamingModelBridge without a token consumer.
@@ -60,9 +61,17 @@ public class StreamingModelBridge implements ChatModel {
      * @return the complete chat response
      * @throws RuntimeException if the request fails, times out, or is interrupted
      */
+    public void cancel() {
+        var f = pendingFuture;
+        if (f != null && !f.isDone()) {
+            f.cancel(true);
+        }
+    }
+
     @Override
     public ChatResponse chat(ChatRequest request) {
         var future = new CompletableFuture<ChatResponse>();
+        this.pendingFuture = future;
 
         streamingModel.chat(request, new StreamingChatResponseHandler() {
             @Override

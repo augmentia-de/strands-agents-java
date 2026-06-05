@@ -28,6 +28,7 @@ public class StreamingAgent extends Agent {
 
     private final StreamingChatModel streamingModel;
     private volatile Consumer<String> currentTokenConsumer;
+    private volatile StreamingModelBridge currentBridge;
 
     /**
      * Constructs a StreamingAgent with only a model.
@@ -176,7 +177,16 @@ public class StreamingAgent extends Agent {
                 consumer.accept(token);
             }
         });
+        currentBridge = bridge;
         return bridge.chat(request);
+    }
+
+    public void cancelStreaming() {
+        cancel();
+        var b = currentBridge;
+        if (b != null) {
+            b.cancel();
+        }
     }
 
     public StreamingChatModel getStreamingModel() {

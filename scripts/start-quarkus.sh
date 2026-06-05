@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # ---- Config (env/Modell, aber NICHT den API-Key) ----
-if [ -f "$SCRIPT_DIR/set_keys.sh" ]; then
-    source "$SCRIPT_DIR/set_keys.sh"
+if [ -f "$SCRIPT_DIR/scripts/set_keys.sh" ]; then
+    source "$SCRIPT_DIR/scripts/set_keys.sh"
     # API-Key nur aus PBE – env-Variable entfernen
     unset OPENAI_API_KEY
 fi

@@ -4,8 +4,8 @@ set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # ---- API-Keys aus set_keys.sh laden ----
-if [ -f "$PROJECT_DIR/set_keys.sh" ]; then
-    source "$PROJECT_DIR/set_keys.sh"
+if [ -f "$PROJECT_DIR/scripts/set_keys.sh" ]; then
+    source "$PROJECT_DIR/scripts/set_keys.sh"
 fi
 
 # ---- Prüfen ----

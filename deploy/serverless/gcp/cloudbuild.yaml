@@ -1,0 +1,49 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    entrypoint: docker
+    args:
+      - build
+      - -f
+      - strands-agents-quarkus/src/main/docker/Dockerfile.native
+      - -t
+      - gcr.io/$PROJECT_ID/strands-agent:$SHORT_SHA
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    entrypoint: docker
+    args:
+      - push
+      - gcr.io/$PROJECT_ID/strands-agent:$SHORT_SHA
+
+  - name: gcr.io/cloud-builders/kubectl
+    entrypoint: kubectl
+    args:
+      - set
+      - image
+      - deployment/strands-agent
+      - strands-agent=gcr.io/$PROJECT_ID/strands-agent:$SHORT_SHA
+    env:
+      - CLOUDSDK_COMPUTE_ZONE=europe-west1-b
+      - CLOUDSDK_CONTAINER_CLUSTER=strands-agent-cluster
+
+  - name: gcr.io/cloud-builders/kubectl
+    entrypoint: kubectl
+    args:
+      - rollout
+      - status
+      - deployment/strands-agent
+
+substitutions:
+  _REGION: europe-west1
+
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING
+
+tags:
+  - strands-agent
+  - java
+  - quarkus
+
+images:
+  - gcr.io/$PROJECT_ID/strands-agent:$SHORT_SHA

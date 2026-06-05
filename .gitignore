@@ -24,6 +24,5 @@ set_keys.sh
 /agent-agent-test/test-output/
 /agent-agent-test/tests/
 
-# Cloud deployment credentials
-deploy/cloud/scripts/set_cloud_credentials.sh
-/config/api-key.enc
+# Serverless deployment credentials
+deploy/serverless/set_cloud_credentials.sh
