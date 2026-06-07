@@ -10,6 +10,7 @@ import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailResult;
 import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.CheckpointHook;
 import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.CheckpointService;
 import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.ConsoleChannel;
+import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.EmailChannel;
 import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.SSEChannel;
 import de.augmentia.strandsagents.core.tools.ListToolsTool;
 import de.augmentia.strandsagents.core.tools.local.HttpTool;
@@ -52,6 +53,9 @@ public class AgentFactory {
         svc.registerChannel(new ConsoleChannel());
         if (sseChannel != null) {
             svc.registerChannel(sseChannel);
+        }
+        if (config.hitlEmailRecipient() != null && !config.hitlEmailRecipient().isBlank()) {
+            svc.registerChannel(new EmailChannel());
         }
         return svc;
     }

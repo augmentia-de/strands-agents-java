@@ -2,6 +2,7 @@ package de.augmentia.strandsagents.quarkus.service;
 
 import de.augmentia.strandsagents.core.*;
 import de.augmentia.strandsagents.core.agent.MockChatModel;
+import de.augmentia.strandsagents.core.agent.routing.LlmRouter;
 import de.augmentia.strandsagents.core.prompt.PromptRegistry;
 import de.augmentia.strandsagents.core.agent.MockStreamingChatModel;
 import de.augmentia.strandsagents.core.agent.Agent;
@@ -300,7 +301,8 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
                 wrappedSimple, 2048);
 
             if (effectiveTier == ModelTier.ROUTING) {
-                agent = new RoutingAgent(wrappedSimple, wrappedAdvanced, selectedTools, new ToolExecutor(),
+                var router = new LlmRouter(wrappedSimple);
+                agent = new RoutingAgent(wrappedSimple, wrappedAdvanced, router, selectedTools, new ToolExecutor(),
                     conversationManager, sessionManager, null, resilienceConfig, plugins);
                 ((RoutingAgent) agent).resolveRoutingTier(systemPrompt);
             } else {
@@ -503,6 +505,18 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
         var modelToUse = wrapModel(model);
         var plugins = buildPlugins(allSkills, config.initialSkills());
         return AgentFactory.createAgent(modelToUse, selectedTools, sessionManager, null, plugins);
+    }
+
+    public Agent createA2AAgent(String systemPrompt, java.util.Set<String> toolNames) {
+        ensureInitialized();
+        var selectedTools = toolNames != null && !toolNames.isEmpty()
+            ? fullRegistry.withOnly(toolNames)
+            : fullRegistry.withOnly(new HashSet<>(fullRegistry.getToolNames()));
+        var modelToUse = wrapModel(model);
+        var plugins = buildPlugins(allSkills, config.initialSkills());
+        var agent = AgentFactory.createAgent(modelToUse, selectedTools, sessionManager, null, plugins);
+        agent.setSystemPrompt(systemPrompt);
+        return agent;
     }
 
     public void releaseSession(String sessionId) {

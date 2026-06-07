@@ -5,6 +5,7 @@ import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.agent.Agent;
 import de.augmentia.strandsagents.core.agent.RoutingAgent;
+import de.augmentia.strandsagents.core.agent.routing.LlmRouter;
 import de.augmentia.strandsagents.core.conversation.ConversationManager;
 import de.augmentia.strandsagents.sessions.SessionManager;
 import de.augmentia.strandsagents.core.logging.FileLlmLogger;
@@ -85,7 +86,7 @@ public record AgentConfig(
 
         Agent agent;
         if (defaultTier == ModelTier.ROUTING) {
-            agent = new RoutingAgent(simpleModel, advancedModel, effectiveRegistry, new ToolExecutor(),
+            agent = new RoutingAgent(simpleModel, advancedModel, new LlmRouter(simpleModel), effectiveRegistry, new ToolExecutor(),
                 conversationManager, sessionManager, chatMemoryStore, resilienceConfig, effectivePlugins);
         } else {
             agent = new Agent(simpleModel, effectiveRegistry, new ToolExecutor(),

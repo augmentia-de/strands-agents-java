@@ -114,7 +114,16 @@ Multi<AgentResult> executeStreamingReactive(String sessionId, String prompt)
 ```java
 class RoutingAgent extends Agent
 
-RoutingAgent(ChatModel simpleModel, ChatModel advancedModel, LlmRouter router, ...)
+RoutingAgent(ChatModel simpleModel, ChatModel advancedModel,
+             ToolRegistry toolRegistry, ToolExecutor toolExecutor,
+             ConversationManager conversationManager, SessionManager sessionManager,
+             ChatMemoryStore chatMemoryStore, ResilienceConfig resilienceConfig,
+             List<Plugin> plugins)
+RoutingAgent(ChatModel simpleModel, ChatModel advancedModel, LlmRouter router,
+             ToolRegistry toolRegistry, ToolExecutor toolExecutor,
+             ConversationManager conversationManager, SessionManager sessionManager,
+             ChatMemoryStore chatMemoryStore, ResilienceConfig resilienceConfig,
+             List<Plugin> plugins)
     // auto-selects simple or advanced model per request
 
 ModelTier resolveRoutingTier(String userGoal)
@@ -913,7 +922,8 @@ record StrandsAgentConfig(
     boolean bashAllowed,       // allow bash execution tool (default false)
     boolean httpAllowPrivate,  // allow HTTP calls to private IPs (default false)
     String extraTools,         // FQCN of extra tool classes, comma-separated
-    String hitlTools           // tool names requiring human approval, comma-separated
+    String hitlTools,          // tool names requiring human approval, comma-separated
+    String hitlEmailRecipient  // email recipient for HITL notifications
 )
 ```
 
@@ -947,6 +957,8 @@ record StrandsAgentConfig(
 | `STRANDS_SKILLS_SEARCH` | Enable skill search | `false` |
 | `STRANDS_MCP_CONFIG` | MCP config file path | `config/MCP_SERVER_CONFIG.json` |
 | `STRANDS_MCP_INGEST` | Enable MCP ingest | `false` |
+| `STRANDS_AGENT_HITL_TOOLS` | Tools requiring human approval | — |
+| `STRANDS_HITL_EMAIL_RECIPIENT` | HITL email notification recipient | — |
 | `TAVILY_API_KEY` | Tavily web search API key | — |
 | `VAULT_ADDR` | Hashicorp Vault address | — |
 | `VAULT_TOKEN` | Hashicorp Vault token | — |

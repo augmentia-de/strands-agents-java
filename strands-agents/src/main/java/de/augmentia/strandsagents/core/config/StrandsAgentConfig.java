@@ -17,7 +17,8 @@ public record StrandsAgentConfig(
     boolean bashAllowed,
     boolean httpAllowPrivate,
     String extraTools,
-    String hitlTools
+    String hitlTools,
+    String hitlEmailRecipient
 ) {
 
     public static StrandsAgentConfig fromEnv() {
@@ -34,7 +35,8 @@ public record StrandsAgentConfig(
             Boolean.parseBoolean(env("STRANDS_AGENT_BASH_ALLOW", "false")),
             !Boolean.parseBoolean(env("STRANDS_AGENT_HTTP_ALLOW_PRIVATE", "false")),
             env("STRANDS_AGENT_TOOLS", ""),
-            env("STRANDS_AGENT_HITL_TOOLS", "")
+            env("STRANDS_AGENT_HITL_TOOLS", ""),
+            env("STRANDS_HITL_EMAIL_RECIPIENT", "")
         );
     }
 
@@ -52,7 +54,8 @@ public record StrandsAgentConfig(
             Boolean.parseBoolean(prop(props, "strands.agent.bash.allow", "false")),
             !Boolean.parseBoolean(prop(props, "strands.agent.http.allow-private", "false")),
             prop(props, "strands.agent.tools", ""),
-            prop(props, "strands.agent.hitl.tools", "")
+            prop(props, "strands.agent.hitl.tools", ""),
+            prop(props, "strands.hitl.email.recipient", "")
         );
     }
 

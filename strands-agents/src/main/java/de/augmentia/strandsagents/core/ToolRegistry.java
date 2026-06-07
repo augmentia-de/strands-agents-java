@@ -262,6 +262,7 @@ public class ToolRegistry {
         public Builder standard(boolean includeBash) {
             var wd = workspace;
             if (includeBash) {
+                agentTools.add(new CommandTool(wd));
                 agentTools.add(new BashTool(wd));
             }
             agentTools.add(new DockerRunTool(wd));

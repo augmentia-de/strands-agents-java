@@ -7,7 +7,6 @@ import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -17,25 +16,24 @@ import de.augmentia.strandsagents.core.tools.ToolResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class BashTool implements AgentTool<BashTool.Params> {
-    private static final Logger log = LoggerFactory.getLogger(BashTool.class);
+public class CommandTool implements AgentTool<CommandTool.Params> {
+    private static final Logger log = LoggerFactory.getLogger(CommandTool.class);
     private static final int MAX_LINES = 300;
     private static final int MAX_BYTES = 30_720;
     private final Path cwd;
 
-    public BashTool(Path cwd) {
+    public CommandTool(Path cwd) {
         this.cwd = cwd;
     }
 
     @Override
     public String name() {
-        return "bash";
+        return "execute_command";
     }
 
     @Override
     public String description() {
-        return "Execute a bash command. Output truncated to last " + MAX_LINES + " lines. "
-                + "Note: this tool is NOT restricted to the workspace directory. "
+        return "Execute a local system command (e.g., 'mvn clean', 'git status'). Output truncated to last " + MAX_LINES + " lines. "
                 + "The command runs in the workspace directory but can access any path the process has permissions for.";
     }
 
@@ -50,7 +48,7 @@ public class BashTool implements AgentTool<BashTool.Params> {
         var schema = mapper.createObjectNode();
         schema.put("type", "object");
         var props = schema.putObject("properties");
-        addStr(props, "command", "Bash command to execute");
+        addStr(props, "command", "The full command line to execute (e.g., 'mvn clean install')");
         addInt(props, "timeout", "Timeout in seconds (optional)");
         schema.putArray("required").add("command");
         return schema;
@@ -74,15 +72,24 @@ public class BashTool implements AgentTool<BashTool.Params> {
 
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
-        log.debug("Tool: bash START command={}", trunc(params.command(), 500));
+        log.debug("Tool: command START command={}", trunc(params.command(), 500));
 
         Process process = null;
         try {
-            var shell = System.getenv().getOrDefault("SHELL", "/bin/bash");
-            var pb = new ProcessBuilder(shell, "-c", params.command());
+            // ÄNDERUNG: Wir splitten den String in ein Array auf.
+            // Aus "mvn clean install" wird ["mvn", "clean", "install"]
+            String[] commandTokens = params.command().trim().split("\\s+");
+
+            // Wenn der String leer war, werfen wir direkt einen Fehler
+            if (commandTokens.length == 0 || commandTokens[0].isEmpty()) {
+                throw new IllegalArgumentException("Command cannot be empty");
+            }
+
+            // Der ProcessBuilder erhält das Array direkt. Er sucht nun im System-PATH nach dem Programm (z.B. mvn)
+            var pb = new ProcessBuilder(commandTokens);
             pb.directory(cwd.toFile());
 
-            // Redirect error stream into standard output to prevent OS pipe buffer deadlocks
+            // Streams zusammenführen gegen Deadlocks
             pb.redirectErrorStream(true);
 
             process = pb.start();
@@ -95,27 +102,23 @@ public class BashTool implements AgentTool<BashTool.Params> {
 
             try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 while (process.isAlive() || reader.ready()) {
-                    // Check abort flag from agent orchestration layer
                     if (abortFlag.get()) {
-                        log.debug("Tool: bash abort flag detected during execution.");
+                        log.debug("Tool: command abort flag detected.");
                         process.destroyForcibly();
                         throw new InterruptedException("Command aborted by agent");
                     }
 
-                    // Check timeout manually while parsing long loops or slow streams
                     if (System.currentTimeMillis() - startTime > timeoutMillis) {
                         process.destroyForcibly();
                         throw new RuntimeException("Command timed out after " + params.timeout() + " seconds");
                     }
 
-                    // Non-blocking loop read assistance via line checking when ready
                     if (reader.ready()) {
                         String line = reader.readLine();
                         if (line != null) {
                             lines.add(line);
                             totalBytes += line.length() + 1;
 
-                            // Trim output windows to match max metrics gracefully
                             while (lines.size() > MAX_LINES || totalBytes > MAX_BYTES * 2) {
                                 if (!lines.isEmpty()) {
                                     totalBytes -= lines.removeFirst().length() + 1;
@@ -129,23 +132,21 @@ public class BashTool implements AgentTool<BashTool.Params> {
                             }
                         }
                     } else {
-                        // Small cooling sleep to keep CPU cycles relaxed during quiet streams
                         Thread.sleep(10);
                     }
                 }
             }
 
-            // Await final exit status clearance
             int exitCode = process.waitFor();
             var result = String.join("\n", lines);
 
             if (exitCode != 0) {
                 result += "\n\nCommand exited with code " + exitCode;
-                log.debug("Tool: bash ERROR exitCode={}", exitCode);
+                log.debug("Tool: command ERROR exitCode={}", exitCode);
                 throw new RuntimeException(result);
             }
 
-            log.debug("Tool: bash DONE exitCode={} lines={}", exitCode, lines.size());
+            log.debug("Tool: command DONE exitCode={} lines={}", exitCode, lines.size());
             return new ToolResult(List.of(new TextContent(trunc(result, 500))), null);
 
         } catch (IOException | InterruptedException e) {
@@ -153,13 +154,13 @@ public class BashTool implements AgentTool<BashTool.Params> {
                 process.destroyForcibly();
             }
             if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt(); // Restore standard interrupt flag state
+                Thread.currentThread().interrupt();
             }
             if (abortFlag.get()) {
-                log.debug("Tool: bash ABORTED");
+                log.debug("Tool: command ABORTED");
                 throw new RuntimeException("Command aborted", e);
             }
-            log.debug("Tool: bash ERROR: {}", e.getMessage());
+            log.debug("Tool: command ERROR: {}", e.getMessage());
             throw new RuntimeException(e.getMessage(), e);
         }
     }

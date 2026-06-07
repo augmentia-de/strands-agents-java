@@ -2,6 +2,8 @@ package de.augmentia.strandsagents.core.agent;
 
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
+import de.augmentia.strandsagents.core.agent.routing.LlmRouter;
+import de.augmentia.strandsagents.core.agent.routing.RoutingResult;
 import de.augmentia.strandsagents.core.config.ModelTier;
 import de.augmentia.strandsagents.core.conversation.ConversationManager;
 import de.augmentia.strandsagents.core.plugin.Plugin;
@@ -25,9 +27,19 @@ public class RoutingAgent extends Agent {
 
     private final ChatModel simpleModel;
     private final ChatModel advancedModel;
+    private final LlmRouter router;
     private volatile ModelTier resolvedTier;
 
     public RoutingAgent(ChatModel simpleModel, ChatModel advancedModel,
+                        ToolRegistry toolRegistry, ToolExecutor toolExecutor,
+                        ConversationManager conversationManager, SessionManager sessionManager,
+                        ChatMemoryStore chatMemoryStore, ResilienceConfig resilienceConfig,
+                        List<Plugin> plugins) {
+        this(simpleModel, advancedModel, null, toolRegistry, toolExecutor, conversationManager,
+            sessionManager, chatMemoryStore, resilienceConfig, plugins);
+    }
+
+    public RoutingAgent(ChatModel simpleModel, ChatModel advancedModel, LlmRouter router,
                         ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                         ConversationManager conversationManager, SessionManager sessionManager,
                         ChatMemoryStore chatMemoryStore, ResilienceConfig resilienceConfig,
@@ -36,12 +48,24 @@ public class RoutingAgent extends Agent {
             chatMemoryStore, resilienceConfig, plugins);
         this.simpleModel = simpleModel;
         this.advancedModel = advancedModel;
+        this.router = router;
         this.resolvedTier = ModelTier.SIMPLE;
         setAdvancedModel(advancedModel);
         setModelTier(ModelTier.ROUTING);
     }
 
     public ModelTier resolveRoutingTier(String userGoal) {
+        if (router != null) {
+            var result = router.classify(userGoal, List.of("SIMPLE", "ADVANCED"));
+            if ("ADVANCED".equalsIgnoreCase(result.topic())) {
+                resolvedTier = ModelTier.ADVANCED;
+            } else {
+                resolvedTier = ModelTier.SIMPLE;
+            }
+            log.debug("Routing resolved tier={} (via router) for goal='{}'", resolvedTier, truncate(userGoal));
+            return resolvedTier;
+        }
+
         var prompt = PromptRegistry.get("routing_agent.classifier", userGoal);
         var request = ChatRequest.builder()
             .messages(List.of(

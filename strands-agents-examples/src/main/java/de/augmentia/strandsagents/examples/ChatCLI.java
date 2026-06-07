@@ -62,6 +62,7 @@ public class ChatCLI {
         System.out.println("  LLM-Log: logs/llm-calls.log (10×2MB rotating)");
 
         var registry = ToolRegistry.builder()
+                .workspace(Path.of(".").toAbsolutePath())
             .standard()
             .with("de.augmentia.strandsagents.core.tools.CalculatorTool")
             .build();

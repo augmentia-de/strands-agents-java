@@ -164,6 +164,7 @@ ToolRegistry registry = ToolRegistry.builder()
 | `FindTool` | `core.tools.FindTool` | Find files by glob pattern |
 | `GrepTool` | `core.tools.GrepTool` | Search file contents by regex |
 | `LsTool` | `core.tools.LsTool` | List directory contents |
+| `DockerRunTool` | `core.tools.DockerRunTool` | Execute command in Docker container |
 | `WebFetchTool` | `core.tools.WebFetchTool` | Fetch a URL |
 | `WebSearchTool` | `core.tools.WebSearchTool` | Perform a web search |
 
@@ -175,7 +176,6 @@ ToolRegistry registry = ToolRegistry.builder()
 | `TimeTool` | `core.tools.TimeTool` | `getCurrentTime()`, `getCurrentDate()` |
 | `HttpTool` | `core.tools.HttpTool` | `get(url)`, `post(url, body)` |
 | `HumanInTheLoopTool` | `core.tools.HumanInTheLoopTool` | Request human input/approval |
-| `ElasticsearchMemoryTool` | `core.tools.ElasticsearchMemoryTool` | ES-based long-term memory |
 
 ### 3.2 Runtime Tool Manipulation
 
@@ -706,17 +706,15 @@ CompletableFuture<AgentResult> future = agent.executeEvents(prompt, subscriber);
 
 ### 10.3 Event Types
 
-| Event | Fired When |
-|-------|-----------|
 | `AgentStartedEvent(sessionId, timestamp, prompt)` | Execution begins |
 | `AgentFinishedEvent(sessionId, timestamp, answer)` | Execution ends |
 | `ModelRequestedEvent(sessionId, timestamp, messages)` | LLM call starts |
-| `ModelRespondedEvent(sessionId, timestamp, response, tokenUsage)` | LLM call completes |
-| `ToolCalledEvent(sessionId, timestamp, toolName, args)` | Tool execution starts |
-| `ToolRespondedEvent(sessionId, timestamp, toolName, result)` | Tool execution completes |
+| `AfterInvocationEvent(sessionId, timestamp, response, messages)` | LLM call completes |
+| `ToolExecutionStartedEvent(sessionId, timestamp, toolCall)` | Tool execution starts |
+| `ToolExecutionFinishedEvent(sessionId, timestamp, result)` | Tool execution completes |
 | `BeforeInvocationEvent(sessionId, timestamp, systemPrompt, messages)` | Before each iteration |
-| `AfterInvocationEvent(sessionId, timestamp, response, messages)` | After each iteration |
-| `AgentStateChangedEvent(sessionId, timestamp, from, to)` | Phase transitions (EXECUTING → WAITING_FOR_HUMAN, etc.) |
+| `TokenEvent(sessionId, timestamp, token)` | Streaming token received |
+| `AgentStateChangedEvent(sessionId, timestamp, from, to)` | Phase transitions |
 
 ---
 

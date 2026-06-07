@@ -361,7 +361,6 @@ Currently managed prompts (29 keys): `routing_agent.*`, `cot_planner.*`, `llm_ro
 | `CalculatorTool` | Evaluate mathematical expressions |
 | `TimeTool` | Get current date/time |
 | `McpToolMethod` | Bridge to MCP server tools |
-| `ElasticsearchMemoryTool` | Query Elasticsearch for conversational memory |
 
 ---
 

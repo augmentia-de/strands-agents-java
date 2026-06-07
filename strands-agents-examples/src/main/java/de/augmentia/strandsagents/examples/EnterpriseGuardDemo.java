@@ -962,7 +962,7 @@ public class EnterpriseGuardDemo {
      * <p>
      * <b>Integration:</b> The detector is fed agent events via {@link AgentEventListener}.
      * Additionally, user inputs are passed manually via
-     * {@link #recordCall(String, String, AgentResult)}.
+     * .
      * <p>
      * <b>Small LLM option:</b> USEFUL here! Instead of the heuristic (keyword counting),
      * a mini-LLM (gpt-4o-mini) could classify each user message for threat intent.
