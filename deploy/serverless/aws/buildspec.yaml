@@ -17,10 +17,12 @@ phases:
 
   build:
     commands:
-      - echo "Building container image (native)..."
-      - docker build -f strands-agents-quarkus/src/main/docker/Dockerfile.native -t $REGISTRY/strands/strands-agent:$IMAGE_TAG .
+      - echo "Building native image..."
+      - docker build -f strands-agents-quarkus/src/main/docker/Dockerfile.native -t strands-agent-native:$IMAGE_TAG .
+      - echo "Building Lambda adapter image..."
+      - docker build -f strands-agents-quarkus/src/main/docker/Dockerfile.lambda -t $REGISTRY/strands/strands-agent:$IMAGE_TAG .
       - docker push $REGISTRY/strands/strands-agent:$IMAGE_TAG
-      - echo "Container image built and pushed: $IMAGE_TAG"
+      - echo "Lambda container image built and pushed: $IMAGE_TAG"
 
   post_build:
     commands:

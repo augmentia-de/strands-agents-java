@@ -7,9 +7,12 @@ import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ModelFactory {
 
+    private static final Logger log = LoggerFactory.getLogger(ModelFactory.class);
     private static final Map<ModelProviderType, ModelProvider> providers = new ConcurrentHashMap<>();
 
     static {
@@ -48,14 +51,20 @@ public class ModelFactory {
     public static ChatModel createOpenAiFromEnv(String api_key) {
         LlmConfig config = LlmConfig.fromEnv();
         if (api_key!=null) config = new LlmConfig(api_key, config.baseUrl(), config.modelName(), config.temperature(), config.maxRetries());
+        log.info("createOpenAiFromEnv: apiKey={} baseUrl={} model={}",
+            ConfigReader.mask(config.apiKey()), config.baseUrl(), config.modelName());
         return createOpenAi(config);
     }
     public static ChatModel createOpenAiFromEnv() {
         LlmConfig config = LlmConfig.fromEnv();
+        log.info("createOpenAiFromEnv (no arg): apiKey={} baseUrl={} model={}",
+            ConfigReader.mask(config.apiKey()), config.baseUrl(), config.modelName());
         return createOpenAi(config);
     }
 
     public static ChatModel createOpenAi(LlmConfig config) {
+        log.info("createOpenAi: apiKey={} baseUrl={} model={}",
+            ConfigReader.mask(config.apiKey()), config.baseUrl(), config.modelName());
         var c = new ChatModelConfig(
             ModelProviderType.OPENAI,
             config.apiKey(),
@@ -100,6 +109,9 @@ public class ModelFactory {
     static class OpenAiProvider implements ModelProvider {
         @Override
         public ChatModel createChatModel(ChatModelConfig config) {
+            log.info("OpenAiProvider.createChatModel: apiKey={} baseUrl={} model={}",
+                config.apiKey() != null ? ConfigReader.mask(config.apiKey()) : null,
+                config.baseUrl(), config.modelName());
             var builder = OpenAiChatModel.builder();
             if (config.apiKey() != null) builder.apiKey(config.apiKey());
             if (config.baseUrl() != null && !config.baseUrl().isBlank()) builder.baseUrl(config.baseUrl());
@@ -112,6 +124,9 @@ public class ModelFactory {
 
         @Override
         public StreamingChatModel createStreamingChatModel(ChatModelConfig config) {
+            log.info("OpenAiProvider.createStreamingChatModel: apiKey={} baseUrl={} model={}",
+                config.apiKey() != null ? ConfigReader.mask(config.apiKey()) : null,
+                config.baseUrl(), config.modelName());
             var builder = OpenAiStreamingChatModel.builder();
             if (config.apiKey() != null) builder.apiKey(config.apiKey());
             if (config.baseUrl() != null && !config.baseUrl().isBlank()) builder.baseUrl(config.baseUrl());

@@ -12,8 +12,8 @@ if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "(unset)" ]; then
 fi
 
 echo "=== Checking Native Image ==="
-if ! docker image inspect strands-agents-quarkus:latest >/dev/null 2>&1; then
-  echo "Error: strands-agents-quarkus:latest image not found."
+if ! docker image inspect strands-agent:latest >/dev/null 2>&1; then
+  echo "Error: strands-agent:latest (native) image not found."
   echo "Please run ./scripts/build.sh --native first."
   exit 1
 fi
@@ -54,7 +54,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "=== Preparing local .env and config ==="
 if [ ! -f "$SCRIPT_DIR/.env" ]; then
-  echo "OPENAI_API_KEY=your_key_here" > "$SCRIPT_DIR/.env"
+  echo "# API-Key only from PBE vault (use setup endpoint)" > "$SCRIPT_DIR/.env"
+  echo "OPENAI_API_KEY=" >> "$SCRIPT_DIR/.env"
   echo "OPENAI_BASE_URL=https://openrouter.ai/api/v1" >> "$SCRIPT_DIR/.env"
   echo "OPENAI_MODEL=openai/gpt-oss-120b:free" >> "$SCRIPT_DIR/.env"
   echo "Created .env template — please edit $SCRIPT_DIR/.env and add your API key."
@@ -67,7 +68,7 @@ cat > "$TMP_CONFIG/MCP_SERVER_CONFIG.json" <<EOF
   "mcpServers": {
     "filesystem": {
       "type": "sse",
-      "url": "http://mcp-filesystem:8080/sse"
+      "url": "http://filesystem-mcp:8080/sse"
     }
   }
 }
@@ -88,7 +89,7 @@ gcloud compute scp \
     "$VM_NAME":~/deploy-strands/config/ --zone="$ZONE"
 
 echo "=== Transferring Native Image (this may take a while) ==="
-docker save strands-agents-quarkus:latest | gzip | \
+docker save strands-agent:latest | gzip | \
     gcloud compute ssh "$VM_NAME" --zone="$ZONE" --command 'sudo gunzip | sudo docker load'
 
 echo "=== Starting Containers on VM ==="

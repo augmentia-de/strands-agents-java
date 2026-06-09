@@ -10,6 +10,9 @@ if [ -f "$SCRIPT_DIR/scripts/set_keys.sh" ]; then
     unset OPENAI_API_KEY
 fi
 
+# ---- Docker (für Testcontainers / Open WebUI) ----
+export DOCKER_HOST="${DOCKER_HOST:-unix:///var/run/docker.sock}"
+
 # ---- PBE-Key-Vault (wie native Docker) ----
 export JSTRANDS_KEY_PATH="${JSTRANDS_KEY_PATH:-$SCRIPT_DIR/config/api-key.enc}"
 

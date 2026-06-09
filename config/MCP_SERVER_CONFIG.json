@@ -2,7 +2,7 @@
   "mcpServers": {
     "filesystem": {
       "type": "sse",
-      "url": "http://mcp-filesystem:8080/sse"
+      "url": "http://filesystem-mcp:3000/sse"
     }
   }
 }

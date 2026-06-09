@@ -1,6 +1,7 @@
 package de.augmentia.strandsagents.core.config;
 
 import java.util.Map;
+import static de.augmentia.strandsagents.core.config.ConfigReader.*;
 
 public record ChatModelConfig(
     ModelProviderType provider,
@@ -16,12 +17,12 @@ public record ChatModelConfig(
         var provider = ModelProviderType.fromEnv(prefix);
         return new ChatModelConfig(
             provider,
-            envOrProperty(prefix + "API_KEY", null),
-            envOrProperty(prefix + "BASE_URL", null),
-            envOrProperty(prefix + "MODEL", null),
-            parseDoubleOrNull(envOrProperty(prefix + "TEMPERATURE", null)),
-            parseIntOrNull(envOrProperty(prefix + "MAX_RETRIES", null)),
-            envOrProperty(prefix + "OLLAMA_BASE_URL", null)
+            get(prefix + "API_KEY", null),
+            get(prefix + "BASE_URL", null),
+            get(prefix + "MODEL", null),
+            parseDouble(get(prefix + "TEMPERATURE", null)),
+            parseInt(get(prefix + "MAX_RETRIES", null)),
+            get(prefix + "OLLAMA_BASE_URL", null)
         );
     }
 
@@ -30,12 +31,12 @@ public record ChatModelConfig(
         if (!hasAny(prefix)) return fallback;
         return new ChatModelConfig(
             provider,
-            envOrProperty(prefix + "API_KEY", fallback != null ? fallback.apiKey() : null),
-            envOrProperty(prefix + "BASE_URL", fallback != null ? fallback.baseUrl() : null),
-            envOrProperty(prefix + "MODEL", fallback != null ? fallback.modelName() : null),
-            parseDoubleOrNull(envOrProperty(prefix + "TEMPERATURE", fallback != null && fallback.temperature() != null ? fallback.temperature().toString() : null)),
-            parseIntOrNull(envOrProperty(prefix + "MAX_RETRIES", fallback != null && fallback.maxRetries() != null ? fallback.maxRetries().toString() : null)),
-            envOrProperty(prefix + "OLLAMA_BASE_URL", fallback != null ? fallback.ollamaBaseUrl() : null)
+            get(prefix + "API_KEY", fallback != null ? fallback.apiKey() : null),
+            get(prefix + "BASE_URL", fallback != null ? fallback.baseUrl() : null),
+            get(prefix + "MODEL", fallback != null ? fallback.modelName() : null),
+            parseDouble(get(prefix + "TEMPERATURE", fallback != null && fallback.temperature() != null ? fallback.temperature().toString() : null)),
+            parseInt(get(prefix + "MAX_RETRIES", fallback != null && fallback.maxRetries() != null ? fallback.maxRetries().toString() : null)),
+            get(prefix + "OLLAMA_BASE_URL", fallback != null ? fallback.ollamaBaseUrl() : null)
         );
     }
 
@@ -45,8 +46,8 @@ public record ChatModelConfig(
             secrets.getOrDefault("api_key", fallback.apiKey()),
             secrets.getOrDefault("base_url", fallback.baseUrl()),
             secrets.getOrDefault("model", fallback.modelName()),
-            parseDoubleOrNull(secrets.get("temperature")),
-            parseIntOrNull(secrets.get("max_retries")),
+            parseDouble(secrets.get("temperature")),
+            parseInt(secrets.get("max_retries")),
             secrets.getOrDefault("ollama_base_url", fallback.ollamaBaseUrl())
         );
     }
@@ -61,32 +62,5 @@ public record ChatModelConfig(
 
     public LlmConfig toLlmConfig() {
         return new LlmConfig(apiKey, baseUrl, modelName, temperature, maxRetries);
-    }
-
-    private static boolean hasAny(String prefix) {
-        return System.getenv(prefix + "PROVIDER") != null
-            || System.getenv(prefix + "API_KEY") != null
-            || System.getenv(prefix + "BASE_URL") != null
-            || System.getenv(prefix + "MODEL") != null;
-    }
-
-    private static String envOrProperty(String key, String fallback) {
-        var val = System.getProperty("vault." + key);
-        if (val != null && !val.isBlank()) return val;
-        val = System.getenv(key);
-        if (val != null && !val.isBlank()) return val;
-        val = System.getProperty(key);
-        if (val != null && !val.isBlank()) return val;
-        return fallback;
-    }
-
-    private static Double parseDoubleOrNull(String s) {
-        if (s == null || s.isBlank()) return null;
-        try { return Double.parseDouble(s); } catch (NumberFormatException e) { return null; }
-    }
-
-    private static Integer parseIntOrNull(String s) {
-        if (s == null || s.isBlank()) return null;
-        try { return Integer.parseInt(s); } catch (NumberFormatException e) { return null; }
     }
 }

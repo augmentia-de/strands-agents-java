@@ -13,10 +13,31 @@
 # ============================================================
 FROM strands-agent-native:latest AS base
 
+# zlib für das SSM-Extension-Binary
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends zlib1g && \
+    rm -rf /var/lib/apt/lists/*
+
+# AWS Parameters & Secrets Lambda Extension (HTTP auf localhost:2773)
+RUN case "$(uname -m)" in \
+        aarch64) ARCH="-arm64"; ;; \
+        *) ARCH=""; ;; \
+    esac && \
+    apt-get update && apt-get install -y --no-install-recommends curl ca-certificates unzip && \
+    curl -sL "https://aws-parameters-and-secrets-lambda-extension.s3.amazonaws.com/parameters-and-secrets-lambda-extension${ARCH}.zip" \
+        -o /tmp/params-ext.zip && \
+    unzip -o /tmp/params-ext.zip -d /opt/extensions/ && \
+    rm /tmp/params-ext.zip && \
+    apt-get purge -y curl ca-certificates unzip && \
+    apt-get autoremove --purge -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# AWS Lambda Web Adapter (HTTP-konforme Apps auf Lambda)
 COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.0 /lambda-adapter /opt/extensions/lambda-adapter
 
 ENV READINESS_CHECK_PATH=/q/health/live \
     AWS_LAMBDA_EXEC_WRAPPER=/opt/bootstrap \
-    AWS_LWA_PORT=8082
+    AWS_LWA_PORT=8082 \
+    PARAMETERS_SECRETS_EXTENSION_HTTP_PORT=2773
 
 EXPOSE 8082

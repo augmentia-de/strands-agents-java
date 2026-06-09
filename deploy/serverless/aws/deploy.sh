@@ -53,6 +53,7 @@ clean_account_id() {
 
 info()  { echo -e "\033[0;36m[INFO]\033[0m  $*"; }
 ok()    { echo -e "\033[0;32m[OK]\033[0m    $*"; }
+warn()  { echo -e "\033[0;33m[WARN]\033[0m $*"; }
 err()   { echo -e "\033[0;31m[ERROR]\033[0m $*"; }
 
 check_aws() {
@@ -116,14 +117,42 @@ deploy_lambda() {
             --timeout "$TIMEOUT"
         )
         if ! aws lambda create-function "${create_args[@]}" 2>/dev/null; then
-            err "Lambda-Erstellung fehlgeschlagen. IAM-Rolle '${SERVICE_NAME}-role' existiert?"
-            err "Erstelle sie mit:"
-            err "  aws iam create-role --role-name ${SERVICE_NAME}-role \\"
-            err "    --assume-role-policy-document '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}'"
+            err "Lambda-Erstellung fehlgeschlagen"
             exit 1
         fi
         ok "Lambda-Funktion erstellt"
     fi
+}
+
+ensure_ssm_secrets() {
+    local key="${OPENAI_API_KEY:-}"
+    [[ -z "$key" ]] && { warn "OPENAI_API_KEY nicht gesetzt — überspringe SSM"; return; }
+    aws ssm put-parameter \
+        --name "/${SERVICE_NAME}/openai-api-key" \
+        --value "$key" --type SecureString --overwrite \
+        --region "$AWS_REGION" &>/dev/null
+    ok "OPENAI_API_KEY in SSM Parameter Store gesichert"
+}
+
+ensure_lambda_role() {
+    local role_name="${SERVICE_NAME}-role"
+    if aws iam get-role --role-name "$role_name" &>/dev/null; then
+        ok "IAM-Rolle '$role_name' existiert"
+        return
+    fi
+    info "Erstelle IAM-Rolle '$role_name' …"
+    aws iam create-role --role-name "$role_name" \
+        --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}' &>/dev/null
+    aws iam attach-role-policy --role-name "$role_name" \
+        --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole &>/dev/null
+    local policy_arn="arn:aws:iam::$AWS_ACCOUNT_ID:policy/${SERVICE_NAME}-ssm-read"
+    if ! aws iam get-policy --policy-arn "$policy_arn" &>/dev/null; then
+        aws iam create-policy --policy-name "${SERVICE_NAME}-ssm-read" \
+            --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"ssm:GetParameter","Resource":"arn:aws:ssm:*:*:parameter/'"${SERVICE_NAME}"'/*"}]}' &>/dev/null
+    fi
+    aws iam attach-role-policy --role-name "$role_name" \
+        --policy-arn "$policy_arn" &>/dev/null
+    ok "IAM-Rolle '$role_name' erstellt mit SSM-Leseberechtigung"
 }
 
 set_env_vars() {
@@ -132,6 +161,9 @@ set_env_vars() {
         "OPENAI_BASE_URL=${OPENAI_BASE_URL:-}"
         "OPENAI_MODEL=${OPENAI_MODEL:-}"
         "OPENAI_API_KEY=${OPENAI_API_KEY:-}"
+        "STRANDS_SESSION_DIR=/tmp/.sessions"
+        "STRANDS_SECRET_CLOUD_PROVIDER=aws"
+        "STRANDS_SECRET_AWS_SSM_PATH=/${SERVICE_NAME}/openai-api-key"
     )
     if [[ -n "$ENV_FILE" && -f "$ENV_FILE" ]]; then
         while IFS='=' read -r key value; do
@@ -162,44 +194,46 @@ set_env_vars() {
 create_api_gateway() {
     local api_name="${SERVICE_NAME}-api"
     local api_id
-    api_id=$(aws apigateway create-rest-api \
-        --name "$api_name" \
-        --region "$AWS_REGION" \
-        --query 'id' --output text 2>/dev/null || true)
+    api_id=$(aws apigateway get-rest-apis --region "$AWS_REGION" \
+        --query "items[?name=='${api_name}'].id" --output text 2>/dev/null || true)
     if [[ -z "$api_id" ]]; then
-        info "API Gateway '$api_name' existiert bereits oder Fehler"
-        return
+        info "Erstelle API Gateway '$api_name' …"
+        api_id=$(aws apigateway create-rest-api \
+            --name "$api_name" --region "$AWS_REGION" \
+            --query 'id' --output text)
+        [[ -z "$api_id" ]] && { err "API Gateway Erstellung fehlgeschlagen"; return; }
+        ok "API Gateway erstellt (ID: $api_id)"
+    else
+        info "API Gateway '$api_name' existiert bereits (ID: $api_id)"
     fi
     local root_id
     root_id=$(aws apigateway get-resources --rest-api-id "$api_id" \
         --region "$AWS_REGION" --query 'items[0].id' --output text)
     local proxy_id
-    proxy_id=$(aws apigateway create-resource \
-        --rest-api-id "$api_id" \
-        --parent-id "$root_id" \
-        --path-part "{proxy+}" \
+    proxy_id=$(aws apigateway get-resources --rest-api-id "$api_id" \
         --region "$AWS_REGION" \
-        --query 'id' --output text)
+        --query "items[?pathPart=='{proxy+}'].id" --output text 2>/dev/null || true)
+    if [[ -z "$proxy_id" ]]; then
+        proxy_id=$(aws apigateway create-resource \
+            --rest-api-id "$api_id" --parent-id "$root_id" \
+            --path-part "{proxy+}" --region "$AWS_REGION" \
+            --query 'id' --output text)
+    fi
     local function_arn="arn:aws:lambda:$AWS_REGION:$AWS_ACCOUNT_ID:function:$SERVICE_NAME"
     for resource_id in "$root_id" "$proxy_id"; do
         aws apigateway put-method \
-            --rest-api-id "$api_id" \
-            --resource-id "$resource_id" \
-            --http-method ANY \
-            --authorization-type NONE \
+            --rest-api-id "$api_id" --resource-id "$resource_id" \
+            --http-method ANY --authorization-type NONE \
             --region "$AWS_REGION" &>/dev/null || true
         aws apigateway put-integration \
-            --rest-api-id "$api_id" \
-            --resource-id "$resource_id" \
-            --http-method ANY \
-            --type AWS_PROXY \
+            --rest-api-id "$api_id" --resource-id "$resource_id" \
+            --http-method ANY --type AWS_PROXY \
             --integration-http-method POST \
             --uri "arn:aws:apigateway:$AWS_REGION:lambda:path/2015-03-31/functions/$function_arn/invocations" \
             --region "$AWS_REGION" &>/dev/null || true
     done
     aws apigateway create-deployment \
-        --rest-api-id "$api_id" \
-        --stage-name prod \
+        --rest-api-id "$api_id" --stage-name prod \
         --region "$AWS_REGION" &>/dev/null || true
     aws lambda add-permission \
         --function-name "$SERVICE_NAME" \
@@ -209,7 +243,7 @@ create_api_gateway() {
         --source-arn "arn:aws:execute-api:$AWS_REGION:$AWS_ACCOUNT_ID:$api_id/*/*" \
         --region "$AWS_REGION" &>/dev/null || true
     local api_url="https://${api_id}.execute-api.${AWS_REGION}.amazonaws.com/prod"
-    ok "API Gateway erstellt: $api_url"
+    ok "API Gateway URL: $api_url"
 }
 
 # ── Main ────────────────────────────────────────────────────
@@ -223,6 +257,8 @@ fi
 clean_account_id
 ecr_login
 ensure_ecr
+ensure_lambda_role
+ensure_ssm_secrets
 build_and_push
 deploy_lambda
 set_env_vars

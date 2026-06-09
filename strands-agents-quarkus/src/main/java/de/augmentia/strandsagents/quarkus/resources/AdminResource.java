@@ -52,6 +52,7 @@ public class AdminResource {
         try {
             var apiKey = ApiKeyVault.load(password);
             agentService.activateModel(apiKey);
+            System.setProperty("vault.OPENAI_API_KEY", apiKey);
             return Response.ok(Map.of("status", "ok")).build();
         } catch (AEADBadTagException e) {
             return Response.status(401).entity(Map.of("error", "Falsches Passwort")).build();

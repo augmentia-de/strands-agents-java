@@ -9,11 +9,15 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.Map;
 import javax.crypto.AEADBadTagException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Path("/api/vault")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class KeyVaultResource {
+
+    private static final Logger log = LoggerFactory.getLogger(KeyVaultResource.class);
 
     @Inject
     KeyVaultHolder vaultHolder;
@@ -97,16 +101,25 @@ public class KeyVaultResource {
         try {
             var entries = ApiKeyVault.loadMap(password);
             int count = 0;
+            log.info("Vault reload: {} entries loaded from vault", entries.size());
             for (var entry : entries.entrySet()) {
-                System.setProperty("vault." + entry.getKey(), entry.getValue());
+                var key = entry.getKey();
+                var val = entry.getValue();
+                log.info("Vault reload: setting vault.{} = {}", key, mask(val));
+                System.setProperty("vault." + key, val);
                 count++;
             }
             vaultHolder.setEntries(entries);
             if (entries.containsKey("OPENAI_API_KEY")) {
                 var apiKey = entries.get("OPENAI_API_KEY");
                 if (apiKey != null && !apiKey.isBlank()) {
+                    log.info("Vault reload: OPENAI_API_KEY found, calling activateModel");
                     agentService.activateModel(apiKey);
+                } else {
+                    log.warn("Vault reload: OPENAI_API_KEY present but blank");
                 }
+            } else {
+                log.warn("Vault reload: no OPENAI_API_KEY in vault entries (keys: {})", entries.keySet());
             }
             return Response.ok(Map.of("status", "ok", "applied", count)).build();
         } catch (AEADBadTagException e) {
@@ -114,5 +127,11 @@ public class KeyVaultResource {
         } catch (Exception e) {
             return Response.status(500).entity(Map.of("error", e.getMessage())).build();
         }
+    }
+
+    private static String mask(String s) {
+        if (s == null) return null;
+        if (s.length() <= 8) return s;
+        return s.substring(0, 8) + "...";
     }
 }

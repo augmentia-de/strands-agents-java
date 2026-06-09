@@ -1,8 +1,8 @@
 services:
 
-  mcp-filesystem:
+  filesystem-mcp:
     image: node:22-slim
-    container_name: mcp-filesystem
+    container_name: filesystem-mcp
     ports:
       - "3000:8080"
     working_dir: /workspace
@@ -27,19 +27,21 @@ services:
     restart: unless-stopped
 
   strands-agent:
-    image: strands-agents-quarkus:latest
+    image: strands-agent:latest
     container_name: strands-agent
     depends_on:
-      mcp-filesystem:
+      filesystem-mcp:
         condition: service_healthy
     ports:
       - "8082:8082"
+    env_file:
+      - .env
     environment:
+      - STRANDS_SKILLS_DIR=/work/skills
+      - STRANDS_AGENT_TOOLS=de.augmentia.strandsagents.core.tools.CalculatorTool
+      - JSTRANDS_KEY_PATH=/work/config/api-key.enc
       - STRANDS_AGENT_MCP_CONFIG=/work/config/MCP_SERVER_CONFIG.json
       - STRANDS_AGENT_WORKSPACE=/work/workspace
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
-      - OPENAI_MODEL=${OPENAI_MODEL}
     volumes:
       - ./config:/work/config
       - ./.sessions:/work/.sessions

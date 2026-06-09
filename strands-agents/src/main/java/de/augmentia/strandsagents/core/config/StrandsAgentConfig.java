@@ -60,13 +60,23 @@ public record StrandsAgentConfig(
     }
 
     public static StrandsAgentConfig fromMixed() {
-        var props = new Properties();
-        System.getProperties().forEach((k, v) -> {
-            if (k instanceof String key && v instanceof String val) {
-                props.setProperty(key, val);
-            }
-        });
-        return fromProperties(props);
+        var cfg = fromEnv();
+        return new StrandsAgentConfig(
+            System.getProperty("strands.agent.skills.dir", cfg.skillsDir()),
+            System.getProperty("strands.agent.session.dir", cfg.sessionDir()),
+            Boolean.parseBoolean(System.getProperty("strands.agent.llm-log.enabled", String.valueOf(cfg.llmLogEnabled()))),
+            System.getProperty("strands.agent.llm-log.path", cfg.llmLogPath()),
+            cfg.initialSkills(),
+            Boolean.parseBoolean(System.getProperty("strands.agent.skills.search", String.valueOf(cfg.skillSearchEnabled()))),
+            Boolean.parseBoolean(System.getProperty("strands.agent.mcp.ingest", String.valueOf(cfg.mcpIngestEnabled()))),
+            System.getProperty("strands.agent.mcp.config", cfg.mcpConfigPath()),
+            System.getProperty("strands.agent.workspace", cfg.workspace()),
+            Boolean.parseBoolean(System.getProperty("strands.agent.bash.allow", String.valueOf(cfg.bashAllowed()))),
+            !Boolean.parseBoolean(System.getProperty("strands.agent.http.allow-private", String.valueOf(!cfg.httpAllowPrivate()))),
+            System.getProperty("strands.agent.tools", cfg.extraTools()),
+            System.getProperty("strands.agent.hitl.tools", cfg.hitlTools()),
+            System.getProperty("strands.hitl.email.recipient", cfg.hitlEmailRecipient())
+        );
     }
 
     public Path resolvedWorkspace() {

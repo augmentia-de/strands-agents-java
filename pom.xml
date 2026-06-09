@@ -38,7 +38,7 @@
         <module>strands-agents</module>
         <module>strands-agents-quarkus</module>
         <module>strands-agents-examples</module>
-        <module>strands-agents-spring</module>
+        <!--module>strands-agents-spring</module-->
     </modules>
 
     <properties>

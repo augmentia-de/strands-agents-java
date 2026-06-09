@@ -43,27 +43,151 @@ What is **not implemented at all**:
 
 ## Prerequisites
 
-- Java 21 (JDK) with `--enable-preview`
-- Maven 3.9+
-- Optional: OpenAI-compatible API key (`OPENAI_API_KEY`, `SIMPLE_API_KEY`, or via Vault)
+| Dependency | Version | Required for |
+|------------|---------|-------------|
+| **Java JDK** | 21+ (with `--enable-preview`) | Local dev, Quarkus/Spring modes |
+| **Maven** | 3.9+ | Building from source |
+| **Docker** | 24+ | Container builds, deployments, Quarkus dev mode (Testcontainers) |
+| **Docker Compose** | v2 | Local deployment (`deploy.sh --jvm` / `--native`) |
+| **gcloud CLI** | latest | GCP VM deployment (`deploy.sh --gcp`) |
+| **OpenAI-compatible API key** | — | LLM access (stored in PBE vault, never in `.env`) |
 
 ---
 
 ## Quick Start
 
+### 1. Core SDK (no API key needed)
+
 ```bash
-# Build project and run tests
-./dev.sh test
+# Build and run tests
+./scripts/dev.sh build
+./scripts/dev.sh test
 
-# With a real LLM:
-export OPENAI_API_KEY=sk-...
-mvn test -pl strands-agents -Dtest=AgentMvpIT
+# Run demo with mock LLM
+./scripts/dev.sh run-mock
 
-# Run the mock demo (no API key needed)
-./dev.sh run-mock
+# Interactive chat REPL (mock)
+./scripts/dev.sh chat --mock
+```
+
+### 2. Quarkus REST API (local dev, hot reload)
+
+```bash
+# Start dev server on http://localhost:8082
+./scripts/start-quarkus.sh dev
+```
+
+Opens a Swagger UI at `/q/swagger-ui` and a key-vault UI at `/keys`.
+
+### 3. Docker deployment (JVM)
+
+```bash
+./scripts/build.sh          # Build JVM image → strands-agent:latest
+./scripts/deploy.sh --jvm   # Start containers on port 8082
+```
+
+### 4. Docker deployment (Native)
+
+```bash
+./scripts/build.sh --native       # Build native image (GraalVM, ~5 min)
+./scripts/deploy.sh --native      # Start native container on port 8082
 ```
 
 ---
+
+## Startup Scripts
+
+All scripts live in `scripts/` and share a common pattern: `--help` for usage, auto‑source `set_keys.sh` for PBE vault keys.
+
+### `scripts/dev.sh` — Core SDK development
+
+Build, test, and run demos from `strands-agents-examples`. No Docker required.
+
+| Command | Description |
+|---------|-------------|
+| `./scripts/dev.sh build` | `mvn clean compile` |
+| `./scripts/dev.sh test` | Run unit tests |
+| `./scripts/dev.sh run` | Run `Main` demo (requires LLM key via PBE vault) |
+| `./scripts/dev.sh run-mock` | Run `MainMock` demo (no key needed) |
+| `./scripts/dev.sh chat` | Interactive CLI chat (real LLM) |
+| `./scripts/dev.sh chat --mock` | Interactive CLI chat (mock) |
+
+**Requirements:** Java 21, Maven
+
+### `scripts/start-quarkus.sh` — Quarkus REST API
+
+Starts the `strands-agents-quarkus` module (REST API, SSE streaming, Swagger UI).
+
+| Command | Description |
+|---------|-------------|
+| `./scripts/start-quarkus.sh dev` | Quarkus Dev Mode with hot reload (default) |
+| `./scripts/start-quarkus.sh prod` | Production build + `java -jar` |
+| `./scripts/start-quarkus.sh build-only` | Build JAR without starting |
+
+- Port: **8082**
+- API key loaded from **PBE vault** (`config/api-key.enc`), env var `OPENAI_API_KEY` is **unset** for security
+- Key management UI at `/keys`
+- Swagger UI at `/q/swagger-ui`
+
+**Requirements:** Java 21, Maven, Docker (for Testcontainers in dev mode)
+
+### `scripts/start-spring.sh` — Spring Boot variant
+
+Starts the `strands-agents-spring` module (alternative Spring Boot frontend).
+
+| Command | Description |
+|---------|-------------|
+| `./scripts/start-spring.sh dev` | Spring Boot dev mode (port 8081) |
+| `./scripts/start-spring.sh dev-ui` | Spring Boot (background) + Vite dev server (foreground) |
+| `./scripts/start-spring.sh prod` | Production build + `java -jar` |
+| `./scripts/start-spring.sh build-only` | Build JAR without starting |
+
+**Requirements:** Java 21, Maven
+
+### `scripts/build.sh` — Docker image builder
+
+Builds Docker images for JVM, Native (GraalVM), or Lambda deployment.
+
+| Command | Image | Dockerfile |
+|---------|-------|------------|
+| `./scripts/build.sh` | `strands-agent:latest` (JVM) | `Dockerfile.jvm` |
+| `./scripts/build.sh --native` | `strands-agent:latest` (native) | `Dockerfile.native` |
+| `./scripts/build.sh --lambda` | `strands-agent:latest` (native + Lambda adapter) | `Dockerfile.native` + `Dockerfile.lambda` |
+| `./scripts/build.sh --tag v1.0` | Custom tag | — |
+| `./scripts/build.sh --push gcr.io/my-proj/agent` | Build + push to registry | — |
+
+- Native build uses **GraalVM/Mandrel** via Docker multi-stage (~5 min build time)
+- No JDK/Maven needed on host — all build tools run inside Docker
+
+**Requirements:** Docker
+
+### `scripts/deploy.sh` — Unified deployment
+
+Deploys locally via Docker Compose or to a GCP Compute Engine VM.
+
+| Command | Description |
+|---------|-------------|
+| `./scripts/deploy.sh` or `--jvm` | `docker compose -f docker/docker-compose.yml up -d` |
+| `./scripts/deploy.sh --native` | `docker compose -f docker/docker-compose.native.yml up -d` |
+| `./scripts/deploy.sh --gcp` | Transfer image + config to GCP VM, restart |
+
+All modes:
+- Generate `.env` template if missing (non-secret config only — API key goes in PBE vault)
+- Create required directories (`config`, `.sessions`, `logs`, `workspace`)
+- Set POSIX permissions for container UID 1001
+- Check that the required Docker image exists before deploying
+
+**Requirements:** Docker, Docker Compose (+ `gcloud` CLI for `--gcp`)
+
+### `scripts/start-main.sh` — Single demo launcher
+
+Runs `SelfImprovementDemo` from `strands-agents-examples`:
+
+```bash
+./scripts/start-main.sh
+```
+
+**Requirements:** Java 21, Maven
 
 ## Usage Examples
 
@@ -128,9 +252,8 @@ AgentResult result = agent.execute("List files in the current directory.");
 The `strands-agents-quarkus` module provides a full REST API for the agent.
 
 ```bash
-# Start the Quarkus dev server
-./start-quarkus.sh
-# Server starts on http://localhost:8082
+# Start the Quarkus dev server on http://localhost:8082
+./scripts/start-quarkus.sh dev
 ```
 
 **Available endpoints:**

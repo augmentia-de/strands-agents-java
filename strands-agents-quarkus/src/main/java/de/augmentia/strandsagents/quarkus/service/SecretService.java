@@ -1,5 +1,7 @@
 package de.augmentia.strandsagents.quarkus.service;
 
+import de.augmentia.strandsagents.core.secret.SecretProvider;
+import de.augmentia.strandsagents.core.secret.cloud.CloudSecretProviderFactory;
 import de.augmentia.strandsagents.vault.VaultConfig;
 import de.augmentia.strandsagents.vault.VaultSecretProvider;
 import jakarta.annotation.PostConstruct;
@@ -14,6 +16,7 @@ public class SecretService {
 
     private volatile String runtimeApiKey;
     private VaultSecretProvider vault;
+    private SecretProvider cloudProvider;
 
     @PostConstruct
     void init() {
@@ -30,6 +33,19 @@ public class SecretService {
         } else {
             log.info("VAULT_ADDR/VAULT_TOKEN not set – using env vars only");
         }
+
+        var cloudProviderType = getConfig("STRANDS_SECRET_CLOUD_PROVIDER");
+        if (cloudProviderType != null) {
+            cloudProvider = CloudSecretProviderFactory.create(
+                cloudProviderType,
+                getConfig("STRANDS_SECRET_AWS_SSM_PATH"),
+                getConfig("STRANDS_SECRET_GCP_PROJECT_ID"),
+                getConfig("STRANDS_SECRET_GCP_SECRET_ID")
+            );
+            log.info("CloudSecretProvider: type={} active={}", cloudProviderType, cloudProvider != null);
+        } else {
+            log.info("STRANDS_SECRET_CLOUD_PROVIDER not set – no cloud secret provider");
+        }
     }
 
     public void setRuntimeApiKey(String key) {
@@ -45,15 +61,35 @@ public class SecretService {
     }
 
     public String getOpenAiApiKey() {
-        if (runtimeApiKey != null) return runtimeApiKey;
+        if (runtimeApiKey != null) {
+            log.info("getOpenAiApiKey → runtimeApiKey ({})", mask(runtimeApiKey));
+            return runtimeApiKey;
+        }
         if (vault != null) {
             try {
-                return vault.getSecret("openai", "api_key");
+                var val = vault.getSecret("openai", "api_key");
+                if (val != null) {
+                    log.info("getOpenAiApiKey → vault ({})", mask(val));
+                    return val;
+                }
             } catch (Exception e) {
                 log.debug("Vault openai/api_key nicht gefunden: {}", e.getMessage());
             }
         }
-        return System.getenv("OPENAI_API_KEY");
+        if (cloudProvider != null) {
+            try {
+                var val = cloudProvider.getSecret("openai", "api_key");
+                if (val != null) {
+                    log.info("getOpenAiApiKey → cloudSecretProvider ({})", mask(val));
+                    return val;
+                }
+            } catch (Exception e) {
+                log.debug("Cloud secret provider failed: {}", e.getMessage());
+            }
+        }
+        var envVal = System.getenv("OPENAI_API_KEY");
+        log.info("getOpenAiApiKey → env.OPENAI_API_KEY = {}", mask(envVal));
+        return envVal;
     }
 
     public String getTavilyApiKey() {
@@ -80,5 +116,19 @@ public class SecretService {
 
     public boolean isVaultEnabled() {
         return vault != null;
+    }
+
+    private static String getConfig(String key) {
+        var val = System.getenv(key);
+        if (val != null && !val.isBlank()) return val;
+        val = System.getProperty(key);
+        if (val != null && !val.isBlank()) return val;
+        return null;
+    }
+
+    private static String mask(String s) {
+        if (s == null) return null;
+        if (s.length() <= 8) return s;
+        return s.substring(0, 8) + "...";
     }
 }

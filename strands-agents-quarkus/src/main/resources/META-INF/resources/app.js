@@ -225,7 +225,7 @@ function showApiKeyError(msg) {
 
 async function checkApiKeyStatus() {
   try {
-    var resp = await fetch('/api/admin/status');
+    var resp = await fetch('api/admin/status');
     if (!resp.ok) return false;
     var data = await resp.json();
     renderApiKeyState(data.stored, data.active);
@@ -239,7 +239,7 @@ async function setupApiKey() {
   if (!apiKey || !password) { showApiKeyError('API Key and password required'); return; }
   showApiKeyError('');
   try {
-    var resp = await fetch('/api/admin/setup', {
+    var resp = await fetch('api/admin/setup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ apiKey: apiKey, password: password })
@@ -259,7 +259,7 @@ async function activate() {
   if (!password) { showApiKeyError('Password required'); return; }
   showApiKeyError('');
   try {
-    var resp = await fetch('/api/admin/activate', {
+    var resp = await fetch('api/admin/activate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password: password })
@@ -276,7 +276,7 @@ async function activate() {
 async function deactivate() {
   showApiKeyError('');
   try {
-    var resp = await fetch('/api/admin/deactivate', { method: 'POST' });
+    var resp = await fetch('api/admin/deactivate', { method: 'POST' });
     if (!resp.ok) return;
     renderApiKeyState(true, false);
   } catch (err) {
@@ -314,7 +314,7 @@ function mcpToolCheckboxHtml(name, description) {
 
 async function fetchMcpServers() {
   try {
-    var resp = await fetch('/api/mcp/servers');
+    var resp = await fetch('api/mcp/servers');
     if (!resp.ok) return;
     state.mcpServers = await resp.json();
     renderMcpServers();
@@ -371,7 +371,7 @@ async function toggleMcpServer(serverName, checked) {
   var toolsDiv = document.getElementById('mcp-tools-' + serverName.replace(/[^a-zA-Z0-9_-]/g, '_'));
   if (toolsDiv) toolsDiv.innerHTML = '<p class="status-pending" style="font-size:12px">\u23f3 Loading tools...</p>';
   try {
-    var resp = await fetch('/api/mcp/discover', {
+    var resp = await fetch('api/mcp/discover', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ server: serverName })
@@ -397,7 +397,7 @@ async function connectMcpServer() {
   statusEl.className = 'status-pending';
   try {
     var customName = 'custom_' + url.replace(/[^a-zA-Z0-9]/g, '_');
-    var resp = await fetch('/api/mcp/connect', {
+    var resp = await fetch('api/mcp/connect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: url, name: customName })
@@ -438,7 +438,7 @@ function updateMcpTools() {
 /* ── Sessions ── */
 async function loadSessions() {
   try {
-    var resp = await fetch('/api/sessions');
+    var resp = await fetch('api/sessions');
     if (!resp.ok) return;
     var sessions = await resp.json();
     renderSessions(sessions);
@@ -484,7 +484,7 @@ async function switchSession(sid) {
 
 async function deleteSession(sid) {
   try {
-    await fetch('/api/sessions/' + encodeURIComponent(sid), { method: 'DELETE' });
+    await fetch('api/sessions/' + encodeURIComponent(sid), { method: 'DELETE' });
     if (state.sessionId === sid) {
       newSession();
     }
@@ -494,7 +494,7 @@ async function deleteSession(sid) {
 
 /* ── Agent Init ── */
 function newSession() {
-  fetch('/api/agent/release', {
+  fetch('api/agent/release', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionId: state.sessionId })
@@ -547,7 +547,7 @@ async function initAgent() {
   addMessage('system', 'Initializing agent with current Tools/Skills/MCP Tools...');
 
   try {
-    var resp = await fetch('/api/agent/init', {
+    var resp = await fetch('api/agent/init', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(buildInitBody())
@@ -594,7 +594,7 @@ async function reinitAgent() {
   try {
     var body = buildInitBody();
     body.sessionId = state.sessionId;
-    var resp = await fetch('/api/agent/reinit', {
+    var resp = await fetch('api/agent/reinit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -644,7 +644,7 @@ async function sendMessage() {
   cancelBtn.style.display = '';
 
   try {
-    var resp = await fetch('/api/chat/stream', {
+    var resp = await fetch('api/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -780,7 +780,7 @@ function cancelMessage() {
     ac.abort();
   }
   // Also tell backend to cancel the LLM call
-  fetch('/api/chat/cancel', {
+  fetch('api/chat/cancel', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionId: state.sessionId })

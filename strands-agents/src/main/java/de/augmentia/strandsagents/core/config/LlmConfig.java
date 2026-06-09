@@ -1,6 +1,7 @@
 package de.augmentia.strandsagents.core.config;
 
 import de.augmentia.strandsagents.core.secret.SecretProvider;
+import static de.augmentia.strandsagents.core.config.ConfigReader.*;
 
 public record LlmConfig(
     String apiKey,
@@ -12,11 +13,11 @@ public record LlmConfig(
 
     public static LlmConfig fromEnv() {
         return new LlmConfig(
-            envOrProperty("OPENAI_API_KEY"),
-            envOrProperty("OPENAI_BASE_URL"),
-            envOrProperty("OPENAI_MODEL"),
-            parseDoubleOrNull(envOrProperty("LLM_TEMPERATURE")),
-            parseIntOrNull(envOrProperty("LLM_MAX_RETRIES"))
+            get("OPENAI_API_KEY"),
+            get("OPENAI_BASE_URL"),
+            get("OPENAI_MODEL"),
+            parseDouble(get("LLM_TEMPERATURE")),
+            parseInt(get("LLM_MAX_RETRIES"))
         );
     }
 
@@ -35,28 +36,10 @@ public record LlmConfig(
         var secrets = vault.getSecrets(path);
         return new LlmConfig(
             secrets.get("api_key"),
-            secrets.getOrDefault("base_url", envOrProperty("OPENAI_BASE_URL")),
-            secrets.getOrDefault("model", envOrProperty("OPENAI_MODEL")),
-            parseDoubleOrNull(secrets.get("temperature")),
-            parseIntOrNull(secrets.get("max_retries"))
+            secrets.getOrDefault("base_url", get("OPENAI_BASE_URL")),
+            secrets.getOrDefault("model", get("OPENAI_MODEL")),
+            parseDouble(secrets.get("temperature")),
+            parseInt(secrets.get("max_retries"))
         );
-    }
-
-    private static String envOrProperty(String key) {
-        var val = System.getProperty("vault." + key);
-        if (val != null && !val.isBlank()) return val;
-        val = System.getenv(key);
-        if (val != null && !val.isBlank()) return val;
-        return System.getProperty(key);
-    }
-
-    private static Double parseDoubleOrNull(String s) {
-        if (s == null || s.isBlank()) return null;
-        try { return Double.parseDouble(s); } catch (NumberFormatException e) { return null; }
-    }
-
-    private static Integer parseIntOrNull(String s) {
-        if (s == null || s.isBlank()) return null;
-        try { return Integer.parseInt(s); } catch (NumberFormatException e) { return null; }
     }
 }

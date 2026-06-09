@@ -798,10 +798,11 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
     }
 
     public synchronized void activateModel(String apiKey) {
+        log.info("activateModel: setRuntimeApiKey ({})", mask(apiKey));
         secretService.setRuntimeApiKey(apiKey);
         ensureInitialized();
         this.model = createModel();
-        log.info("API-Key aktiviert – Model neu erstellt");
+        log.info("activateModel: done – model is Mock: {}", this.model instanceof MockChatModel);
     }
 
     public synchronized void deactivateModel() {
@@ -812,23 +813,28 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
     }
 
     private ChatModel createModel() {
-        // Try multi-provider tiered config first
         var tieredConfig = injectApiKeys(TieredModelConfig.fromEnv());
-        if (!isDefaultOpenAiFallback(tieredConfig.simple())) {
+        var simple = tieredConfig.simple();
+        log.info("createModel: simple tier: provider={} apiKey={} model={} baseUrl={}",
+            simple.provider(), mask(simple.apiKey()), simple.modelName(), simple.baseUrl());
+        var isDefault = isDefaultOpenAiFallback(simple);
+        log.info("createModel: isDefaultOpenAiFallback={}", isDefault);
+        if (!isDefault) {
+            log.info("createModel: using tiered config path");
             return ModelFactory.createChatModel(ModelTier.SIMPLE, tieredConfig);
         }
-        // Fallback to classic OpenAI + vault
+        log.info("createModel: fallback to secretService.getOpenAiApiKey()");
         try {
             var apiKey = secretService.getOpenAiApiKey();
+            log.info("createModel: secretService.getOpenAiApiKey() = {}", mask(apiKey));
             if (apiKey != null && !apiKey.isBlank()) {
                 return ModelFactory.createOpenAiFromEnv(apiKey);
             }
         } catch (Exception e) {
-            log.debug("Model creation via secret service failed: {}", e.getMessage());
+            log.warn("createModel: secret service fallback failed: {}", e.getMessage());
         }
-        var mock = new MockChatModel();
-        log.warn("OPENAI_API_KEY nicht gesetzt – nutze MockChatModel");
-        return mock;
+        log.warn("createModel: no API key found – using MockChatModel");
+        return new MockChatModel();
     }
 
     private dev.langchain4j.model.chat.StreamingChatModel findStreamingModel() {
@@ -851,23 +857,30 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
     private TieredModelConfig injectApiKeys(TieredModelConfig config) {
         var simple = config.simple();
         var advanced = config.advanced();
+        log.info("injectApiKeys: simple.apiKey={} advanced.apiKey={}",
+            mask(simple.apiKey()), mask(advanced.apiKey()));
         if (simple.apiKey() != null && advanced.apiKey() != null) return config;
 
         var fallbackKey = secretService.getOpenAiApiKey();
+        log.info("injectApiKeys: fallbackKey={}", mask(fallbackKey));
         if (fallbackKey == null || fallbackKey.isBlank()) return config;
 
         var newSimple = simple.apiKey() != null ? simple : simple.withApiKey(fallbackKey);
         var newAdvanced = advanced.apiKey() != null ? advanced : advanced.withApiKey(fallbackKey);
         if (newSimple == simple && newAdvanced == advanced) return config;
+        log.info("injectApiKeys: injected key into simple={} advanced={}",
+            newSimple != simple, newAdvanced != advanced);
         return new TieredModelConfig(newSimple, newAdvanced, config.defaultTier());
     }
 
     private static boolean isDefaultOpenAiFallback(ChatModelConfig config) {
-        // Check if config is the default OpenAI fallback (no provider/model explicitly set)
-        return config.provider() == ModelProviderType.OPENAI
+        var result = config.provider() == ModelProviderType.OPENAI
             && config.modelName() == null
             && config.apiKey() == null
             && config.baseUrl() == null;
+        log.info("isDefaultOpenAiFallback: provider={} model={} apiKey={} baseUrl={} → {}",
+            config.provider(), config.modelName(), mask(config.apiKey()), config.baseUrl(), result);
+        return result;
     }
 
     private ChatModel wrapModel(ChatModel m) {
@@ -936,5 +949,11 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
         try {
             Files.createDirectories(logDir);
         } catch (Exception ignored) {}
+    }
+
+    static String mask(String s) {
+        if (s == null) return null;
+        if (s.length() <= 8) return s;
+        return s.substring(0, 8) + "...";
     }
 }
