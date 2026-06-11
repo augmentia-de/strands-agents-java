@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.model.agent.StopReason;
-import de.augmentia.strandsagents.core.tools.AgentTool;
-import de.augmentia.strandsagents.core.tools.ToolResult;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.model.agent.StopReason;
+import de.augmentia.strandsagents.features.tools.AgentTool;
+import de.augmentia.strandsagents.features.tools.ToolResult;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;

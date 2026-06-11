@@ -1,0 +1,22 @@
+# Feature toggles for Strands Agents.
+# Default state for each feature. Overridable via environment variables
+# (STRANDS_FEATURE_<NAME>) or system properties (strands.feature.<name>).
+features:
+  bash:
+    enabled: false
+    description: "Allow bash command execution"
+  mcp_ingest:
+    enabled: false
+    description: "Enable MCP server ingestion"
+  skill_search:
+    enabled: false
+    description: "Enable skill search capability"
+  http_allow_private:
+    enabled: false
+    description: "Allow HTTP requests to private IPs"
+  llm_logging:
+    enabled: true
+    description: "Enable LLM call logging"
+  hitl:
+    enabled: false
+    description: "Enable human-in-the-loop checkpointing"

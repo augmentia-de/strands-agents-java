@@ -1,8 +1,8 @@
 package de.augmentia.strandsagents.examples.tools;
 
-import de.augmentia.strandsagents.core.hook.AgentHook;
-import de.augmentia.strandsagents.core.hook.HookContexts;
-import de.augmentia.strandsagents.core.hook.HookResult;
+import de.augmentia.strandsagents.features.pipeline.AgentHook;
+import de.augmentia.strandsagents.features.pipeline.HookContexts;
+import de.augmentia.strandsagents.features.pipeline.HookResult;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class RandomTimeoutHook implements AgentHook {

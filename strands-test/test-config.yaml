@@ -8,8 +8,7 @@ model:
   responseTemplate: "Mock-Antwort: %s"
 tools:
   preset: "minimal"
-  additional:
-  - "de.augmentia.strandsagents.core.tools.CalculatorTool"
+  additional: []
   include: null
   exclude: null
 conversation: null

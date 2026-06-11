@@ -2,16 +2,16 @@ package de.augmentia.strandsagents.examples.domain;
 
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.core.agent.StreamingAgent;
-import de.augmentia.strandsagents.core.config.ModelFactory;
-import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.core.model.agent.AgentResult;
-import de.augmentia.strandsagents.core.model.agent.AgentState;
-import de.augmentia.strandsagents.core.model.agent.AgentStatus;
-import de.augmentia.strandsagents.core.model.agent.StopReason;
-import de.augmentia.strandsagents.core.model.session.Session;
-import de.augmentia.strandsagents.sessions.FileSessionManager;
-import de.augmentia.strandsagents.sessions.SessionManager;
+import de.augmentia.strandsagents.core.StreamingAgent;
+import de.augmentia.strandsagents.config.ModelFactory;
+import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.model.agent.AgentResult;
+import de.augmentia.strandsagents.model.agent.AgentState;
+import de.augmentia.strandsagents.model.agent.AgentStatus;
+import de.augmentia.strandsagents.model.agent.StopReason;
+import de.augmentia.strandsagents.model.session.Session;
+import de.augmentia.strandsagents.features.sessions.FileSessionManager;
+import de.augmentia.strandsagents.features.sessions.SessionManager;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import org.slf4j.Logger;
@@ -58,10 +58,10 @@ public class SDLCWorkflowDemo {
         logger.info("StreamingAgent initialized for session: {}", sessionId);
 
         this.agent.addEventListener(event -> {
-            if (event instanceof de.augmentia.strandsagents.core.model.event.ToolExecutionStartedEvent startEvent) {
+            if (event instanceof de.augmentia.strandsagents.model.event.ToolExecutionStartedEvent startEvent) {
                 var tc = startEvent.toolCall();
                 System.out.printf("\n🛠️  [Tool-Aufruf] Tool '%s' wird gestartet mit Parametern: %s\n", tc.toolName(), tc.arguments());
-            } else if (event instanceof de.augmentia.strandsagents.core.model.event.ToolExecutionFinishedEvent finishEvent) {
+            } else if (event instanceof de.augmentia.strandsagents.model.event.ToolExecutionFinishedEvent finishEvent) {
                 var res = finishEvent.result();
                 if (res.isError()) {
                     System.err.printf("⚠️  [Tool-Ergebnis] Tool '%s' fehlgeschlagen. Fehler: %s\n", res.toolName(), res.result());

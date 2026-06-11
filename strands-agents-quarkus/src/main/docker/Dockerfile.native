@@ -7,6 +7,10 @@ WORKDIR /project
 COPY pom.xml .
 COPY strands-agents/pom.xml strands-agents/pom.xml
 COPY strands-agents/src strands-agents/src
+COPY strands-secret-provider-aws/pom.xml strands-secret-provider-aws/pom.xml
+COPY strands-secret-provider-aws/src strands-secret-provider-aws/src
+COPY strands-secret-provider-gcp/pom.xml strands-secret-provider-gcp/pom.xml
+COPY strands-secret-provider-gcp/src strands-secret-provider-gcp/src
 COPY strands-agents-quarkus/pom.xml strands-agents-quarkus/pom.xml
 COPY strands-agents-quarkus/src strands-agents-quarkus/src
 # Dummy modules — parent POM deklariert sie, aber sie werden für quarkus nicht gebraucht

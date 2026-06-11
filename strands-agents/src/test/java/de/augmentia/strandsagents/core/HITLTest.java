@@ -2,15 +2,15 @@ package de.augmentia.strandsagents.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.augmentia.strandsagents.core.agent.MockChatModel;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.model.agent.AgentPhase;
+import de.augmentia.strandsagents.core.MockChatModel;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.model.agent.AgentPhase;
 import java.util.List;
 
-import de.augmentia.strandsagents.core.plugin.guardrail.ApprovalResult;
-import de.augmentia.strandsagents.core.plugin.hitl.HITLAuthority;
-import de.augmentia.strandsagents.core.plugin.hitl.HITLPlugin;
-import de.augmentia.strandsagents.core.plugin.hitl.HITLProvider;
+import de.augmentia.strandsagents.features.guardrails.ApprovalResult;
+import de.augmentia.strandsagents.features.hitl.HITLAuthority;
+import de.augmentia.strandsagents.features.hitl.HITLPlugin;
+import de.augmentia.strandsagents.features.hitl.HITLProvider;
 import org.junit.jupiter.api.Test;
 
 class HITLTest {

@@ -1,6 +1,6 @@
-package de.augmentia.strandsagents.telemetry;
+package de.augmentia.strandsagents.features.telemetry;
 
-import de.augmentia.strandsagents.core.model.event.AgentEvent;
+import de.augmentia.strandsagents.model.event.AgentEvent;
 
 @FunctionalInterface
 public interface AgentEventFilter {

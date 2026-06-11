@@ -1,7 +1,7 @@
 package de.augmentia.strandsagents.quarkus.agui.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.augmentia.strandsagents.core.agent.StreamingAgent;
+import de.augmentia.strandsagents.core.StreamingAgent;
 import de.augmentia.strandsagents.quarkus.agui.dto.AguiEvent;
 import de.augmentia.strandsagents.quarkus.agui.dto.RunAgentInput;
 import de.augmentia.strandsagents.quarkus.agui.service.AguiTranslator;
@@ -91,7 +91,7 @@ public class AguiResource {
             try {
                 var model = agentService.getStreamingModel();
                 if (model == null) {
-                    var mockModel = new de.augmentia.strandsagents.core.agent.MockStreamingChatModel();
+                    var mockModel = new de.augmentia.strandsagents.core.MockStreamingChatModel();
                     var agent = new StreamingAgent(mockModel,
                         agentService.getFullRegistry(), new de.augmentia.strandsagents.core.ToolExecutor());
                     agent.setEventListener(translator);

@@ -2,10 +2,10 @@ package de.augmentia.strandsagents.examples.feature;
 
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.config.ModelFactory;
-import de.augmentia.strandsagents.core.tools.CalculatorTool;
-import de.augmentia.strandsagents.core.tools.local.TimeTool;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.config.ModelFactory;
+import de.augmentia.strandsagents.features.tools.CalculatorTool;
+import de.augmentia.strandsagents.features.tools.TimeTool;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;

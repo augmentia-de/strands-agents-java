@@ -2,13 +2,13 @@ package de.augmentia.strandsagents.examples;
 
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.config.ModelFactory;
-import de.augmentia.strandsagents.core.model.agent.AgentResult;
-import de.augmentia.strandsagents.core.model.event.AgentStartedEvent;
-import de.augmentia.strandsagents.core.model.event.ToolExecutionFinishedEvent;
-import de.augmentia.strandsagents.core.model.event.ToolExecutionStartedEvent;
-import de.augmentia.strandsagents.skills.*;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.config.ModelFactory;
+import de.augmentia.strandsagents.model.agent.AgentResult;
+import de.augmentia.strandsagents.model.event.AgentStartedEvent;
+import de.augmentia.strandsagents.model.event.ToolExecutionFinishedEvent;
+import de.augmentia.strandsagents.model.event.ToolExecutionStartedEvent;
+import de.augmentia.strandsagents.features.skills.*;
 import dev.langchain4j.model.chat.ChatModel;
 import java.util.List;
 
@@ -84,7 +84,7 @@ public class Main {
             .build();
 
         var model = createModel();
-        var capTool = new de.augmentia.strandsagents.skills.CapabilitySearchTool(capRegistry, model);
+        var capTool = new de.augmentia.strandsagents.features.skills.CapabilitySearchTool(capRegistry, model);
         registry.register(ToolRegistry.createMethod(capTool));
 
         var agent = new Agent(model, registry, new ToolExecutor(),

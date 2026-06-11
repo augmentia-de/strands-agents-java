@@ -2,10 +2,10 @@ package de.augmentia.strandsagents.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.config.ModelFactory;
-import de.augmentia.strandsagents.core.model.agent.AgentResult;
-import de.augmentia.strandsagents.core.model.agent.StopReason;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.config.ModelFactory;
+import de.augmentia.strandsagents.model.agent.AgentResult;
+import de.augmentia.strandsagents.model.agent.StopReason;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 

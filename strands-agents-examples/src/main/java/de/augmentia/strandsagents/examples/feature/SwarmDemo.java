@@ -4,15 +4,15 @@ import java.lang.reflect.Method;
 import java.util.Map;
 
 import de.augmentia.strandsagents.core.*;
-import de.augmentia.strandsagents.core.agent.subagent.SubAgentTool;
-import de.augmentia.strandsagents.core.agent.swarm.SwarmOrchestrator;
-import de.augmentia.strandsagents.core.config.AgentConfig;
-import de.augmentia.strandsagents.core.config.ModelFactory;
-import de.augmentia.strandsagents.core.model.event.ToolExecutionFinishedEvent;
-import de.augmentia.strandsagents.core.model.event.ToolExecutionStartedEvent;
+import de.augmentia.strandsagents.features.subagent.SubAgentTool;
+import de.augmentia.strandsagents.features.swarm.SwarmOrchestrator;
+import de.augmentia.strandsagents.config.AgentConfig;
+import de.augmentia.strandsagents.config.ModelFactory;
+import de.augmentia.strandsagents.model.event.ToolExecutionFinishedEvent;
+import de.augmentia.strandsagents.model.event.ToolExecutionStartedEvent;
 
 import dev.langchain4j.model.chat.ChatModel;
-import de.augmentia.strandsagents.core.tools.CalculatorTool;
+import de.augmentia.strandsagents.features.tools.CalculatorTool;
 
 public class SwarmDemo {
 

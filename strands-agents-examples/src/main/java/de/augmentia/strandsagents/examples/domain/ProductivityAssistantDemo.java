@@ -1,9 +1,9 @@
 package de.augmentia.strandsagents.examples.domain;
 
 
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.subagent.SubAgentTool;
-import de.augmentia.strandsagents.core.config.ModelFactory;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.features.subagent.SubAgentTool;
+import de.augmentia.strandsagents.config.ModelFactory;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 

@@ -1,13 +1,13 @@
 package de.augmentia.strandsagents.examples.domain;
 
 import de.augmentia.strandsagents.core.*;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.config.ModelFactory;
-import de.augmentia.strandsagents.core.conversation.ConversationManager;
-import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.core.model.agent.AgentResult;
-import de.augmentia.strandsagents.sessions.FileSessionManager;
-import de.augmentia.strandsagents.sessions.SessionManager;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.config.ModelFactory;
+import de.augmentia.strandsagents.features.conversation.ConversationManager;
+import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.model.agent.AgentResult;
+import de.augmentia.strandsagents.features.sessions.FileSessionManager;
+import de.augmentia.strandsagents.features.sessions.SessionManager;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.model.chat.ChatModel;
 

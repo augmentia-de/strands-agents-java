@@ -1,7 +1,7 @@
-package de.augmentia.strandsagents.telemetry;
+package de.augmentia.strandsagents.features.telemetry;
 
 import de.augmentia.strandsagents.core.AgentEventListener;
-import de.augmentia.strandsagents.core.model.event.*;
+import de.augmentia.strandsagents.model.event.*;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 

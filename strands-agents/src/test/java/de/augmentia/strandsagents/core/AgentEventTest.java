@@ -2,15 +2,15 @@ package de.augmentia.strandsagents.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.augmentia.strandsagents.core.agent.MockChatModel;
-import de.augmentia.strandsagents.core.agent.Agent;
+import de.augmentia.strandsagents.core.MockChatModel;
+import de.augmentia.strandsagents.core.Agent;
 
 import java.util.ArrayList;
 
-import de.augmentia.strandsagents.core.model.event.AgentEvent;
-import de.augmentia.strandsagents.core.model.event.AgentFinishedEvent;
-import de.augmentia.strandsagents.core.model.event.AgentStartedEvent;
-import de.augmentia.strandsagents.core.model.event.ModelRequestedEvent;
+import de.augmentia.strandsagents.model.event.AgentEvent;
+import de.augmentia.strandsagents.model.event.AgentFinishedEvent;
+import de.augmentia.strandsagents.model.event.AgentStartedEvent;
+import de.augmentia.strandsagents.model.event.ModelRequestedEvent;
 import org.junit.jupiter.api.Test;
 
 class AgentEventTest {

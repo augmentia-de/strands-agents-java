@@ -1,19 +1,19 @@
 package de.augmentia.strandsagents.examples;
 
 import de.augmentia.strandsagents.core.*;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.config.AgentConfig;
-import de.augmentia.strandsagents.core.config.ModelFactory;
-import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.core.model.agent.AgentResult;
-import de.augmentia.strandsagents.core.model.event.*;
-import de.augmentia.strandsagents.core.plugin.Plugin;
-import de.augmentia.strandsagents.core.tools.McpToolMethod;
-import de.augmentia.strandsagents.sessions.FileChatMemoryStore;
-import de.augmentia.strandsagents.sessions.FileSessionManager;
-import de.augmentia.strandsagents.skills.AgentSkillsPlugin;
-import de.augmentia.strandsagents.skills.Skill;
-import de.augmentia.strandsagents.skills.SkillParser;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.config.AgentConfig;
+import de.augmentia.strandsagents.config.ModelFactory;
+import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.model.agent.AgentResult;
+import de.augmentia.strandsagents.model.event.*;
+import de.augmentia.strandsagents.features.plugin.Plugin;
+import de.augmentia.strandsagents.features.tools.McpToolMethod;
+import de.augmentia.strandsagents.features.sessions.FileChatMemoryStore;
+import de.augmentia.strandsagents.features.sessions.FileSessionManager;
+import de.augmentia.strandsagents.features.skills.AgentSkillsPlugin;
+import de.augmentia.strandsagents.features.skills.Skill;
+import de.augmentia.strandsagents.features.skills.SkillParser;
 import dev.langchain4j.mcp.client.DefaultMcpClient;
 import dev.langchain4j.mcp.client.McpClient;
 import dev.langchain4j.mcp.client.transport.http.StreamableHttpMcpTransport;
@@ -64,7 +64,7 @@ public class ChatCLI {
         var registry = ToolRegistry.builder()
                 .workspace(Path.of(".").toAbsolutePath())
             .standard()
-            .with("de.augmentia.strandsagents.core.tools.CalculatorTool")
+            .with("de.augmentia.strandsagents.features.tools.CalculatorTool")
             .build();
 
         var mcpCommand = System.getenv("MCP_SERVER_COMMAND");

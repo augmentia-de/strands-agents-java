@@ -4,13 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.MockChatModel;
-import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.core.hook.HookRegistry;
-import de.augmentia.strandsagents.core.plugin.hitl.HITLAuthority;
-import de.augmentia.strandsagents.core.plugin.hitl.HITLHook;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.core.MockChatModel;
+import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.features.plugin.Plugin;
+import de.augmentia.strandsagents.features.guardrails.ApprovalResult;
+import de.augmentia.strandsagents.features.hitl.HITLAuthority;
+import de.augmentia.strandsagents.features.hitl.HITLPlugin;
 import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.List;
 
 class AgentDemoSmokeTest {
 
@@ -27,7 +31,7 @@ class AgentDemoSmokeTest {
     void agentWithToolsExecutesSuccessfully() {
         var registry = ToolRegistry.builder()
             .standard()
-            .with("de.augmentia.strandsagents.core.tools.CalculatorTool")
+            .with("de.augmentia.strandsagents.features.tools.CalculatorTool")
             .build();
         var agent = new Agent(
             new MockChatModel(),
@@ -44,16 +48,12 @@ class AgentDemoSmokeTest {
 
     @Test
     void agentWithHooksExecutesSuccessfully() {
-        var hookRegistry = new HookRegistry();
-        hookRegistry.register(new HITLHook(
-            (action, context) -> {
-                var now = java.time.Instant.now();
-                return new de.augmentia.strandsagents.core.plugin.guardrail.ApprovalResult(action, true, "auto-approved", now);
-            },
+        var hitlPlugin = new HITLPlugin(
+            (action, context) -> new ApprovalResult(action, true, "auto-approved", Instant.now()),
             HITLAuthority.CONFIRM,
-            java.util.List.of(),
-            HITLHook.Mode.SYNC_BLOCKING
-        ));
+            List.of()
+        );
+        List<Plugin> plugins = List.of(hitlPlugin);
         var agent = new Agent(
             new MockChatModel("Mock: %s"),
             ToolRegistry.builder().standard().build(),
@@ -61,8 +61,7 @@ class AgentDemoSmokeTest {
             new SlidingWindowConversationManager(10),
             null,
             null,
-            java.util.List.of(),
-            hookRegistry
+            plugins
         );
         agent.setSystemPrompt("You are a test assistant.");
         var result = agent.execute("Hello from hook test");

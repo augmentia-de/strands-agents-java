@@ -2,7 +2,7 @@ package de.augmentia.strandsagents.examples.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.augmentia.strandsagents.core.agent.MockStreamingChatModel;
+import de.augmentia.strandsagents.core.MockStreamingChatModel;
 import org.junit.jupiter.api.Test;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;

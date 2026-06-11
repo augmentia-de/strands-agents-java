@@ -6,27 +6,22 @@
 #
 # Build:
 #   docker build -f strands-agents-quarkus/src/main/docker/Dockerfile.native -t strands-agent-native .
-#   docker build -f strands-agents-quarkus/src/main/docker/Dockerfile.lambda -t strands-agent-lambda .
+#   docker build -f strands-agents-quarkus/src/main/docker/Dockerfile.lambda \
+#       --build-arg SSM_EXTENSION_URL=... -t strands-agent-lambda .
 #
 # Lokal testen:
 #   docker run -p 8082:8082 -e VAULT_ADDR=... strands-agent-lambda
 # ============================================================
 FROM strands-agent-native:latest AS base
 
-# zlib für das SSM-Extension-Binary
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends zlib1g && \
-    rm -rf /var/lib/apt/lists/*
 
 # AWS Parameters & Secrets Lambda Extension (HTTP auf localhost:2773)
-RUN case "$(uname -m)" in \
-        aarch64) ARCH="-arm64"; ;; \
-        *) ARCH=""; ;; \
-    esac && \
+ARG SSM_EXTENSION_URL
+RUN test -n "$SSM_EXTENSION_URL" && \
     apt-get update && apt-get install -y --no-install-recommends curl ca-certificates unzip && \
-    curl -sL "https://aws-parameters-and-secrets-lambda-extension.s3.amazonaws.com/parameters-and-secrets-lambda-extension${ARCH}.zip" \
-        -o /tmp/params-ext.zip && \
-    unzip -o /tmp/params-ext.zip -d /opt/extensions/ && \
+    curl -sL "$SSM_EXTENSION_URL" -o /tmp/params-ext.zip && \
+    unzip -o /tmp/params-ext.zip -d /opt/ && \
     rm /tmp/params-ext.zip && \
     apt-get purge -y curl ca-certificates unzip && \
     apt-get autoremove --purge -y && \

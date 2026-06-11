@@ -1,13 +1,13 @@
-package de.augmentia.strandsagents.core.resilience;
+package de.augmentia.strandsagents.features.resilience;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.core.agent.MockChatModel;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.model.agent.StopReason;
+import de.augmentia.strandsagents.core.MockChatModel;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.model.agent.StopReason;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
 

@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.core.structured;
+package de.augmentia.strandsagents.features.structured;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -1,6 +1,6 @@
 package de.augmentia.strandsagents.quarkus.service;
 
-import de.augmentia.strandsagents.core.tools.local.*;
+import de.augmentia.strandsagents.features.tools.*;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection(targets = {
@@ -87,29 +87,29 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
     GrepTool.Params.class,
     FindTool.class,
     FindTool.Params.class,
-    de.augmentia.strandsagents.core.tools.ListToolsTool.class,
-    de.augmentia.strandsagents.core.tools.ListToolsTool.Params.class,
+    de.augmentia.strandsagents.features.tools.ListToolsTool.class,
+    de.augmentia.strandsagents.features.tools.ListToolsTool.Params.class,
     WebFetchTool.class,
     WebFetchTool.Params.class,
     WebSearchTool.class,
     WebSearchTool.Params.class,
-    de.augmentia.strandsagents.skills.McpListTool.class,
-    de.augmentia.strandsagents.skills.McpListTool.Params.class,
-    de.augmentia.strandsagents.skills.McpIngestTool.class,
-    de.augmentia.strandsagents.skills.McpIngestTool.Params.class,
-    de.augmentia.strandsagents.skills.CapabilitySearchTool.class,
-    de.augmentia.strandsagents.skills.CapabilitySearchTool.Params.class,
-    de.augmentia.strandsagents.skills.SkillSearchTool.class,
-    de.augmentia.strandsagents.skills.SkillSearchTool.Params.class,
-    de.augmentia.strandsagents.core.model.message.Message.class,
-    de.augmentia.strandsagents.core.model.message.MessageTypeIdResolver.class,
-    de.augmentia.strandsagents.core.model.message.UserMessage.class,
-    de.augmentia.strandsagents.core.model.message.AssistantMessage.class,
-    de.augmentia.strandsagents.core.model.message.SystemMessage.class,
-    de.augmentia.strandsagents.core.model.message.ToolMessage.class,
-    de.augmentia.strandsagents.core.model.session.Session.class,
-    de.augmentia.strandsagents.core.model.agent.AgentState.class,
-    de.augmentia.strandsagents.core.model.agent.AgentStatus.class
+    de.augmentia.strandsagents.features.skills.McpListTool.class,
+    de.augmentia.strandsagents.features.skills.McpListTool.Params.class,
+    de.augmentia.strandsagents.features.skills.McpIngestTool.class,
+    de.augmentia.strandsagents.features.skills.McpIngestTool.Params.class,
+    de.augmentia.strandsagents.features.skills.CapabilitySearchTool.class,
+    de.augmentia.strandsagents.features.skills.CapabilitySearchTool.Params.class,
+    de.augmentia.strandsagents.features.skills.SkillSearchTool.class,
+    de.augmentia.strandsagents.features.skills.SkillSearchTool.Params.class,
+    de.augmentia.strandsagents.model.message.Message.class,
+    de.augmentia.strandsagents.model.message.MessageTypeIdResolver.class,
+    de.augmentia.strandsagents.model.message.UserMessage.class,
+    de.augmentia.strandsagents.model.message.AssistantMessage.class,
+    de.augmentia.strandsagents.model.message.SystemMessage.class,
+    de.augmentia.strandsagents.model.message.ToolMessage.class,
+    de.augmentia.strandsagents.model.session.Session.class,
+    de.augmentia.strandsagents.model.agent.AgentState.class,
+    de.augmentia.strandsagents.model.agent.AgentStatus.class
 })
 public class McpNativeRegistration {
 }

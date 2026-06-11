@@ -1,9 +1,9 @@
 package de.augmentia.strandsagents.quarkus.resources;
 
-import de.augmentia.strandsagents.core.model.api.AgentInitRequest;
-import de.augmentia.strandsagents.core.model.api.ChatRequest;
-import de.augmentia.strandsagents.core.model.api.ChatResponse;
-import de.augmentia.strandsagents.core.model.api.ToolInfo;
+import de.augmentia.strandsagents.model.api.AgentInitRequest;
+import de.augmentia.strandsagents.model.api.ChatRequest;
+import de.augmentia.strandsagents.model.api.ChatResponse;
+import de.augmentia.strandsagents.model.api.ToolInfo;
 import de.augmentia.strandsagents.quarkus.service.AgentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.smallrye.common.annotation.Blocking;

@@ -2,9 +2,9 @@ package de.augmentia.strandsagents.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.augmentia.strandsagents.core.agent.MockChatModel;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.subagent.SubAgentTool;
+import de.augmentia.strandsagents.core.MockChatModel;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.features.subagent.SubAgentTool;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 

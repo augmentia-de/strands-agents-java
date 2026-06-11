@@ -3,11 +3,11 @@ package de.augmentia.strandsagents.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import de.augmentia.strandsagents.core.agent.MockChatModel;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.tools.AgentTool;
-import de.augmentia.strandsagents.core.tools.ToolResult;
-import de.augmentia.strandsagents.core.model.agent.StopReason;
+import de.augmentia.strandsagents.core.MockChatModel;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.features.tools.AgentTool;
+import de.augmentia.strandsagents.features.tools.ToolResult;
+import de.augmentia.strandsagents.model.agent.StopReason;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 

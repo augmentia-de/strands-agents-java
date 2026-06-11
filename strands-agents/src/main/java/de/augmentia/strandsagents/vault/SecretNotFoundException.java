@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.vault;
+package de.augmentia.strandsagents.features.secrets;
 
 public class SecretNotFoundException extends RuntimeException {
     public SecretNotFoundException(String message) {

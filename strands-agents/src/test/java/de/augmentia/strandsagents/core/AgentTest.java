@@ -2,13 +2,11 @@ package de.augmentia.strandsagents.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.augmentia.strandsagents.core.agent.MockChatModel;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.core.model.agent.StopReason;
+import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.model.agent.StopReason;
 
-import de.augmentia.strandsagents.core.structured.StructuredOutputConfig;
-import de.augmentia.strandsagents.sessions.FileSessionManager;
+import de.augmentia.strandsagents.features.structured.StructuredOutputConfig;
+import de.augmentia.strandsagents.features.sessions.FileSessionManager;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
@@ -17,11 +15,13 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.TokenUsage;
 import dev.langchain4j.model.output.FinishReason;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import de.augmentia.strandsagents.features.pipeline.AgentHook;
+import de.augmentia.strandsagents.features.pipeline.HookContexts;
+import de.augmentia.strandsagents.features.pipeline.HookResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -56,7 +56,13 @@ class AgentTest {
     void pluginHooksCanModifySystemPrompt() {
         var agent = new Agent(new MockChatModel());
         agent.setSystemPrompt("Base prompt");
-        agent.setPluginHook(sb -> sb.append("\n<!-- extra -->"));
+        agent.addHook(new AgentHook() {
+            @Override public String name() { return "test-hook"; }
+            @Override public HookResult beforeModelCall(HookContexts.BeforeModelCallContext ctx) {
+                ctx.systemPrompt().append("\n<!-- extra -->");
+                return new HookResult.Continue();
+            }
+        });
 
         agent.execute("test");
 
@@ -68,8 +74,20 @@ class AgentTest {
     void multiplePluginHooksAreAppliedInOrder() {
         var agent = new Agent(new MockChatModel());
         agent.setSystemPrompt("Start");
-        agent.setPluginHook(sb -> sb.append(" A"));
-        agent.setPluginHook(sb -> sb.append(" B"));
+        agent.addHook(new AgentHook() {
+            @Override public String name() { return "hook-a"; }
+            @Override public HookResult beforeModelCall(HookContexts.BeforeModelCallContext ctx) {
+                ctx.systemPrompt().append(" A");
+                return new HookResult.Continue();
+            }
+        });
+        agent.addHook(new AgentHook() {
+            @Override public String name() { return "hook-b"; }
+            @Override public HookResult beforeModelCall(HookContexts.BeforeModelCallContext ctx) {
+                ctx.systemPrompt().append(" B");
+                return new HookResult.Continue();
+            }
+        });
 
         agent.execute("test");
 
@@ -82,7 +100,7 @@ class AgentTest {
         var agent = new Agent(new MockChatModel());
         agent.setSystemPrompt("Original");
         agent.setEventListener(event -> {
-            if (event instanceof de.augmentia.strandsagents.core.model.event.BeforeInvocationEvent bie) {
+            if (event instanceof de.augmentia.strandsagents.model.event.BeforeInvocationEvent bie) {
                 captured[0] = bie.systemPrompt();
                 bie.systemPrompt().append(" + event-added");
             }
@@ -269,7 +287,7 @@ class AgentTest {
     void buildRequestIncludesTools() {
         var model = new RecordingChatModel();
         var registry = new ToolRegistry();
-        registry.register(new de.augmentia.strandsagents.core.tools.AgentTool<Object>() {
+        registry.register(new de.augmentia.strandsagents.features.tools.AgentTool<Object>() {
             @Override public String name() { return "my-tool"; }
             @Override public String description() { return "A tool"; }
             @Override public Class<Object> parameterType() { return Object.class; }
@@ -277,10 +295,10 @@ class AgentTest {
                 return com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
             }
             @Override
-            public de.augmentia.strandsagents.core.tools.ToolResult execute(
+            public de.augmentia.strandsagents.features.tools.ToolResult execute(
                     String id, Object p, java.util.concurrent.atomic.AtomicBoolean a,
-                    java.util.function.Consumer<de.augmentia.strandsagents.core.tools.ToolResult> u) {
-                return de.augmentia.strandsagents.core.tools.ToolResult.success("ok");
+                    java.util.function.Consumer<de.augmentia.strandsagents.features.tools.ToolResult> u) {
+                return de.augmentia.strandsagents.features.tools.ToolResult.success("ok");
             }
         });
         var agent = new Agent(model, registry, new ToolExecutor());

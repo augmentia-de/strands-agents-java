@@ -21,13 +21,6 @@ export AWS_REGION="${AWS_REGION:-eu-central-1}"
 # Alternativ: gcloud auth login (dann hier leer lassen)
 export GOOGLE_APPLICATION_CREDENTIALS="${GOOGLE_APPLICATION_CREDENTIALS:-}"
 
-# ── Azure ───────────────────────────────────────────────────
-# Service Principal: Microsoft Entra ID → App-Registrierungen
-export AZURE_CLIENT_ID="${AZURE_CLIENT_ID}"
-export AZURE_TENANT_ID="${AZURE_TENANT_ID}"
-export AZURE_CLIENT_SECRET="${AZURE_CLIENT_SECRET}"
-export AZURE_SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID}"
-
 # ── Prüfung ─────────────────────────────────────────────────
 check_aws_creds() {
     if [[ "$AWS_ACCESS_KEY_ID" == "CHANGEME" || "$AWS_SECRET_ACCESS_KEY" == "CHANGEME" ]]; then
@@ -52,12 +45,3 @@ check_gcp_creds() {
     echo -e "\033[0;32m[OK]\033[0m    GCP-Credentials gesetzt ($GOOGLE_APPLICATION_CREDENTIALS)"
 }
 
-check_azure_creds() {
-    if [[ -n "$AZURE_CLIENT_ID" && -n "$AZURE_TENANT_ID" && -n "$AZURE_CLIENT_SECRET" ]]; then
-        echo -e "\033[0;32m[OK]\033[0m    Azure-Service-Principal gesetzt"
-    else
-        echo -e "\033[0;33m[HINWEIS]\033[0m Azure-Service-Principal nicht gesetzt"
-        echo "  Nutze:  az login"
-        echo "  Oder setze AZURE_CLIENT_ID + AZURE_TENANT_ID + AZURE_CLIENT_SECRET"
-    fi
-}

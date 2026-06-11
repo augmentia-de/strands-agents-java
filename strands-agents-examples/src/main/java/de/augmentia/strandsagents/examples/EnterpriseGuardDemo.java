@@ -4,30 +4,29 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.config.LlmConfig;
-import de.augmentia.strandsagents.core.config.ModelFactory;
-import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.core.hook.AgentHook;
-import de.augmentia.strandsagents.core.hook.HookContexts;
-import de.augmentia.strandsagents.core.hook.HookRegistry;
-import de.augmentia.strandsagents.core.hook.HookResult;
-import de.augmentia.strandsagents.core.model.agent.AgentResult;
-import de.augmentia.strandsagents.core.model.agent.ExecutionMetrics;
-import de.augmentia.strandsagents.core.model.agent.StopReason;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.config.LlmConfig;
+import de.augmentia.strandsagents.config.ModelFactory;
+import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.features.pipeline.AgentHook;
+import de.augmentia.strandsagents.features.pipeline.HookContexts;
+import de.augmentia.strandsagents.features.pipeline.HookRegistry;
+import de.augmentia.strandsagents.features.pipeline.HookResult;
+import de.augmentia.strandsagents.model.agent.AgentResult;
+import de.augmentia.strandsagents.model.agent.ExecutionMetrics;
+import de.augmentia.strandsagents.model.agent.StopReason;
 import de.augmentia.strandsagents.core.AgentEventListener;
-import de.augmentia.strandsagents.core.model.event.*;
-import de.augmentia.strandsagents.core.model.message.Message;
-import de.augmentia.strandsagents.core.plugin.guardrail.*;
-import de.augmentia.strandsagents.core.plugin.hitl.HITLAuthority;
-import de.augmentia.strandsagents.core.plugin.hitl.HITLHook;
-import de.augmentia.strandsagents.core.plugin.hitl.HITLPlugin;
-import de.augmentia.strandsagents.core.resilience.CircuitBreakerConfig;
-import de.augmentia.strandsagents.core.resilience.ResilienceConfig;
-import de.augmentia.strandsagents.core.resilience.RetryConfig;
-import de.augmentia.strandsagents.core.tools.CalculatorTool;
-import de.augmentia.strandsagents.core.tools.local.GrepTool;
-import de.augmentia.strandsagents.core.tools.local.ReadTool;
+import de.augmentia.strandsagents.model.event.*;
+import de.augmentia.strandsagents.model.message.Message;
+import de.augmentia.strandsagents.features.guardrails.*;
+import de.augmentia.strandsagents.features.hitl.HITLAuthority;
+import de.augmentia.strandsagents.features.hitl.HITLPlugin;
+import de.augmentia.strandsagents.features.resilience.CircuitBreakerConfig;
+import de.augmentia.strandsagents.features.resilience.ResilienceConfig;
+import de.augmentia.strandsagents.features.resilience.RetryConfig;
+import de.augmentia.strandsagents.features.tools.CalculatorTool;
+import de.augmentia.strandsagents.features.tools.GrepTool;
+import de.augmentia.strandsagents.features.tools.ReadTool;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
@@ -209,7 +208,7 @@ public class EnterpriseGuardDemo {
         //   human approval. Useful for high-risk environments (finance,
         //   medicine, production). For normal scenarios AUTO is sufficient.
         var hitl = new HITLPlugin(
-            HITLHook.consoleProvider(),
+            HITLPlugin.consoleProvider(),
             HITLAuthority.AUTO,   // For the demo: AUTO (no manual intervention)
             List.of()             // Alle Tools auto-genehmigt
         );

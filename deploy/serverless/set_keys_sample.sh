@@ -9,7 +9,7 @@
 # Zusätzlich benötigt jede Cloud Credentials:
 #   AWS:  aws configure  oder  AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY
 #   GCP:  gcloud auth login  oder  GOOGLE_APPLICATION_CREDENTIALS=/pfad/key.json
-#   Azure: az login  oder  AZURE_CLIENT_ID + AZURE_TENANT_ID + AZURE_CLIENT_SECRET
+
 # ============================================================
 
 # ── Vault (Remote HashiCorp) ────────────────────────────────
@@ -37,14 +37,6 @@ export LAMBDA_TIMEOUT="${LAMBDA_TIMEOUT:-30}"
 export GCP_PROJECT_ID="${GCP_PROJECT_ID:-CHANGEME}"
 export GCP_REGION="${GCP_REGION:-europe-west1}"
 export GCP_IMAGE_REGISTRY="${GCP_IMAGE_REGISTRY:-gcr.io}"
-
-# ── Azure Container Apps ───────────────────────────────────
-export AZURE_RESOURCE_GROUP="${AZURE_RESOURCE_GROUP:-cloud-quarkus-rg}"
-export AZURE_LOCATION="${AZURE_LOCATION:-westeurope}"
-export AZURE_SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID}"
-export AZURE_ACR_NAME="${AZURE_ACR_NAME}"
-export AZURE_CONTAINER_APP="${AZURE_CONTAINER_APP:-cloud-quarkus}"
-
 # ── Kubernetes / Helm (optional) ───────────────────────────
 export K8S_NAMESPACE="${K8S_NAMESPACE:-default}"
 export K8S_INGRESS_HOST="${K8S_INGRESS_HOST:-cloud-quarkus.example.com}"

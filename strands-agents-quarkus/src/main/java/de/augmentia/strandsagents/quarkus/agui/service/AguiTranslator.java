@@ -1,7 +1,7 @@
 package de.augmentia.strandsagents.quarkus.agui.service;
 
 import de.augmentia.strandsagents.core.AgentEventListener;
-import de.augmentia.strandsagents.core.model.event.*;
+import de.augmentia.strandsagents.model.event.*;
 import de.augmentia.strandsagents.quarkus.agui.dto.AguiEvent;
 import de.augmentia.strandsagents.quarkus.agui.dto.AguiMessage;
 import java.util.*;

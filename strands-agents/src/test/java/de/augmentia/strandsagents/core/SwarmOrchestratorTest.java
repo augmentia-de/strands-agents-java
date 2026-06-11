@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Map;
 
-import de.augmentia.strandsagents.core.agent.MockChatModel;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.swarm.SwarmOrchestrator;
+import de.augmentia.strandsagents.core.MockChatModel;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.features.swarm.SwarmOrchestrator;
 import org.junit.jupiter.api.Test;
 
 class SwarmOrchestratorTest {

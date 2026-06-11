@@ -1,8 +1,8 @@
-package de.augmentia.strandsagents.vault;
+package de.augmentia.strandsagents.features.secrets;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.augmentia.strandsagents.core.secret.SecretProvider;
+import de.augmentia.strandsagents.features.secrets.SecretProvider;
 
 import java.io.IOException;
 import java.nio.file.Files;

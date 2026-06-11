@@ -6,10 +6,10 @@ import java.util.List;
 import java.util.Map;
 
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.config.AgentConfig;
-import de.augmentia.strandsagents.core.config.ModelFactory;
-import de.augmentia.strandsagents.core.model.agent.AgentResult;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.config.AgentConfig;
+import de.augmentia.strandsagents.config.ModelFactory;
+import de.augmentia.strandsagents.model.agent.AgentResult;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;

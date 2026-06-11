@@ -1,38 +1,38 @@
 package de.augmentia.strandsagents.quarkus.service;
 
 import de.augmentia.strandsagents.core.*;
-import de.augmentia.strandsagents.core.agent.MockChatModel;
-import de.augmentia.strandsagents.core.agent.routing.LlmRouter;
-import de.augmentia.strandsagents.core.prompt.PromptRegistry;
-import de.augmentia.strandsagents.core.agent.MockStreamingChatModel;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.AgentFactory;
-import de.augmentia.strandsagents.core.agent.StreamingAgent;
-import de.augmentia.strandsagents.core.config.ChatModelConfig;
-import de.augmentia.strandsagents.core.config.ModelFactory;
-import de.augmentia.strandsagents.core.config.ModelProviderType;
-import de.augmentia.strandsagents.core.config.ModelTier;
-import de.augmentia.strandsagents.core.config.TieredModelConfig;
-import de.augmentia.strandsagents.core.agent.RoutingAgent;
-import de.augmentia.strandsagents.core.conversation.SummarizingConversationManager;
-import de.augmentia.strandsagents.core.logging.FileLlmLogger;
-import de.augmentia.strandsagents.core.logging.LoggingChatModel;
-import de.augmentia.strandsagents.core.model.event.AgentStateChangedEvent;
-import de.augmentia.strandsagents.core.plugin.Plugin;
-import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.CheckpointHook;
-import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.CheckpointService;
-import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.SSEChannel;
-import de.augmentia.strandsagents.skills.*;
+import de.augmentia.strandsagents.core.MockChatModel;
+import de.augmentia.strandsagents.features.routing.LlmRouter;
+import de.augmentia.strandsagents.prompt.PromptRegistry;
+import de.augmentia.strandsagents.core.MockStreamingChatModel;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.core.AgentFactory;
+import de.augmentia.strandsagents.core.StreamingAgent;
+import de.augmentia.strandsagents.config.ChatModelConfig;
+import de.augmentia.strandsagents.config.ModelFactory;
+import de.augmentia.strandsagents.config.ModelProviderType;
+import de.augmentia.strandsagents.config.ModelTier;
+import de.augmentia.strandsagents.config.TieredModelConfig;
+import de.augmentia.strandsagents.core.RoutingAgent;
+import de.augmentia.strandsagents.features.conversation.SummarizingConversationManager;
+import de.augmentia.strandsagents.features.telemetry.FileLlmLogger;
+import de.augmentia.strandsagents.features.telemetry.LoggingChatModel;
+import de.augmentia.strandsagents.model.event.AgentStateChangedEvent;
+import de.augmentia.strandsagents.features.plugin.Plugin;
+import de.augmentia.strandsagents.features.hitl.HITLPlugin;
+import de.augmentia.strandsagents.features.hitl.checkpoint.CheckpointService;
+import de.augmentia.strandsagents.features.hitl.checkpoint.SSEChannel;
+import de.augmentia.strandsagents.features.skills.*;
 import dev.langchain4j.mcp.client.McpClient;
-import de.augmentia.strandsagents.core.config.StrandsAgentConfig;
-import de.augmentia.strandsagents.core.mcp.McpConnector;
-import de.augmentia.strandsagents.core.model.api.AgentInitRequest;
-import de.augmentia.strandsagents.core.model.api.ChatRequest;
-import de.augmentia.strandsagents.core.model.api.ChatResponse;
-import de.augmentia.strandsagents.core.model.api.McpServerSelection;
-import de.augmentia.strandsagents.core.model.api.SkillInfo;
-import de.augmentia.strandsagents.core.model.api.ToolInfo;
-import de.augmentia.strandsagents.sessions.FileSessionManager;
+import de.augmentia.strandsagents.config.StrandsAgentConfig;
+import de.augmentia.strandsagents.features.mcp.McpConnector;
+import de.augmentia.strandsagents.model.api.AgentInitRequest;
+import de.augmentia.strandsagents.model.api.ChatRequest;
+import de.augmentia.strandsagents.model.api.ChatResponse;
+import de.augmentia.strandsagents.model.api.McpServerSelection;
+import de.augmentia.strandsagents.model.api.SkillInfo;
+import de.augmentia.strandsagents.model.api.ToolInfo;
+import de.augmentia.strandsagents.features.sessions.FileSessionManager;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import jakarta.annotation.PostConstruct;
@@ -48,25 +48,25 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailPlugin;
-import de.augmentia.strandsagents.core.plugin.hitl.checkpoint.ConsoleChannel;
-import de.augmentia.strandsagents.core.model.event.ToolExecutionStartedEvent;
-import de.augmentia.strandsagents.core.model.event.ToolExecutionFinishedEvent;
-import de.augmentia.strandsagents.core.plugin.guardrail.GuardrailResult;
-import de.augmentia.strandsagents.core.resilience.CircuitBreakerConfig;
-import de.augmentia.strandsagents.core.resilience.ResilienceConfig;
-import de.augmentia.strandsagents.core.resilience.RetryConfig;
-import de.augmentia.strandsagents.core.tools.local.BashTool;
-import de.augmentia.strandsagents.core.tools.HumanInTheLoopTool;
-import de.augmentia.strandsagents.core.tools.local.ReadTool;
-import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.core.conversation.ConversationManager;
-import de.augmentia.strandsagents.sessions.SessionManager;
+import de.augmentia.strandsagents.features.guardrails.GuardrailPlugin;
+import de.augmentia.strandsagents.features.hitl.checkpoint.ConsoleChannel;
+import de.augmentia.strandsagents.model.event.ToolExecutionStartedEvent;
+import de.augmentia.strandsagents.model.event.ToolExecutionFinishedEvent;
+import de.augmentia.strandsagents.features.guardrails.GuardrailResult;
+import de.augmentia.strandsagents.features.resilience.CircuitBreakerConfig;
+import de.augmentia.strandsagents.features.resilience.ResilienceConfig;
+import de.augmentia.strandsagents.features.resilience.RetryConfig;
+import de.augmentia.strandsagents.features.tools.BashTool;
+import de.augmentia.strandsagents.features.tools.HumanInTheLoopTool;
+import de.augmentia.strandsagents.features.tools.ReadTool;
+import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.features.conversation.ConversationManager;
+import de.augmentia.strandsagents.features.sessions.SessionManager;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ApplicationScoped
-public class AgentService implements de.augmentia.strandsagents.core.service.AgentService {
+public class AgentService implements de.augmentia.strandsagents.features.service.AgentService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentService.class);
     private static final String TOOLS_PLACEHOLDER = "{{tools}}";
@@ -537,11 +537,11 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
         // 1. ChatModel
         ChatModel model = createModel(); // Reusing the service's model creation logic
 
-        // 2. CheckpointService
+        // 2. CheckpointService + HITL Plugin
         CheckpointService cpService = new CheckpointService(
             System.getenv("STRANDS_AGENT_HITL_TOOLS"), 120_000);
         cpService.registerChannel(new ConsoleChannel());
-        var cpHook = new CheckpointHook(cpService);
+        var hitlPlugin = new HITLPlugin(cpService);
 
         // 3. ToolRegistry
         ToolRegistry toolRegistry = new ToolRegistry();
@@ -570,7 +570,7 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
             List.of((messages, context) -> GuardrailResult.ok())
         );
 
-        List<Plugin> plugins = List.of(guardrails);
+        List<Plugin> plugins = List.of(guardrails, hitlPlugin);
 
         Agent agent = new Agent(
             model,
@@ -583,9 +583,6 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
         );
 
         agent.setCheckpointService(cpService);
-        agent.addHook(cpHook);
-        cpHook.setAgent(agent);
-
         agent.setSystemPrompt(PromptRegistry.get("agent_service.demo_system_prompt"));
 
         var start = System.nanoTime();
@@ -598,7 +595,7 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
     }
 
     private ChatResponse buildChatResponse(
-            de.augmentia.strandsagents.core.model.agent.AgentResult result,
+            de.augmentia.strandsagents.model.agent.AgentResult result,
             long durationMs,
             List<String> phases,
             ConcurrentHashMap<String, ToolCallCapture> toolCallMap) {

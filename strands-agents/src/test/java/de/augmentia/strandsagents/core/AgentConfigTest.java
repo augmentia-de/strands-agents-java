@@ -3,10 +3,10 @@ package de.augmentia.strandsagents.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import de.augmentia.strandsagents.core.config.AgentConfig;
-import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.core.tools.AgentTool;
-import de.augmentia.strandsagents.core.tools.ToolResult;
+import de.augmentia.strandsagents.config.AgentConfig;
+import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.features.tools.AgentTool;
+import de.augmentia.strandsagents.features.tools.ToolResult;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 

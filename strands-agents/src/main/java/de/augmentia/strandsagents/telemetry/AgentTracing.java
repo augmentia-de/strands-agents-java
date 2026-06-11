@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.telemetry;
+package de.augmentia.strandsagents.features.telemetry;
 
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;

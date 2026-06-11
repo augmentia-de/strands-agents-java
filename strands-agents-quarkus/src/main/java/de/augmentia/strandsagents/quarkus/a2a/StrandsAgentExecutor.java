@@ -1,6 +1,6 @@
 package de.augmentia.strandsagents.quarkus.a2a;
 
-import de.augmentia.strandsagents.core.agent.Agent;
+import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.quarkus.service.AgentService;
 import org.a2aproject.sdk.server.agentexecution.AgentExecutor;
 import org.a2aproject.sdk.server.agentexecution.RequestContext;

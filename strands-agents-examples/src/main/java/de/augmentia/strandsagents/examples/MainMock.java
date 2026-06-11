@@ -3,11 +3,11 @@ package de.augmentia.strandsagents.examples;
 
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.subagent.SubAgentTool;
-import de.augmentia.strandsagents.core.agent.swarm.SwarmOrchestrator;
-import de.augmentia.strandsagents.core.config.AgentConfig;
-import de.augmentia.strandsagents.core.model.event.*;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.features.subagent.SubAgentTool;
+import de.augmentia.strandsagents.features.swarm.SwarmOrchestrator;
+import de.augmentia.strandsagents.config.AgentConfig;
+import de.augmentia.strandsagents.model.event.*;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
@@ -34,7 +34,7 @@ public class MainMock {
         System.out.println("─── 1. Basis: Events + Tools + Sessions ───");
 
         var registry = ToolRegistry.builder()
-            .with("de.augmentia.strandsagents.core.tools.CalculatorTool")
+            .with("de.augmentia.strandsagents.features.tools.CalculatorTool")
             .build();
         var model = new DemoMockModel();
         var agent = new Agent(model, registry, new ToolExecutor());

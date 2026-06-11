@@ -3,14 +3,14 @@ package de.augmentia.strandsagents.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import de.augmentia.strandsagents.core.agent.MockChatModel;
-import de.augmentia.strandsagents.core.agent.MockStreamingChatModel;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.StreamingAgent;
-import de.augmentia.strandsagents.core.model.agent.StopReason;
-import de.augmentia.strandsagents.core.model.event.*;
-import de.augmentia.strandsagents.core.tools.AgentTool;
-import de.augmentia.strandsagents.core.tools.ToolResult;
+import de.augmentia.strandsagents.core.MockChatModel;
+import de.augmentia.strandsagents.core.MockStreamingChatModel;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.core.StreamingAgent;
+import de.augmentia.strandsagents.model.agent.StopReason;
+import de.augmentia.strandsagents.model.event.*;
+import de.augmentia.strandsagents.features.tools.AgentTool;
+import de.augmentia.strandsagents.features.tools.ToolResult;
 import java.util.ArrayList;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Flow;
@@ -75,12 +75,18 @@ class StreamingTest {
     void eventStreamShouldContainAllEventTypes() {
         var agent = new Agent(new MockChatModel());
         var events = new CopyOnWriteArrayList<AgentEvent>();
+        var done = new java.util.concurrent.CompletableFuture<Void>();
 
         agent.eventStream().subscribe(new Flow.Subscriber<>() {
             @Override
             public void onSubscribe(Flow.Subscription s) { s.request(Long.MAX_VALUE); }
             @Override
-            public void onNext(AgentEvent item) { events.add(item); }
+            public void onNext(AgentEvent item) {
+                events.add(item);
+                if (item instanceof AgentFinishedEvent) {
+                    done.complete(null);
+                }
+            }
             @Override
             public void onError(Throwable throwable) {}
             @Override
@@ -88,6 +94,7 @@ class StreamingTest {
         });
 
         agent.execute("Test");
+        done.orTimeout(5, java.util.concurrent.TimeUnit.SECONDS).join();
 
         assertThat(events).extracting("class")
             .contains(
@@ -155,12 +162,16 @@ class StreamingTest {
     void streamingAgentShouldFireTokenEvents() {
         var agent = new StreamingAgent(new MockStreamingChatModel());
         var events = new CopyOnWriteArrayList<AgentEvent>();
+        var done = new java.util.concurrent.CompletableFuture<Void>();
 
         agent.eventStream().subscribe(new Flow.Subscriber<>() {
             @Override
             public void onSubscribe(Flow.Subscription s) { s.request(Long.MAX_VALUE); }
             @Override
-            public void onNext(AgentEvent item) { events.add(item); }
+            public void onNext(AgentEvent item) {
+                events.add(item);
+                if (item instanceof AgentFinishedEvent) done.complete(null);
+            }
             @Override
             public void onError(Throwable throwable) {}
             @Override
@@ -168,6 +179,7 @@ class StreamingTest {
         });
 
         agent.execute("Hallo");
+        done.orTimeout(5, java.util.concurrent.TimeUnit.SECONDS).join();
 
         var tokenEvents = events.stream()
             .filter(e -> e instanceof TokenEvent)
@@ -179,12 +191,16 @@ class StreamingTest {
     void streamingAgentExecuteStreamingShouldFireTokenEvents() {
         var agent = new StreamingAgent(new MockStreamingChatModel());
         var events = new CopyOnWriteArrayList<AgentEvent>();
+        var done = new java.util.concurrent.CompletableFuture<Void>();
 
         agent.eventStream().subscribe(new Flow.Subscriber<>() {
             @Override
             public void onSubscribe(Flow.Subscription s) { s.request(Long.MAX_VALUE); }
             @Override
-            public void onNext(AgentEvent item) { events.add(item); }
+            public void onNext(AgentEvent item) {
+                events.add(item);
+                if (item instanceof AgentFinishedEvent) done.complete(null);
+            }
             @Override
             public void onError(Throwable throwable) {}
             @Override
@@ -192,6 +208,7 @@ class StreamingTest {
         });
 
         agent.executeStreaming("Hallo", token -> {});
+        done.orTimeout(5, java.util.concurrent.TimeUnit.SECONDS).join();
 
         var tokenEvents = events.stream()
             .filter(e -> e instanceof TokenEvent)
@@ -224,12 +241,18 @@ class StreamingTest {
     void tokenEventShouldContainSessionIdAndToken() {
         var agent = new StreamingAgent(new MockStreamingChatModel("XYZ-%s"));
         var tokenEvents = new ArrayList<TokenEvent>();
+        var done = new java.util.concurrent.CompletableFuture<Void>();
 
         agent.eventStream().subscribe(new Flow.Subscriber<>() {
             @Override
             public void onSubscribe(Flow.Subscription s) { s.request(Long.MAX_VALUE); }
             @Override
-            public void onNext(AgentEvent item) { if (item instanceof TokenEvent te) tokenEvents.add(te); }
+            public void onNext(AgentEvent item) {
+                if (item instanceof TokenEvent te) tokenEvents.add(te);
+                if (item instanceof AgentFinishedEvent) {
+                    done.complete(null);
+                }
+            }
             @Override
             public void onError(Throwable throwable) {}
             @Override
@@ -237,6 +260,7 @@ class StreamingTest {
         });
 
         agent.execute("Hallo");
+        done.orTimeout(5, java.util.concurrent.TimeUnit.SECONDS).join();
 
         assertThat(tokenEvents).isNotEmpty();
         assertThat(tokenEvents.get(0).sessionId()).isNotBlank();

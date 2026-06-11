@@ -7,13 +7,13 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import de.augmentia.strandsagents.core.agent.MockChatModel;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.agent.subagent.SubAgentExecutor;
-import de.augmentia.strandsagents.core.agent.subagent.SubAgentTool;
+import de.augmentia.strandsagents.core.MockChatModel;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.features.subagent.SubAgentExecutor;
+import de.augmentia.strandsagents.features.subagent.SubAgentTool;
 
-import de.augmentia.strandsagents.core.agent.routing.LlmRouter;
-import de.augmentia.strandsagents.core.agent.swarm.SwarmOrchestrator;
+import de.augmentia.strandsagents.features.routing.LlmRouter;
+import de.augmentia.strandsagents.features.swarm.SwarmOrchestrator;
 import org.junit.jupiter.api.Test;
 
 class EnhancedMultiAgentTest {

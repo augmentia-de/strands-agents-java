@@ -1,9 +1,9 @@
 package de.augmentia.strandsagents.quarkus.service;
 
-import de.augmentia.strandsagents.core.secret.SecretProvider;
-import de.augmentia.strandsagents.core.secret.cloud.CloudSecretProviderFactory;
-import de.augmentia.strandsagents.vault.VaultConfig;
-import de.augmentia.strandsagents.vault.VaultSecretProvider;
+import de.augmentia.strandsagents.features.secrets.SecretProvider;
+import de.augmentia.strandsagents.features.secrets.CloudSecretProviderFactory;
+import de.augmentia.strandsagents.features.secrets.VaultConfig;
+import de.augmentia.strandsagents.features.secrets.VaultSecretProvider;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.slf4j.Logger;

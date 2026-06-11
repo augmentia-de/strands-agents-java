@@ -27,6 +27,8 @@ SERVICE_NAME="${SERVICE_NAME:-cloud-quarkus}"
 MEMORY="${MEMORY:-512}"     # MB
 TIMEOUT="${TIMEOUT:-30}"    # Sekunden
 ENV_FILE="${ENV_FILE:-}"    # Optional: Pfad zu .env mit Lambda-Umgebungsvariablen
+# Wird automatisch aufgelöst, sofern nicht gesetzt
+SSM_EXTENSION_ARN="${SSM_EXTENSION_ARN:-}"
 
 REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 FULL_IMAGE="$REGISTRY/$ECR_REPO:$IMAGE_TAG"
@@ -82,6 +84,24 @@ ensure_ecr() {
     fi
 }
 
+resolve_ssm_extension_arn() {
+    if [[ -z "$SSM_EXTENSION_ARN" ]]; then
+        local arch
+        arch=$(uname -m)
+        case "$arch" in
+            aarch64|arm64) ssm_path="/aws/service/aws-parameters-and-secrets-lambda-extension/arm64/latest" ;;
+            *)             ssm_path="/aws/service/aws-parameters-and-secrets-lambda-extension/x86/latest" ;;
+        esac
+        SSM_EXTENSION_ARN=$(aws ssm get-parameter --name "$ssm_path" --region "$AWS_REGION" --query "Parameter.Value" --output text)
+        ok "SSM Extension ARN: $SSM_EXTENSION_ARN"
+    fi
+    # Presigned S3-URL zum Herunterladen des Layer-Inhalts
+    SSM_EXTENSION_URL=$(aws lambda get-layer-version-by-arn \
+        --arn "$SSM_EXTENSION_ARN" --region "$AWS_REGION" \
+        --query "Content.Location" --output text)
+    ok "SSM Extension URL: ${SSM_EXTENSION_URL:0:80}…"
+}
+
 build_and_push() {
     info "Baue Native-Image …"
     docker build -f "$PROJECT_ROOT/strands-agents-quarkus/src/main/docker/Dockerfile.native" \
@@ -89,6 +109,7 @@ build_and_push() {
 
     info "Baue Lambda-Adapter-Image …"
     docker build -f "$PROJECT_ROOT/strands-agents-quarkus/src/main/docker/Dockerfile.lambda" \
+        --build-arg "SSM_EXTENSION_URL=$SSM_EXTENSION_URL" \
         -t "$FULL_IMAGE" "$PROJECT_ROOT"
 
     info "Push nach ECR: $FULL_IMAGE"
@@ -259,6 +280,7 @@ ecr_login
 ensure_ecr
 ensure_lambda_role
 ensure_ssm_secrets
+resolve_ssm_extension_arn
 build_and_push
 deploy_lambda
 set_env_vars

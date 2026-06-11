@@ -2,45 +2,40 @@ package de.augmentia.strandsagents.examples.feature;
 
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.config.ModelFactory;
-import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.core.hook.HookRegistry;
-import de.augmentia.strandsagents.core.model.agent.AgentResult;
-import de.augmentia.strandsagents.core.plugin.hitl.HITLAuthority;
-import de.augmentia.strandsagents.core.plugin.hitl.HITLHook;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.config.ModelFactory;
+import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.features.pipeline.HookRegistry;
+import de.augmentia.strandsagents.model.agent.AgentResult;
+import de.augmentia.strandsagents.features.plugin.Plugin;
+import de.augmentia.strandsagents.features.hitl.HITLAuthority;
+import de.augmentia.strandsagents.features.hitl.HITLPlugin;
 import dev.langchain4j.model.chat.ChatModel;
 
 import java.util.List;
 import java.util.Scanner;
 
-/**
- * HITLDemo demonstrates the Human-in-the-Loop mechanism via Hook system.
- *
- * The agent may only execute a tool after the human has confirmed it
- * via console input (CONFIRM authority).
- */
 public class HITLDemo {
 
     public static void main(String[] args) {
-        System.out.println("=== HITL Demo (Hook-based) ===");
+        System.out.println("=== HITL Demo (Plugin-based) ===");
         System.out.println("Each tool call must be manually confirmed.\n");
 
         ChatModel model = ModelFactory.createOpenAiFromEnv();
 
         ToolRegistry toolRegistry = ToolRegistry.builder()
             .standard()
-            .with("de.augmentia.strandsagents.core.tools.CalculatorTool")
+            .with("de.augmentia.strandsagents.features.tools.CalculatorTool")
             .build();
 
         ToolExecutor toolExecutor = new ToolExecutor();
         var conversationManager = new SlidingWindowConversationManager(10);
 
-        HookRegistry hookRegistry = new HookRegistry();
-        hookRegistry.register(new HITLHook(
-            HITLHook.consoleProvider(),
+        var hitlPlugin = new HITLPlugin(
+            HITLPlugin.consoleProvider(),
             HITLAuthority.CONFIRM
-        ));
+        );
+        List<Plugin> plugins = List.of(hitlPlugin);
 
         Agent agent = new Agent(
             model,
@@ -49,8 +44,7 @@ public class HITLDemo {
             conversationManager,
             null,
             null,
-            List.of(),
-            hookRegistry
+            plugins
         );
 
         agent.setSystemPrompt("You are a helpful assistant with access to tools. "
@@ -79,14 +73,13 @@ public class HITLDemo {
                 try {
                     result = agent.execute(input);
                 } catch (Exception e) {
-                    System.out.println("Error: " + e.getMessage());
+                    System.err.println("Error: " + e.getMessage());
                     continue;
                 }
-                var durationMs = (System.nanoTime() - start) / 1_000_000;
+                long durationMs = (System.nanoTime() - start) / 1_000_000;
 
-                System.out.println("\nAgent: " + result.finalAnswer());
-                System.out.println("  " + durationMs + " ms, "
-                    + result.metrics().toolCallsCount() + " Tool-Calls");
+                System.out.println("\nAgent [" + result.stopReason() + "] (" + durationMs + "ms):");
+                System.out.println(result.finalAnswer());
             }
         }
     }

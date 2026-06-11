@@ -1,8 +1,8 @@
 package de.augmentia.strandsagents.quarkus.service;
 
-import de.augmentia.strandsagents.core.prompt.CompositePromptManager;
-import de.augmentia.strandsagents.core.prompt.PromptRegistry;
-import de.augmentia.strandsagents.core.prompt.YamlPromptManager;
+import de.augmentia.strandsagents.prompt.CompositePromptManager;
+import de.augmentia.strandsagents.prompt.PromptRegistry;
+import de.augmentia.strandsagents.prompt.YamlPromptManager;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;

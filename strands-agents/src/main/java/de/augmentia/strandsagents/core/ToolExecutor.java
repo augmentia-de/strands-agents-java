@@ -1,10 +1,12 @@
 package de.augmentia.strandsagents.core;
 
-import de.augmentia.strandsagents.core.model.tool.ToolExecutionResult;
+import de.augmentia.strandsagents.features.security.CapabilityToken;
+import de.augmentia.strandsagents.model.tool.ToolExecutionResult;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.*;
 
 public class ToolExecutor {
@@ -18,21 +20,42 @@ public class ToolExecutor {
     private final double timeoutProbability;
     private final double exceptionProbability;
     private final double invalidJsonProbability;
+    private Set<CapabilityToken> grantedCapabilities = Set.of();
 
     public ToolExecutor() {
         this(30);
     }
 
     public ToolExecutor(long timeoutSeconds) {
-        this.timeoutSeconds = timeoutSeconds;
-        this.randomFailureEnabled = Boolean.parseBoolean(System.getenv("RANDOM_TOOL_ERRORS_ENABLED"));
-
-        this.timeoutProbability = parseDoubleEnv("RANDOM_TOOL_TIMEOUT_PROBABILITY", 0.1);
-        this.exceptionProbability = parseDoubleEnv("RANDOM_TOOL_EXCEPTION_PROBABILITY", 0.1);
-        this.invalidJsonProbability = parseDoubleEnv("RANDOM_TOOL_INVALID_JSON_PROBABILITY", 0.1);
+        this(timeoutSeconds,
+            Boolean.parseBoolean(System.getenv("RANDOM_TOOL_ERRORS_ENABLED")),
+            parseDoubleEnvStatic("RANDOM_TOOL_TIMEOUT_PROBABILITY", 0.1),
+            parseDoubleEnvStatic("RANDOM_TOOL_EXCEPTION_PROBABILITY", 0.1),
+            parseDoubleEnvStatic("RANDOM_TOOL_INVALID_JSON_PROBABILITY", 0.1));
     }
 
-    private double parseDoubleEnv(String envVarName, double defaultValue) {
+    public ToolExecutor(long timeoutSeconds,
+                        boolean randomFailureEnabled,
+                        double timeoutProbability,
+                        double exceptionProbability,
+                        double invalidJsonProbability) {
+        this.timeoutSeconds = timeoutSeconds;
+        this.randomFailureEnabled = randomFailureEnabled;
+        this.timeoutProbability = timeoutProbability;
+        this.exceptionProbability = exceptionProbability;
+        this.invalidJsonProbability = invalidJsonProbability;
+    }
+
+    public ToolExecutor withGrantedCapabilities(Set<CapabilityToken> capabilities) {
+        this.grantedCapabilities = capabilities != null ? capabilities : Set.of();
+        return this;
+    }
+
+    public Set<CapabilityToken> getGrantedCapabilities() {
+        return grantedCapabilities;
+    }
+
+    static double parseDoubleEnvStatic(String envVarName, double defaultValue) {
         String envValue = System.getenv(envVarName);
         if (envValue != null && !envValue.isBlank()) {
             try {
@@ -92,6 +115,13 @@ public class ToolExecutor {
         }
 
         var toolMethod = registry.get(request.name());
+
+        var requiredCap = toolMethod.requiredCapability();
+        if (requiredCap != null && !grantedCapabilities.contains(requiredCap)) {
+            throw new SecurityException(
+                "Tool '" + request.name() + "' requires capability " + requiredCap
+                + " but executor only has: " + grantedCapabilities);
+        }
 
         var future = VIRTUAL_EXECUTOR.submit(() -> toolMethod.execute(request.arguments()));
         String result;

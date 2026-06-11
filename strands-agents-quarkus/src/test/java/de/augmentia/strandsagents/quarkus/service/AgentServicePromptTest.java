@@ -3,7 +3,7 @@ package de.augmentia.strandsagents.quarkus.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.skills.Skill;
+import de.augmentia.strandsagents.features.skills.Skill;
 import dev.langchain4j.agent.tool.Tool;
 import java.util.List;
 import java.util.Map;

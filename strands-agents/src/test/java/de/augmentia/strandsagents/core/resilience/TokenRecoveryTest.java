@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.core.resilience;
+package de.augmentia.strandsagents.features.resilience;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

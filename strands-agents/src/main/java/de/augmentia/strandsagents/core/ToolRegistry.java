@@ -2,8 +2,9 @@ package de.augmentia.strandsagents.core;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.augmentia.strandsagents.core.tools.*;
-import de.augmentia.strandsagents.core.tools.local.*;
+import de.augmentia.strandsagents.features.security.CapabilityToken;
+import de.augmentia.strandsagents.features.tools.*;
+import de.augmentia.strandsagents.features.tools.ToolCapability;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.agent.tool.ToolSpecifications;
@@ -29,14 +30,20 @@ public class ToolRegistry {
         for (Method method : toolInstance.getClass().getMethods()) {
             if (method.isAnnotationPresent(Tool.class)) {
                 var spec = ToolSpecifications.toolSpecificationFrom(method);
-                tools.put(spec.name(), new JavaToolMethod(toolInstance, method, spec));
+                var cap = method.isAnnotationPresent(ToolCapability.class)
+                    ? method.getAnnotation(ToolCapability.class).value()
+                    : null;
+                tools.put(spec.name(), new JavaToolMethod(toolInstance, method, spec, cap));
             }
         }
     }
 
     public void register(String name, Object toolInstance, Method method) {
         var spec = ToolSpecifications.toolSpecificationFrom(method);
-        tools.put(name, new JavaToolMethod(toolInstance, method, spec));
+        var cap = method.isAnnotationPresent(ToolCapability.class)
+            ? method.getAnnotation(ToolCapability.class).value()
+            : null;
+        tools.put(name, new JavaToolMethod(toolInstance, method, spec, cap));
     }
 
     public void register(String name, ToolSpecification spec, ToolMethod toolMethod) {
@@ -155,10 +162,19 @@ public class ToolRegistry {
         ToolSpecification spec();
 
         String execute(String jsonArguments) throws Exception;
+
+        default de.augmentia.strandsagents.features.security.CapabilityToken requiredCapability() {
+            return null;
+        }
     }
 
-    record JavaToolMethod(Object instance, Method method, ToolSpecification spec)
+    record JavaToolMethod(Object instance, Method method, ToolSpecification spec,
+                          de.augmentia.strandsagents.features.security.CapabilityToken requiredCapability)
             implements ToolMethod {
+
+        JavaToolMethod(Object instance, Method method, ToolSpecification spec) {
+            this(instance, method, spec, null);
+        }
 
         @Override
         public String execute(String jsonArguments) throws Exception {

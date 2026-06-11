@@ -7,7 +7,7 @@ The `SecretService` (Quarkus) resolves API keys in the following priority order:
 ```
 runtimeKey (Web UI / Admin API, in-memory)
   → Hashicorp Vault (VAULT_ADDR + VAULT_TOKEN)
-    → CloudSecretProvider (AWS SSM / GCP Secret Manager / Azure KV)
+    → CloudSecretProvider (AWS SSM / GCP Secret Manager)
       → Environment Variable (OPENAI_API_KEY)
         → MockChatModel (no key = dummy agent)
 ```
@@ -30,7 +30,7 @@ process environment.
 
 ## Option B: Cloud-Native Secret Stores
 
-All three implementations use **plain HTTP calls** — no AWS SDK, no Azure SDK,
+Both implementations use **plain HTTP calls** — no AWS SDK, no GCP SDK,
 no GCP SDK. This keeps native images small and dependencies minimal.
 
 ### B1: AWS SSM Parameter Store (Lambda)
@@ -92,7 +92,7 @@ The extension caches with a configurable TTL (default: 300s).
 
 ---
 
-### B2: GCP Secret Manager (Cloud Run / Cloud Functions / GCE)
+### B2: GCP Secret Manager (GCE / Cloud Run)
 
 **Mechanism:**
 
@@ -107,7 +107,7 @@ is used to call the Secret Manager REST API.
 
 **Prerequisites:**
 
-- Cloud Run / Cloud Functions / GCE has a runtime service account
+- Cloud Run / GCE VM has a runtime service account
 - Service account has `roles/secretmanager.secretAccessor` on the secret:
 
   ```bash
@@ -144,51 +144,35 @@ The metadata provider caches the access token until expiry (max 1h).
 
 ---
 
-### B3: Azure Key Vault (Azure Functions / App Service)
-
-Coming soon. Functional principle mirrors GCP:
-
-```
-Azure Function → Managed Identity Endpoint (169.254.169.254)
-  → OAuth2 Token → Key Vault REST API → Secret
-```
-
-**Planned config:**
-
-```properties
-strands.secret.cloud.provider=azure
-strands.secret.azure.keyvault.url=https://myvault.vault.azure.net
-strands.secret.azure.keyvault.secret-name=openai-api-key
-```
 
 ---
 
 ## Option C: Remote Admin Service via REST
 
 A **central Admin Service** on a GCP VM holds all API keys (encrypted via
-Hashicorp Vault or GCP Secret Manager). Serverless functions from any cloud
+Hashicorp Vault or GCP Secret Manager). Functions from AWS or GCP
 call the Admin Service at startup via REST.
 
 **Architecture:**
 
 ```
-                         ┌──────────────────┐
-                         │  OpenAI API       │
-                         └────────┬─────────┘
-                                  │
-             ┌────────────────────┼────────────────────┐
-             │                    │                    │
-        AWS Lambda          GCP Cloud Run        Azure Functions
-             │                    │                    │
-             └────────┬───────────┼────────────────────┘
-                      │           │
-                      ▼           ▼
-              ┌──────────────────────────────┐
-              │  Admin Service (GCP VM)       │
-              │  - Vault / GCP Secret Manager │
-              │  - Authenticator per Cloud     │
-              │  - Audit-Log (SOC 2)          │
-              └──────────────────────────────┘
+                   ┌──────────────────┐
+                   │  OpenAI API       │
+                   └────────┬─────────┘
+                            │
+              ┌─────────────┴─────────────┐
+              │                           │
+         AWS Lambda                 GCP VM / Cloud Run
+              │                           │
+              └────────┬──────────────────┘
+                       │
+                       ▼
+               ┌──────────────────────────────┐
+               │  Admin Service (GCP VM)       │
+               │  - Vault / GCP Secret Manager │
+               │  - Authenticator per Cloud     │
+               │  - Audit-Log (SOC 2)          │
+               └──────────────────────────────┘
 ```
 
 ### Authentication (without Shared Secret)
@@ -199,7 +183,6 @@ Each cloud provides its workload with a **cryptographically signed identity**:
 |-------|---------|--------|--------------|
 | AWS | SigV4 / IAM | `Authorization: AWS4-HMAC-SHA256 ...` | STS.GetCallerIdentity or signature |
 | GCP | Identity Token (JWT) | `Authorization: Bearer <JWT>` | Google Public Keys (JWKS) |
-| Azure | Managed Identity Token | `Authorization: Bearer <JWT>` | Azure AD Public Keys (JWKS) |
 
 ### Interface (Authenticator)
 
@@ -214,7 +197,7 @@ Pluggable via config:
 
 ```properties
 strands.secret.remote.url=https://admin.internal:8443/api/admin/key
-strands.secret.remote.authenticators=gcp,aws,azure
+strands.secret.remote.authenticators=gcp,aws
 ```
 
 ### Audit-Log (SOC 2)
@@ -271,7 +254,7 @@ For testing only — lost on restart.
 | Env Var | `aws lambda update-function-configuration` | No | CloudWatch |
 | AWS SSM | `aws ssm put-parameter --overwrite` | No | CloudTrail |
 | GCP SM | `gcloud secrets versions add` | No | Cloud Audit Logs |
-| Azure KV | `az keyvault secret set` | No | Azure Monitor |
+
 | Remote Admin | REST call to Admin Service | No | Custom Audit Log |
 | Hashicorp Vault | `vault kv put` | No | Vault Audit Log |
 | Runtime API Key | POST /api/admin/activate | No | No audit |
@@ -280,22 +263,21 @@ For testing only — lost on restart.
 
 ## Deployment Matrix
 
-| Method | AWS Lambda | GCP Cloud Run | GCP VM | Azure Functions | Local |
-|--------|-----------|---------------|--------|-----------------|-------|
-| Env Var | ✓ | ✓ | ✓ | ✓ | ✓ |
-| AWS SSM | ✓ (Extension) | — | — | — | — |
-| GCP SM | — | ✓ (Meta Server) | ✓ (Meta Server) | — | — |
-| Azure KV | — | — | — | ✓ (Managed ID) | — |
-| Remote Admin | ✓ | ✓ | — | ✓ | — |
-| Vault | ✓ (if reachable) | ✓ (if reachable) | ✓ | ✓ (if reachable) | ✓ |
-| Runtime Key | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Method | AWS Lambda | GCP Cloud Run | GCP VM | Local |
+|--------|-----------|---------------|--------|-------|
+| Env Var | ✓ | ✓ | ✓ | ✓ |
+| AWS SSM | ✓ (Extension) | — | — | — |
+| GCP SM | — | ✓ (Meta Server) | ✓ (Meta Server) | — |
+| Remote Admin | ✓ | ✓ | — | — |
+| Vault | ✓ (if reachable) | ✓ (if reachable) | ✓ | ✓ |
+| Runtime Key | ✓ | ✓ | ✓ | ✓ |
 
 ---
 
 ## Configuration Reference (application.properties)
 
 ```properties
-# Cloud provider: aws | gcp | azure | (none)
+# Cloud provider: aws | gcp | (none)
 strands.secret.cloud.provider=
 
 # AWS SSM Parameter Store
@@ -304,10 +286,6 @@ strands.secret.aws.ssm.path=
 # GCP Secret Manager
 strands.secret.gcp.project-id=
 strands.secret.gcp.secret-id=
-
-# Azure Key Vault (coming)
-strands.secret.azure.keyvault.url=
-strands.secret.azure.keyvault.secret-name=
 
 # Remote Admin Service (coming)
 strands.secret.remote.url=
@@ -327,7 +305,7 @@ strands-agents/src/main/java/de/augmentia/strandsagents/core/secret/
 └── cloud/
     ├── AwsSsmProvider.java            # AWS SSM via Lambda Extension
     ├── GcpSecretManagerProvider.java  # GCP SM via Metadata Server
-    ├── AzureKeyVaultProvider.java     # coming
+
     ├── CloudSecretProviderFactory.java# Factory
     └── remote/
         ├── RemoteSecretProvider.java  # coming

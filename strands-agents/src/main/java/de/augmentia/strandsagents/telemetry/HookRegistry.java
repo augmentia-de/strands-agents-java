@@ -1,7 +1,7 @@
-package de.augmentia.strandsagents.telemetry;
+package de.augmentia.strandsagents.features.telemetry;
 
 import de.augmentia.strandsagents.core.AgentEventListener;
-import de.augmentia.strandsagents.core.model.event.AgentEvent;
+import de.augmentia.strandsagents.model.event.AgentEvent;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 

@@ -2,10 +2,10 @@ package de.augmentia.strandsagents.examples.feature;
 
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.core.agent.Agent;
-import de.augmentia.strandsagents.core.config.ModelFactory;
-import de.augmentia.strandsagents.core.resilience.ResilienceConfig;
-import de.augmentia.strandsagents.core.resilience.RetryConfig;
+import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.config.ModelFactory;
+import de.augmentia.strandsagents.features.resilience.ResilienceConfig;
+import de.augmentia.strandsagents.features.resilience.RetryConfig;
 import de.augmentia.strandsagents.examples.tools.ChaosMonkeyHook;
 import de.augmentia.strandsagents.examples.tools.RandomTimeoutHook;
 import de.augmentia.strandsagents.examples.tools.ToolCallingMockModel;

@@ -9,8 +9,7 @@ model:
 
 tools:
   preset: "standard"
-  additional:
-    - "de.augmentia.strandsagents.core.tools.TimeTool"
+  additional: []
   include: ~
   exclude: ~
 
