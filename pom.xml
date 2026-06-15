@@ -80,6 +80,11 @@
                 <artifactId>strands-secret-provider-gcp</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>de.augmentia.strandsagents</groupId>
+                <artifactId>strands-mcp-client-google</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
             <dependency>
                 <groupId>dev.langchain4j</groupId>

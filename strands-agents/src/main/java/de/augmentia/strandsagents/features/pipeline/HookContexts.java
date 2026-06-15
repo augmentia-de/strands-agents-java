@@ -25,7 +25,8 @@ public final class HookContexts {
         String sessionId,
         StringBuilder systemPrompt,
         List<Message> messages,
-        List<ToolSpecification> tools
+        List<ToolSpecification> tools,
+        List<Message> additionalMessages
     ) {}
 
     public record AfterModelCallContext(

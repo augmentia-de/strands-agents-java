@@ -5,7 +5,10 @@ import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.features.pipeline.HookContexts;
 import de.augmentia.strandsagents.features.pipeline.HookResult;
 import de.augmentia.strandsagents.features.plugin.Plugin;
+import de.augmentia.strandsagents.model.message.SystemMessage;
 import de.augmentia.strandsagents.prompt.PromptRegistry;
+import java.time.Instant;
+import java.util.UUID;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -64,11 +67,10 @@ public class AgentSkillsPlugin implements Plugin {
     public HookResult beforeModelCall(HookContexts.BeforeModelCallContext ctx) {
         if (skills.isEmpty()) return new HookResult.Continue();
         var xml = generateSkillsXml();
-        if (!lastInjectedXml.isEmpty()) {
-            int idx = ctx.systemPrompt().indexOf(lastInjectedXml);
-            if (idx >= 0) ctx.systemPrompt().delete(idx, idx + lastInjectedXml.length());
+        if (xml.equals(lastInjectedXml)) {
+            return new HookResult.Continue();
         }
-        ctx.systemPrompt().append(xml);
+        ctx.additionalMessages().add(new SystemMessage(UUID.randomUUID().toString(), Instant.now(), xml, Map.of()));
         lastInjectedXml = xml;
         return new HookResult.Continue();
     }

@@ -81,7 +81,7 @@ class PluginRegistryTest {
     }
 
     @Test
-    void pluginCanSetSystemPromptViaHook() {
+    void pluginCanModifyEffectivePromptWithoutChangingField() {
         var plugin = new Plugin() {
             @Override public String name() { return "prompt-plugin"; }
             @Override public void initAgent(Agent agent) {}
@@ -98,7 +98,8 @@ class PluginRegistryTest {
 
         agent.execute("test");
 
-        assertThat(agent.getSystemPrompt()).contains("<!-- added-by-plugin -->");
+        // Hook modifications no longer persist to the field (cache-friendly)
+        assertThat(agent.getSystemPrompt()).isEqualTo("Base prompt");
     }
 
     @Test

@@ -679,7 +679,11 @@ public class AgentService implements de.augmentia.strandsagents.features.service
     public List<Map<String, String>> getMcpServers() {
         if (capabilityRegistry == null) return List.of();
         return capabilityRegistry.mcpServers().stream()
-            .map(s -> Map.of("name", s.name(), "type", s.url() != null ? "http" : "stdio"))
+            .map(s -> {
+                var type = s.clientType() != null ? s.clientType()
+                    : "streamable-http".equals(s.transportType().name()) ? "streamable-http" : "sse";
+                return Map.of("name", s.name(), "type", type);
+            })
             .toList();
     }
 

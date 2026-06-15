@@ -93,6 +93,7 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
     WebFetchTool.Params.class,
     WebSearchTool.class,
     WebSearchTool.Params.class,
+    de.augmentia.strandsagents.features.mcp.McpClientFactory.class,
     de.augmentia.strandsagents.features.skills.McpListTool.class,
     de.augmentia.strandsagents.features.skills.McpListTool.Params.class,
     de.augmentia.strandsagents.features.skills.McpIngestTool.class,

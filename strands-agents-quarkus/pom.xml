@@ -104,6 +104,11 @@
             <artifactId>assertj-core</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>de.augmentia.strandsagents</groupId>
+            <artifactId>strands-mcp-client-google</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -140,6 +145,7 @@
                 <configuration>
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                        <strands.agent.mcp.config>${project.parent.basedir}/config/MCP_SERVER_CONFIG.json</strands.agent.mcp.config>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>

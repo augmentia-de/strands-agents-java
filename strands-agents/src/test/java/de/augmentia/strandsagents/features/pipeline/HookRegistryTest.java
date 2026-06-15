@@ -6,6 +6,7 @@ import de.augmentia.strandsagents.model.agent.AgentResult;
 import de.augmentia.strandsagents.model.agent.ExecutionMetrics;
 import de.augmentia.strandsagents.model.agent.StopReason;
 import dev.langchain4j.agent.tool.ToolSpecification;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -74,7 +75,7 @@ class HookRegistryTest {
     @Test
     void beforeModelCallContext() {
         var sb = new StringBuilder("sys");
-        var ctx = new HookContexts.BeforeModelCallContext("s1", sb, List.of(), List.of());
+        var ctx = new HookContexts.BeforeModelCallContext("s1", sb, List.of(), List.of(), new ArrayList<>());
         assertThat(ctx.systemPrompt().toString()).isEqualTo("sys");
         assertThat(ctx.messages()).isEmpty();
         assertThat(ctx.tools()).isEmpty();
@@ -274,7 +275,7 @@ class HookRegistryTest {
         var registry = new HookRegistry();
         registry.register(new CancelHook("cancel-mc"));
         var sb = new StringBuilder("sys");
-        var ctx = new HookContexts.BeforeModelCallContext("s1", sb, List.of(), List.of());
+        var ctx = new HookContexts.BeforeModelCallContext("s1", sb, List.of(), List.of(), new ArrayList<>());
         assertThat(registry.triggerBeforeModelCall(ctx))
             .isInstanceOfSatisfying(HookResult.Cancel.class, c ->
                 assertThat(c.reason()).contains("cancel-mc"));
@@ -286,7 +287,7 @@ class HookRegistryTest {
         registry.register(new TestHook("a"));
         var sb = new StringBuilder("sys");
         var tools = List.of(ToolSpecification.builder().name("tool1").build());
-        var ctx = new HookContexts.BeforeModelCallContext("s1", sb, List.of(), tools);
+        var ctx = new HookContexts.BeforeModelCallContext("s1", sb, List.of(), tools, new ArrayList<>());
         var result = registry.triggerBeforeModelCall(ctx);
         assertThat(result).isInstanceOf(HookResult.Modify.class);
         assertThat(((HookResult.Modify<?>) result).value()).isEqualTo(tools);
@@ -298,7 +299,7 @@ class HookRegistryTest {
         var newTools = List.of(ToolSpecification.builder().name("newTool").build());
         registry.register(new ModifyBeforeModelCallToolHook("mod-tools", newTools));
         var sb = new StringBuilder("sys");
-        var ctx = new HookContexts.BeforeModelCallContext("s1", sb, List.of(), List.of());
+        var ctx = new HookContexts.BeforeModelCallContext("s1", sb, List.of(), List.of(), new ArrayList<>());
         var result = registry.triggerBeforeModelCall(ctx);
         assertThat(result).isInstanceOf(HookResult.Modify.class);
         assertThat(((HookResult.Modify<?>) result).value()).isEqualTo(newTools);
@@ -309,7 +310,7 @@ class HookRegistryTest {
         var registry = new HookRegistry();
         registry.register(new ModifyBeforeModelCallPromptHook("mod-prompt"));
         var sb = new StringBuilder("original");
-        var ctx = new HookContexts.BeforeModelCallContext("s1", sb, List.of(), List.of());
+        var ctx = new HookContexts.BeforeModelCallContext("s1", sb, List.of(), List.of(), new ArrayList<>());
         registry.triggerBeforeModelCall(ctx);
         assertThat(ctx.systemPrompt().toString()).isEqualTo("modified by hook");
     }

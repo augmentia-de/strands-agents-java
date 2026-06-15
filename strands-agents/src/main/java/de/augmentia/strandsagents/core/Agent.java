@@ -96,6 +96,7 @@ public class Agent {
     private final ChatMemory chatMemory;
     private ToolRegistry toolRegistry;
     private final ToolExecutor toolExecutor;
+    private volatile List<String> lastToolNames = List.of();
     private String sessionId;
     private ChatModel simpleModel;
     private final ConversationManager conversationManager;
@@ -528,7 +529,7 @@ public class Agent {
             var sb = new StringBuilder(systemPrompt != null ? systemPrompt : "");
             var bie = new BeforeInvocationEvent(sid, Instant.now(), sb, domainMessages);
             fire(bie);
-            systemPrompt = sb.toString().trim();
+            var effectivePrompt = sb.toString().trim();
 
             var toolSpecs = structuredForceActive
                 ? List.<dev.langchain4j.agent.tool.ToolSpecification>of()
@@ -536,9 +537,9 @@ public class Agent {
 
             // Hook: beforeModelCall
             var beforeMcCtx = new HookContexts.BeforeModelCallContext(
-                sid, new StringBuilder(systemPrompt), domainMessages, toolSpecs);
+                sid, new StringBuilder(effectivePrompt), domainMessages, toolSpecs, new ArrayList<>());
             var beforeMcResult = hookRegistry.triggerBeforeModelCall(beforeMcCtx);
-            systemPrompt = beforeMcCtx.systemPrompt().toString();
+            effectivePrompt = beforeMcCtx.systemPrompt().toString();
             if (beforeMcResult instanceof HookResult.Modify<?> m
                     && m.value() instanceof List<?> list) {
                 @SuppressWarnings("unchecked")
@@ -559,6 +560,41 @@ public class Agent {
                 return result;
             }
 
+            // Detect tool changes and notify the LLM
+            var currentToolNames = toolSpecs.stream()
+                .map(ToolSpecification::name)
+                .sorted()
+                .toList();
+            if (!currentToolNames.equals(lastToolNames)) {
+                if (!lastToolNames.isEmpty()) {
+                    var added = new ArrayList<>(currentToolNames);
+                    added.removeAll(lastToolNames);
+                    var removed = new ArrayList<>(lastToolNames);
+                    removed.removeAll(currentToolNames);
+                    var notice = new StringBuilder("SYSTEM NOTE: Your available tools have been updated.");
+                    if (!added.isEmpty()) {
+                        notice.append(" Added: ").append(String.join(", ", added));
+                    }
+                    if (!removed.isEmpty()) {
+                        notice.append(" Removed: ").append(String.join(", ", removed));
+                    }
+                    log.debug("Tool change detected — added={}, removed={}", added, removed);
+                    beforeMcCtx.additionalMessages().add(
+                        new de.augmentia.strandsagents.model.message.SystemMessage(
+                            UUID.randomUUID().toString(), Instant.now(), notice.toString(), Map.of()));
+                }
+                lastToolNames = currentToolNames;
+            }
+
+            // Persist additional messages from hooks and tool change notifications into chatMemory
+            if (!beforeMcCtx.additionalMessages().isEmpty()) {
+                for (var msg : beforeMcCtx.additionalMessages()) {
+                    chatMemory.add(ChatMessageConverter.toLangChain4j(msg));
+                }
+                currentMessages = chatMemory.messages();
+                domainMessages = ChatMessageConverter.toDomainMessages(currentMessages);
+            }
+
             // LLM call with afterModelCall hook & retry support
             var responseText = "";
             AiMessage aiMessage = null;
@@ -569,7 +605,7 @@ public class Agent {
                 fire(new ModelRequestedEvent(sid, Instant.now(), domainMessages));
 
                 try {
-                    response = callWithResilience(currentMessages, toolSpecs);
+                    response = callWithResilience(currentMessages, toolSpecs, effectivePrompt);
                 } catch (Exception e) {
                     phase = AgentPhase.FAILED;
                     var durationMs = (System.nanoTime() - start) / 1_000_000;
@@ -851,13 +887,13 @@ public class Agent {
         return model.chat(request);
     }
 
-    private ChatResponse callWithResilience(List<ChatMessage> currentMessages, List<ToolSpecification> toolSpecs) {
+    private ChatResponse callWithResilience(List<ChatMessage> currentMessages, List<ToolSpecification> toolSpecs, String effectivePrompt) {
         var recovery = new TokenRecovery();
         var msgs = currentMessages;
 
         while (true) {
             try {
-                var request = buildRequest(msgs, toolSpecs);
+                var request = buildRequest(msgs, toolSpecs, effectivePrompt);
 
                 Callable<ChatResponse> chatCall = () -> doChat(request);
 
@@ -882,11 +918,11 @@ public class Agent {
         }
     }
 
-    private ChatRequest buildRequest(List<ChatMessage> messages, List<ToolSpecification> toolSpecs) {
+    private ChatRequest buildRequest(List<ChatMessage> messages, List<ToolSpecification> toolSpecs, String effectivePrompt) {
         var builder = ChatRequest.builder();
-        if (systemPrompt != null && !systemPrompt.isBlank()) {
+        if (effectivePrompt != null && !effectivePrompt.isBlank()) {
             var allMessages = new ArrayList<ChatMessage>();
-            allMessages.add(SystemMessage.from(systemPrompt));
+            allMessages.add(SystemMessage.from(effectivePrompt));
             allMessages.addAll(messages);
             builder.messages(allMessages);
         } else {

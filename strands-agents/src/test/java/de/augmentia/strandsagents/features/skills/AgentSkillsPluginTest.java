@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.core.MockChatModel;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -184,11 +185,38 @@ class AgentSkillsPluginTest {
     }
 
     @Test
-    void initAgentWithSkillsCallsInject() {
+    void beforeModelCallInjectsSkillsAsAdditionalMessageOnFirstCall() {
         var plugin = new AgentSkillsPlugin(List.of(TEST_SKILL));
-        var agent = new Agent(new MockChatModel());
-        plugin.initAgent(agent);
-        agent.execute("hello");
+        var sb = new StringBuilder("system");
+        var msgs = List.<de.augmentia.strandsagents.model.message.Message>of();
+        var additional = new ArrayList<de.augmentia.strandsagents.model.message.Message>();
+        var ctx = new de.augmentia.strandsagents.features.pipeline.HookContexts.BeforeModelCallContext(
+            "s1", sb, msgs, List.of(), additional);
+
+        plugin.beforeModelCall(ctx);
+
+        assertThat(additional).hasSize(1);
+        assertThat(additional.get(0)).isInstanceOf(de.augmentia.strandsagents.model.message.SystemMessage.class);
+        assertThat(((de.augmentia.strandsagents.model.message.SystemMessage) additional.get(0)).content())
+            .contains("test-skill");
+    }
+
+    @Test
+    void beforeModelCallDoesNotDuplicateOnSameSkills() {
+        var plugin = new AgentSkillsPlugin(List.of(TEST_SKILL));
+        var sb = new StringBuilder("system");
+        var msgs = List.<de.augmentia.strandsagents.model.message.Message>of();
+        var additional = new ArrayList<de.augmentia.strandsagents.model.message.Message>();
+        var ctx = new de.augmentia.strandsagents.features.pipeline.HookContexts.BeforeModelCallContext(
+            "s1", sb, msgs, List.of(), additional);
+
+        // First call — injects
+        plugin.beforeModelCall(ctx);
+        assertThat(additional).hasSize(1);
+
+        // Second call with same skills — no duplicate
+        plugin.beforeModelCall(ctx);
+        assertThat(additional).hasSize(1);
     }
 
     @Test

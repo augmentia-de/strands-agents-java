@@ -35,3 +35,5 @@ deploy/serverless/set_cloud_credentials.sh
 /strands-cli/
 /.github/
 /.chat-memory/
+/docker/google/credentials.json
+/docker/google/

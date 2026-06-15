@@ -54,7 +54,8 @@ class AgentTest {
 
     @Test
     void pluginHooksCanModifySystemPrompt() {
-        var agent = new Agent(new MockChatModel());
+        var model = new RecordingChatModel();
+        var agent = new Agent(model);
         agent.setSystemPrompt("Base prompt");
         agent.addHook(new AgentHook() {
             @Override public String name() { return "test-hook"; }
@@ -66,13 +67,17 @@ class AgentTest {
 
         agent.execute("test");
 
-        assertThat(agent.getSystemPrompt()).contains("Base prompt");
-        assertThat(agent.getSystemPrompt()).contains("<!-- extra -->");
+        assertThat(agent.getSystemPrompt()).isEqualTo("Base prompt");
+        var request = model.lastRequest();
+        assertThat(request).isNotNull();
+        var firstMsg = request.messages().get(0);
+        assertThat(((dev.langchain4j.data.message.SystemMessage) firstMsg).text()).contains("<!-- extra -->");
     }
 
     @Test
     void multiplePluginHooksAreAppliedInOrder() {
-        var agent = new Agent(new MockChatModel());
+        var model = new RecordingChatModel();
+        var agent = new Agent(model);
         agent.setSystemPrompt("Start");
         agent.addHook(new AgentHook() {
             @Override public String name() { return "hook-a"; }
@@ -91,13 +96,18 @@ class AgentTest {
 
         agent.execute("test");
 
-        assertThat(agent.getSystemPrompt()).isEqualTo("Start A B");
+        assertThat(agent.getSystemPrompt()).isEqualTo("Start");
+        var request = model.lastRequest();
+        assertThat(request).isNotNull();
+        var firstMsg = request.messages().get(0);
+        assertThat(((dev.langchain4j.data.message.SystemMessage) firstMsg).text()).isEqualTo("Start A B");
     }
 
     @Test
     void systemPromptModificationViaBeforeInvocationEvent() {
         var captured = new StringBuilder[]{new StringBuilder()};
-        var agent = new Agent(new MockChatModel());
+        var model = new RecordingChatModel();
+        var agent = new Agent(model);
         agent.setSystemPrompt("Original");
         agent.setEventListener(event -> {
             if (event instanceof de.augmentia.strandsagents.model.event.BeforeInvocationEvent bie) {
@@ -109,7 +119,12 @@ class AgentTest {
         agent.execute("test");
 
         assertThat(captured[0].toString()).contains("Original");
-        assertThat(agent.getSystemPrompt()).contains("event-added");
+        assertThat(captured[0].toString()).contains("event-added");
+        assertThat(agent.getSystemPrompt()).isEqualTo("Original");
+        var request = model.lastRequest();
+        assertThat(request).isNotNull();
+        var firstMsg = request.messages().get(0);
+        assertThat(((dev.langchain4j.data.message.SystemMessage) firstMsg).text()).contains("event-added");
     }
 
     // ── P1: Conversation Manager Pruning Integration ────────────────
@@ -308,6 +323,103 @@ class AgentTest {
         var request = model.lastRequest();
         assertThat(request.toolSpecifications()).isNotEmpty();
         assertThat(request.toolSpecifications().get(0).name()).isEqualTo("my-tool");
+    }
+
+    // ── P1: Dynamic Tool Change Notifications ────────────────────────
+
+    @Test
+    void toolChangeDetectedWhenToolAddedBetweenTurns() {
+        var model = new RecordingChatModel();
+        var registry = new ToolRegistry();
+        var tool = new de.augmentia.strandsagents.features.tools.AgentTool<Object>() {
+            @Override public String name() { return "tool-a"; }
+            @Override public String description() { return "Tool A"; }
+            @Override public Class<Object> parameterType() { return Object.class; }
+            @Override public com.fasterxml.jackson.databind.node.ObjectNode parameterSchema() {
+                return com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+            }
+            @Override
+            public de.augmentia.strandsagents.features.tools.ToolResult execute(
+                    String id, Object p, java.util.concurrent.atomic.AtomicBoolean a,
+                    java.util.function.Consumer<de.augmentia.strandsagents.features.tools.ToolResult> u) {
+                return de.augmentia.strandsagents.features.tools.ToolResult.success("ok");
+            }
+        };
+        registry.register(tool);
+        var agent = new Agent(model, registry, new ToolExecutor());
+
+        // First turn with tool-a only
+        agent.execute("first turn");
+        var messagesAfterFirst = agent.getChatMemory().messages();
+        var noticesAfterFirst = messagesAfterFirst.stream()
+            .filter(m -> m instanceof dev.langchain4j.data.message.SystemMessage)
+            .filter(m -> ((dev.langchain4j.data.message.SystemMessage) m).text().contains("tools have been updated"))
+            .count();
+        assertThat(noticesAfterFirst).as("no tool change notice on first turn").isZero();
+
+        // Add a second tool mid-session
+        var toolB = new de.augmentia.strandsagents.features.tools.AgentTool<Object>() {
+            @Override public String name() { return "tool-b"; }
+            @Override public String description() { return "Tool B"; }
+            @Override public Class<Object> parameterType() { return Object.class; }
+            @Override public com.fasterxml.jackson.databind.node.ObjectNode parameterSchema() {
+                return com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+            }
+            @Override
+            public de.augmentia.strandsagents.features.tools.ToolResult execute(
+                    String id, Object p, java.util.concurrent.atomic.AtomicBoolean a,
+                    java.util.function.Consumer<de.augmentia.strandsagents.features.tools.ToolResult> u) {
+                return de.augmentia.strandsagents.features.tools.ToolResult.success("ok");
+            }
+        };
+        agent.addTool(toolB);
+
+        // Second turn — tool change should be detected
+        agent.execute("second turn");
+        var messagesAfterSecond = agent.getChatMemory().messages();
+        var noticesAfterSecond = messagesAfterSecond.stream()
+            .filter(m -> m instanceof dev.langchain4j.data.message.SystemMessage)
+            .filter(m -> ((dev.langchain4j.data.message.SystemMessage) m).text().contains("tools have been updated"))
+            .toList();
+        assertThat(noticesAfterSecond).hasSize(1);
+        assertThat(((dev.langchain4j.data.message.SystemMessage) noticesAfterSecond.get(0)).text())
+            .contains("tool-b");
+    }
+
+    @Test
+    void toolChangeDetectedWhenToolRemovedBetweenTurns() {
+        var model = new RecordingChatModel();
+        var registry = new ToolRegistry();
+        var tool = new de.augmentia.strandsagents.features.tools.AgentTool<Object>() {
+            @Override public String name() { return "tool-a"; }
+            @Override public String description() { return "Tool A"; }
+            @Override public Class<Object> parameterType() { return Object.class; }
+            @Override public com.fasterxml.jackson.databind.node.ObjectNode parameterSchema() {
+                return com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+            }
+            @Override
+            public de.augmentia.strandsagents.features.tools.ToolResult execute(
+                    String id, Object p, java.util.concurrent.atomic.AtomicBoolean a,
+                    java.util.function.Consumer<de.augmentia.strandsagents.features.tools.ToolResult> u) {
+                return de.augmentia.strandsagents.features.tools.ToolResult.success("ok");
+            }
+        };
+        registry.register(tool);
+        var agent = new Agent(model, registry, new ToolExecutor());
+
+        agent.execute("first turn");
+
+        agent.removeTool("tool-a");
+
+        agent.execute("second turn");
+        var messages = agent.getChatMemory().messages();
+        var notices = messages.stream()
+            .filter(m -> m instanceof dev.langchain4j.data.message.SystemMessage)
+            .filter(m -> ((dev.langchain4j.data.message.SystemMessage) m).text().contains("tools have been updated"))
+            .toList();
+        assertThat(notices).hasSize(1);
+        assertThat(((dev.langchain4j.data.message.SystemMessage) notices.get(0)).text())
+            .contains("Removed: tool-a");
     }
 
     // ── Helper: RecordingChatModel ───────────────────────────────────
