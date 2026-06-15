@@ -1,0 +1,19 @@
+{
+    "model": "gpt-4o",
+    "systemPrompt": "You are a JSON-configured assistant.",
+    "temperature": 0.3,
+    "maxIterations": 10,
+    "maxMessages": 25,
+    "provider": "OPENAI",
+    "tools": [
+        "de.augmentia.strandsagents.features.tools.WebSearchTool",
+        "de.augmentia.strandsagents.features.tools.WebFetchTool"
+    ],
+    "resilience": {
+        "retry": {
+            "maxAttempts": 5,
+            "backoffDelayMs": 2000,
+            "backoffMultiplier": 3.0
+        }
+    }
+}

@@ -119,6 +119,24 @@ public class Agent {
     private volatile Thread executionThread;
 
     /**
+     * Mutable runtime configuration snapshot source.
+     * <p>
+     * During construction, {@link #initRunConfig()} copies the Agent's own fields
+     * ({@link #toolRegistry}, {@link #hookRegistry}, {@link #systemPrompt},
+     * {@link #structuredOutputConfig}) into this config object. All subsequent
+     * setters on Agent (e.g. {@link #setSystemPrompt(String)}) update both the
+     * Agent field and this config in parallel, while getters prefer the config
+     * value with the Agent field as fallback.
+     * <p>
+     * At the start of {@link #executeLoop(String, String, Map)} a call to
+     * {@link AgentRunConfig#snapshot()} captures an immutable {@link RunSnapshot}
+     * that is used for the entire execution. This ensures consistent configuration
+     * even if the Agent's fields are mutated concurrently by a different thread
+     * (e.g. via {@link #setToolRegistry(ToolRegistry)}).
+     */
+    private final AgentRunConfig runConfig = new AgentRunConfig();
+
+    /**
      * Constructs an Agent with only a chat model and default components.
      *
      * @param model the chat model to use for orchestration
@@ -217,6 +235,7 @@ public class Agent {
         this.sessionId = UUID.randomUUID().toString();
         this.eventPublisher = new SubmissionPublisher<>();
         this.hookRegistry = new HookRegistry();
+        initRunConfig();
         log.debug("Agent created — model={}, tools={}, convMgr={}, sessionMgr={}, resilience={}",
             model.getClass().getSimpleName(),
             toolRegistry != null ? toolRegistry.size() : 0,
@@ -230,6 +249,7 @@ public class Agent {
                  ResilienceConfig resilienceConfig, HookRegistry hookRegistry) {
         this(model, toolRegistry, toolExecutor, conversationManager, sessionManager, resilienceConfig);
         this.hookRegistry = hookRegistry != null ? hookRegistry : new HookRegistry();
+        runConfig.setHookRegistry(this.hookRegistry);
     }
 
     public Agent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
@@ -241,16 +261,17 @@ public class Agent {
 
     public Agent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                  ConversationManager conversationManager, SessionManager sessionManager,
-                 ResilienceConfig resilienceConfig, List<Plugin> plugins, HookRegistry hookRegistry) {
-        this(model, toolRegistry, toolExecutor, conversationManager, sessionManager, resilienceConfig, hookRegistry);
+                 ChatMemoryStore chatMemoryStore, ResilienceConfig resilienceConfig,
+                 List<Plugin> plugins) {
+        this(model, toolRegistry, toolExecutor, conversationManager, sessionManager,
+            chatMemoryStore, resilienceConfig);
         initPlugins(plugins);
     }
 
     public Agent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                  ConversationManager conversationManager, SessionManager sessionManager,
-                 ChatMemoryStore chatMemoryStore, ResilienceConfig resilienceConfig,
-                 List<Plugin> plugins) {
-        this(model, toolRegistry, toolExecutor, conversationManager, sessionManager, chatMemoryStore, resilienceConfig);
+                 ResilienceConfig resilienceConfig, List<Plugin> plugins, HookRegistry hookRegistry) {
+        this(model, toolRegistry, toolExecutor, conversationManager, sessionManager, resilienceConfig, hookRegistry);
         initPlugins(plugins);
     }
 
@@ -268,6 +289,33 @@ public class Agent {
         if (config.systemPrompt() != null && !config.systemPrompt().isBlank()) {
             setSystemPrompt(config.systemPrompt());
         }
+    }
+
+    /**
+     * Copies the Agent's current field values into {@link #runConfig}.
+     * Called once at the end of the main constructor so that the mutable
+     * config reflects the initial component setup. Subsequent mutations go
+     * through the individual setters which update both sides in parallel.
+     */
+    private void initRunConfig() {
+        runConfig.setToolRegistry(toolRegistry);
+        runConfig.setHookRegistry(hookRegistry);
+        runConfig.setSystemPrompt(systemPrompt);
+        runConfig.setStructuredOutputConfig(structuredOutputConfig);
+    }
+
+    /**
+     * Returns the mutable runtime configuration holder.
+     * <p>
+     * The returned {@link AgentRunConfig} can be used to inspect or modify
+     * the agent's current configuration outside of the main Agent API.
+     * Call {@link AgentRunConfig#snapshot()} to capture an immutable view
+     * for safe use across thread boundaries.
+     *
+     * @return the runtime config (never null)
+     */
+    public AgentRunConfig getRunConfig() {
+        return runConfig;
     }
 
     public List<Plugin> getPlugins() {
@@ -319,18 +367,20 @@ public class Agent {
 
     public void setStructuredOutputConfig(StructuredOutputConfig config) {
         this.structuredOutputConfig = config;
+        runConfig.setStructuredOutputConfig(config);
     }
 
     public StructuredOutputConfig getStructuredOutputConfig() {
-        return structuredOutputConfig;
+        return runConfig.getStructuredOutputConfig() != null ? runConfig.getStructuredOutputConfig() : structuredOutputConfig;
     }
 
     public String getSystemPrompt() {
-        return systemPrompt;
+        return runConfig.getSystemPrompt();
     }
 
     public void setSystemPrompt(String systemPrompt) {
         this.systemPrompt = systemPrompt;
+        runConfig.setSystemPrompt(systemPrompt);
     }
 
     /**
@@ -451,6 +501,7 @@ public class Agent {
 
     private AgentResult executeLoop(String sid, String prompt, Map<String, Object> contextVariables) {
         log.debug("executeLoop start — sessionId={}", sid);
+        var run = runConfig.snapshot();
         cancelled = false;
         executionThread = Thread.currentThread();
         try {
@@ -465,7 +516,7 @@ public class Agent {
         phase = AgentPhase.EXECUTING;
         fire(new AgentStartedEvent(sid, Instant.now(), prompt));
 
-        var beforeAgentResult = hookRegistry.triggerBeforeAgent(
+        var beforeAgentResult = run.hookRegistry().triggerBeforeAgent(
             new HookContexts.BeforeAgentContext(sid, prompt, contextVariables));
         if (beforeAgentResult instanceof HookResult.Modify<?> m) {
             log.debug("beforeAgent hook modified prompt — was '{}', now '{}'",
@@ -526,19 +577,20 @@ public class Agent {
                 }
             }
 
-            var sb = new StringBuilder(systemPrompt != null ? systemPrompt : "");
+            var sb = new StringBuilder(run.systemPrompt() != null ? run.systemPrompt() : "");
             var bie = new BeforeInvocationEvent(sid, Instant.now(), sb, domainMessages);
             fire(bie);
             var effectivePrompt = sb.toString().trim();
 
-            var toolSpecs = structuredForceActive
-                ? List.<dev.langchain4j.agent.tool.ToolSpecification>of()
-                : toolRegistry.getSpecifications();
+            List<dev.langchain4j.agent.tool.ToolSpecification> toolSpecs = structuredForceActive
+                ? java.util.Collections.emptyList()
+                : run.toolRegistry() != null ? run.toolRegistry().getSpecifications()
+                  : java.util.Collections.emptyList();
 
             // Hook: beforeModelCall
             var beforeMcCtx = new HookContexts.BeforeModelCallContext(
                 sid, new StringBuilder(effectivePrompt), domainMessages, toolSpecs, new ArrayList<>());
-            var beforeMcResult = hookRegistry.triggerBeforeModelCall(beforeMcCtx);
+            var beforeMcResult = run.hookRegistry().triggerBeforeModelCall(beforeMcCtx);
             effectivePrompt = beforeMcCtx.systemPrompt().toString();
             if (beforeMcResult instanceof HookResult.Modify<?> m
                     && m.value() instanceof List<?> list) {
@@ -631,7 +683,7 @@ public class Agent {
                     hookRetry, inputTokens, outputTokens, responseText.length());
 
                 // Hook: afterModelCall
-                var afterMc = hookRegistry.triggerAfterModelCall(
+                var afterMc = run.hookRegistry().triggerAfterModelCall(
                     new HookContexts.AfterModelCallContext(sid, responseText, inputTokens, outputTokens), responseText);
                 if (afterMc instanceof HookResult.Cancel c) {
                     log.debug("afterModelCall hook cancelled — reason={}", c.reason());
@@ -676,7 +728,8 @@ public class Agent {
             chatMemory.add(aiMessage);
 
             // Structured output: try to extract JSON if enabled
-            if (structuredOutputConfig != null && structuredOutputConfig.isEnabled()
+            var soConfig = run.structuredOutputConfig();
+            if (soConfig != null && soConfig.isEnabled()
                 && !aiMessage.hasToolExecutionRequests()) {
                 try {
                     OBJECT_MAPPER.readTree(responseText);
@@ -687,7 +740,7 @@ public class Agent {
                         log.debug("Structured output parse failed, forcing with prompt");
                         structuredForceAttempted = true;
                         structuredForceActive = true;
-                        chatMemory.add(UserMessage.from(structuredOutputConfig.forcePrompt()));
+                        chatMemory.add(UserMessage.from(soConfig.forcePrompt()));
                         continue;
                     }
                     log.debug("Structured output force attempt also failed");
@@ -706,7 +759,7 @@ public class Agent {
                     StopReason.COMPLETED,
                     structuredOutputResult
                 );
-                var afterAgent = hookRegistry.triggerAfterAgent(
+                var afterAgent = run.hookRegistry().triggerAfterAgent(
                     new HookContexts.AfterAgentContext(sid, doneResult), doneResult.finalAnswer());
                 var finalAnswer = afterAgent instanceof HookResult.Modify<?> m
                     ? (String) m.value() : doneResult.finalAnswer();
@@ -730,7 +783,7 @@ public class Agent {
                 var args = parseArgs(req.arguments());
 
                 // Hook: beforeToolCall
-                var beforeTc = hookRegistry.triggerBeforeToolCall(
+                var beforeTc = run.hookRegistry().triggerBeforeToolCall(
                     new HookContexts.BeforeToolCallContext(sid, req.name(), args));
                 if (beforeTc instanceof HookResult.Cancel c) {
                     log.debug("beforeToolCall hook cancelled tool '{}' — reason={}", req.name(), c.reason());
@@ -748,13 +801,13 @@ public class Agent {
                     ToolExecutionResult toolResult;
                     if (contextVariables.isEmpty()) {
                         toolResult = wrapWithRetry(() ->
-                            toolExecutor.execute(req, toolRegistry));
+                            toolExecutor.execute(req, run.toolRegistry()));
                     } else {
                         var prevSession = AgentContext.SESSION.get();
                         AgentContext.SESSION.set(contextVariables);
                         try {
                             toolResult = wrapWithRetry(() ->
-                                toolExecutor.execute(req, toolRegistry));
+                                toolExecutor.execute(req, run.toolRegistry()));
                         } finally {
                             if (prevSession != null) {
                                 AgentContext.SESSION.set(prevSession);
@@ -765,7 +818,7 @@ public class Agent {
                     }
 
                     // Hook: afterToolCall
-                    var afterTcResult = hookRegistry.triggerAfterToolCall(
+                    var afterTcResult = run.hookRegistry().triggerAfterToolCall(
                         new HookContexts.AfterToolCallContext(sid, req.name(), toolResult.result(), toolResult.isError()),
                         toolResult.result());
                     var modifiedResult = afterTcResult instanceof HookResult.Modify<?>(Object value)
@@ -815,7 +868,7 @@ public class Agent {
             new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
             StopReason.MAX_ITERATIONS
         );
-        var afterAgent = hookRegistry.triggerAfterAgent(
+        var afterAgent = run.hookRegistry().triggerAfterAgent(
             new HookContexts.AfterAgentContext(sid, result), result.finalAnswer());
         var finalAnswer = afterAgent instanceof HookResult.Modify<?>(Object value)
             ? (String) value : result.finalAnswer();
@@ -1002,35 +1055,41 @@ public class Agent {
     }
 
     public ToolRegistry getToolRegistry() {
-        return toolRegistry;
+        return runConfig.getToolRegistry() != null ? runConfig.getToolRegistry() : toolRegistry;
     }
 
     public void setToolRegistry(ToolRegistry toolRegistry) {
         this.toolRegistry = toolRegistry;
+        runConfig.setToolRegistry(toolRegistry);
     }
 
     public void addTool(Object toolInstance) {
-        toolRegistry.register(toolInstance);
+        var reg = runConfig.getToolRegistry() != null ? runConfig.getToolRegistry() : toolRegistry;
+        reg.register(toolInstance);
     }
 
     public void addTool(de.augmentia.strandsagents.features.tools.AgentTool<?> tool) {
-        toolRegistry.register(tool);
+        var reg = runConfig.getToolRegistry() != null ? runConfig.getToolRegistry() : toolRegistry;
+        reg.register(tool);
     }
 
     public void removeTool(String name) {
-        toolRegistry.remove(name);
+        var reg = runConfig.getToolRegistry() != null ? runConfig.getToolRegistry() : toolRegistry;
+        reg.remove(name);
     }
 
     public HookRegistry getHookRegistry() {
-        return hookRegistry;
+        return runConfig.getHookRegistry() != null ? runConfig.getHookRegistry() : hookRegistry;
     }
 
     public void setHookRegistry(HookRegistry hookRegistry) {
         this.hookRegistry = hookRegistry != null ? hookRegistry : new HookRegistry();
+        runConfig.setHookRegistry(this.hookRegistry);
     }
 
     public void addHook(de.augmentia.strandsagents.features.pipeline.AgentHook hook) {
-        hookRegistry.register(hook);
+        var reg = runConfig.getHookRegistry() != null ? runConfig.getHookRegistry() : hookRegistry;
+        reg.register(hook);
     }
 
     public void removeHook(String name) {

@@ -25,6 +25,10 @@ public class DefaultStrandsAgent implements StrandsAgent {
         return agent;
     }
 
+    public de.augmentia.strandsagents.core.AgentRunConfig getRunConfig() {
+        return agent.getRunConfig();
+    }
+
     @Override
     public String ask(String userMessage) {
         return resultToString(agent.execute(userMessage));

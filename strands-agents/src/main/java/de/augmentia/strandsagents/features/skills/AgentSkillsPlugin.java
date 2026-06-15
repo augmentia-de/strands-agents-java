@@ -21,6 +21,7 @@ public class AgentSkillsPlugin implements Plugin {
     private final List<String> initialSkills;
     String lastInjectedXml = "";
     private boolean skillSearchEnabled;
+    private Agent agent;
 
     public AgentSkillsPlugin(List<Skill> skills) {
         this(skills, List.of());
@@ -43,7 +44,20 @@ public class AgentSkillsPlugin implements Plugin {
     }
 
     public Map<String, Skill> getSkills() {
-        return skills;
+        return getEffectiveSkills();
+    }
+
+    private Map<String, Skill> getEffectiveSkills() {
+        var all = new LinkedHashMap<>(skills);
+        if (agent != null) {
+            var runConfig = agent.getRunConfig();
+            if (runConfig != null) {
+                for (var s : runConfig.getDynamicSkills()) {
+                    all.putIfAbsent(s.name(), s);
+                }
+            }
+        }
+        return all;
     }
 
     public void setSkillSearchEnabled(boolean enabled) {
@@ -61,11 +75,12 @@ public class AgentSkillsPlugin implements Plugin {
 
     @Override
     public void initAgent(Agent agent) {
+        this.agent = agent;
     }
 
     @Override
     public HookResult beforeModelCall(HookContexts.BeforeModelCallContext ctx) {
-        if (skills.isEmpty()) return new HookResult.Continue();
+        if (getEffectiveSkills().isEmpty()) return new HookResult.Continue();
         var xml = generateSkillsXml();
         if (xml.equals(lastInjectedXml)) {
             return new HookResult.Continue();
@@ -78,7 +93,7 @@ public class AgentSkillsPlugin implements Plugin {
     @Override
     public List<ToolRegistry.ToolMethod> getTools() {
         if (!skillSearchEnabled) return List.of();
-        var tool = new SkillSearchTool(skills, this, null);
+        var tool = new SkillSearchTool(getEffectiveSkills(), this, null);
         return List.of(ToolRegistry.createMethod(tool));
     }
 
@@ -93,12 +108,13 @@ public class AgentSkillsPlugin implements Plugin {
     }
 
     private String generateSkillsXml() {
+        var effective = getEffectiveSkills();
         var buf = new StringBuilder();
 
         if (!initialSkills.isEmpty()) {
             buf.append("<activated_skills>\n");
             for (var name : initialSkills) {
-                var s = skills.get(name);
+                var s = effective.get(name);
                 if (s != null) {
                     buf.append("<skill name=\"").append(escapeXml(s.name())).append("\">\n");
                     buf.append(s.instructions()).append("\n");
@@ -114,10 +130,10 @@ public class AgentSkillsPlugin implements Plugin {
         }
 
         buf.append("<available_skills>\n");
-        if (skills.isEmpty()) {
+        if (effective.isEmpty()) {
             buf.append(PromptRegistry.get("agent_skills_plugin.no_skills")).append("\n");
         } else {
-            for (var s : skills.values()) {
+            for (var s : effective.values()) {
                 buf.append("<skill>\n");
                 buf.append("<name>").append(escapeXml(s.name())).append("</name>\n");
                 buf.append("<description>").append(escapeXml(s.description())).append("</description>\n");
@@ -137,9 +153,10 @@ public class AgentSkillsPlugin implements Plugin {
     }
 
     public String activateSkill(String skillName) {
-        var skill = skills.get(skillName);
+        var effective = getEffectiveSkills();
+        var skill = effective.get(skillName);
         if (skill == null) {
-            var available = skills.keySet().stream().sorted().collect(Collectors.joining(", "));
+            var available = effective.keySet().stream().sorted().collect(Collectors.joining(", "));
             return PromptRegistry.get("agent_skills_plugin.error_not_found", skillName, available);
         }
         return formatSkillResponse(skill);

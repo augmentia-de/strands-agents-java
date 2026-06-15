@@ -1,0 +1,22 @@
+model: "gpt-4o"
+systemPrompt: "You are a helpful assistant configured via YAML."
+temperature: 0.7
+maxIterations: 15
+maxMessages: 30
+provider: "OPENAI"
+skillsDir: "skills"
+initialSkills:
+  - "general"
+  - "coding"
+tools:
+  - "de.augmentia.strandsagents.features.tools.WebSearchTool"
+  - "de.augmentia.strandsagents.features.tools.WebFetchTool"
+resilience:
+  retry:
+    maxAttempts: 3
+    backoffDelayMs: 1000
+    backoffMultiplier: 2.0
+  circuitBreaker:
+    failureRateThreshold: 0.5
+    slidingWindowSeconds: 10
+    halfOpenDelaySeconds: 30
