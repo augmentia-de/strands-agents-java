@@ -1,3 +1,8 @@
 {
-  "mcpServers": { }
+  "mcpServers": {
+    "filesystem": {
+      "type": "sse",
+      "url": "http://filesystem-mcp:3000/sse"
+    }
+  }
 }
