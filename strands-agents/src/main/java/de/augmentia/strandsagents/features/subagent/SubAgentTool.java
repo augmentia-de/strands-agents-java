@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.features.context.AgentContext;
 import de.augmentia.strandsagents.features.tools.AgentTool;
 import de.augmentia.strandsagents.features.tools.ToolResult;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -80,7 +81,10 @@ public class SubAgentTool implements AgentTool<SubAgentTool.Params> {
         var prevDepth = RECURSION_DEPTH.get();
         RECURSION_DEPTH.set(currentDepth + 1);
         try {
-            SubAgentResult a2aResult = executor.call(subAgent, params.prompt(), toolName);
+            var sessionId = AgentContext.SESSION_ID.get();
+            SubAgentResult a2aResult = sessionId != null
+                ? executor.call(subAgent, params.prompt(), toolName, sessionId)
+                : executor.call(subAgent, params.prompt(), toolName);
             return ToolResult.success(a2aResult.result());
         } catch (Exception e) {
             return ToolResult.error("Error in sub-agent: " + e.getMessage());

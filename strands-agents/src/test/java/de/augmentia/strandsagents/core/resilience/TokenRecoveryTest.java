@@ -2,8 +2,10 @@ package de.augmentia.strandsagents.features.resilience;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.memory.chat.MessageWindowChatMemory;
+import dev.langchain4j.memory.ChatMemory;
+import de.augmentia.strandsagents.core.MultiSystemMessageChatMemory;
 import org.junit.jupiter.api.Test;
 
 class TokenRecoveryTest {
@@ -35,7 +37,7 @@ class TokenRecoveryTest {
 
     @Test
     void shouldRemoveHalfOfOldestMessages() {
-        var memory = MessageWindowChatMemory.builder().maxMessages(100).build();
+        var memory = new MultiSystemMessageChatMemory(100);
         for (int i = 1; i <= 10; i++) {
             memory.add(UserMessage.from("msg-" + i));
         }
@@ -51,7 +53,7 @@ class TokenRecoveryTest {
 
     @Test
     void shouldKeepAtLeastTwoMessages() {
-        var memory = MessageWindowChatMemory.builder().maxMessages(100).build();
+        var memory = new MultiSystemMessageChatMemory(100);
         memory.add(UserMessage.from("msg-1"));
         memory.add(UserMessage.from("msg-2"));
         memory.add(UserMessage.from("msg-3"));
@@ -64,7 +66,7 @@ class TokenRecoveryTest {
 
     @Test
     void shouldLimitRecoveryAttempts() {
-        var memory = MessageWindowChatMemory.builder().maxMessages(100).build();
+        var memory = new MultiSystemMessageChatMemory(100);
         for (int i = 1; i <= 10; i++) {
             memory.add(UserMessage.from("msg-" + i));
         }
@@ -79,14 +81,31 @@ class TokenRecoveryTest {
 
     @Test
     void shouldHandleEmptyMemory() {
-        var memory = MessageWindowChatMemory.builder().maxMessages(100).build();
+        var memory = new MultiSystemMessageChatMemory(100);
         var recovery = new TokenRecovery();
         assertThat(recovery.recover(memory)).isFalse();
     }
 
     @Test
+    void preservesSystemMessagesDuringRecovery() {
+        var memory = new MultiSystemMessageChatMemory(100);
+        memory.add(SystemMessage.from("Du bist ein Helfer."));
+        for (int i = 1; i <= 10; i++) {
+            memory.add(UserMessage.from("msg-" + i));
+        }
+
+        var recovery = new TokenRecovery();
+        var result = recovery.recover(memory);
+
+        assertThat(result).isTrue();
+        assertThat(memory.messages().get(0)).isInstanceOf(SystemMessage.class);
+        assertThat(((SystemMessage) memory.messages().get(0)).text()).isEqualTo("Du bist ein Helfer.");
+        assertThat(memory.messages()).hasSize(6);
+    }
+
+    @Test
     void shouldResetAttempts() {
-        var memory = MessageWindowChatMemory.builder().maxMessages(100).build();
+        var memory = new MultiSystemMessageChatMemory(100);
         for (int i = 1; i <= 10; i++) {
             memory.add(UserMessage.from("msg-" + i));
         }

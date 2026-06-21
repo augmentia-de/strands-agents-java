@@ -4,8 +4,8 @@ import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
+import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.memory.ChatMemory;
-import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import java.util.List;
 
 public class TokenRecovery {
@@ -39,16 +39,21 @@ public class TokenRecovery {
         var messages = chatMemory.messages();
         if (messages.size() <= 1) return false;
 
-        int keepCount = Math.max(2, messages.size() / 2);
+        var systemMsgs = messages.stream()
+            .filter(m -> m instanceof SystemMessage)
+            .toList();
+        var nonSystemMsgs = messages.stream()
+            .filter(m -> !(m instanceof SystemMessage))
+            .toList();
 
-        var kept = messages.subList(messages.size() - keepCount, messages.size());
+        if (nonSystemMsgs.size() <= 1) return false;
 
-        if (chatMemory instanceof MessageWindowChatMemory mwcm) {
-            mwcm.clear();
-            for (var msg : kept) {
-                mwcm.add(msg);
-            }
-        }
+        int keepNonSystem = Math.max(2, nonSystemMsgs.size() / 2);
+        var keptNonSystem = nonSystemMsgs.subList(nonSystemMsgs.size() - keepNonSystem, nonSystemMsgs.size());
+
+        chatMemory.clear();
+        for (var msg : systemMsgs) chatMemory.add(msg);
+        for (var msg : keptNonSystem) chatMemory.add(msg);
 
         return true;
     }

@@ -9,6 +9,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import de.augmentia.strandsagents.core.MockChatModel;
 import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.features.context.AgentContext;
+import de.augmentia.strandsagents.features.sessions.InMemorySessionManager;
 import de.augmentia.strandsagents.features.subagent.SubAgentExecutor;
 import de.augmentia.strandsagents.features.subagent.SubAgentTool;
 
@@ -244,6 +246,65 @@ class EnhancedMultiAgentTest {
     }
 
     // --- Integration Tests ---
+
+    // ── Session-Sharing Tests ─────────────────────────────────────────
+
+    @Test
+    void subAgentToolSharesSessionWhenSessionIdIsSet() {
+        var sessionManager = new InMemorySessionManager();
+        var subAgent = new Agent(new MockChatModel("Sub: %s"), new ToolRegistry(), new ToolExecutor(), null, sessionManager);
+        var tool = new SubAgentTool(subAgent, "helper");
+
+        var parentAgent = new Agent(new MockChatModel(), new ToolRegistry(), new ToolExecutor(), null, sessionManager);
+        var session = sessionManager.createSession("test", Map.of());
+        var sid = session.sessionId();
+
+        AgentContext.SESSION_ID.set(sid);
+        try {
+            var result = tool.execute("id", new SubAgentTool.Params("Hallo"), new AtomicBoolean(false), null);
+            assertThat(result.content()).anyMatch(c -> c.toString().contains("Sub"));
+        } finally {
+            AgentContext.SESSION_ID.remove();
+        }
+
+        var loaded = sessionManager.loadSession(sid);
+        assertThat(loaded).isPresent();
+        assertThat(loaded.get().messages()).isNotEmpty();
+    }
+
+    @Test
+    void subAgentToolSessionIdCanBeNull() {
+        var subAgent = new Agent(new MockChatModel("Sub: %s"));
+        var tool = new SubAgentTool(subAgent, "helper");
+
+        var result = tool.execute("id", new SubAgentTool.Params("Hallo"), new AtomicBoolean(false), null);
+        assertThat(result.content()).anyMatch(c -> c.toString().contains("Sub"));
+    }
+
+    @Test
+    void swarmOrchestratorSharesSessionWithWorkers() {
+        var sessionManager = new InMemorySessionManager();
+        var weatherAgent = new Agent(new MockChatModel("Wetter: %s"), new ToolRegistry(), new ToolExecutor(), null, sessionManager);
+        var defaultAgent = new Agent(new MockChatModel("Default: %s"), new ToolRegistry(), new ToolExecutor(), null, sessionManager);
+
+        var orchestrator = new SwarmOrchestrator(
+            Map.of("wetter", weatherAgent), defaultAgent, sessionManager);
+
+        var result = orchestrator.execute("Wetter morgen");
+        assertThat(result.finalAnswer()).contains("Wetter");
+    }
+
+    @Test
+    void swarmOrchestratorWithoutSessionManagerStillWorks() {
+        var weatherAgent = new Agent(new MockChatModel("Wetter: %s"));
+        var defaultAgent = new Agent(new MockChatModel("Default: %s"));
+
+        var orchestrator = new SwarmOrchestrator(
+            Map.of("wetter", weatherAgent), defaultAgent);
+
+        var result = orchestrator.execute("Wetter morgen");
+        assertThat(result.finalAnswer()).contains("Wetter");
+    }
 
     @Test
     void fullOrchestrationWithSubAgentExecutor() {

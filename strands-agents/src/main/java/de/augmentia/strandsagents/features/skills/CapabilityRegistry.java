@@ -1,6 +1,8 @@
 package de.augmentia.strandsagents.features.skills;
 
+import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.features.mcp.McpClientFactory;
+import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.mcp.client.DefaultMcpClient;
 import dev.langchain4j.mcp.client.McpClient;
 import dev.langchain4j.mcp.client.transport.http.HttpMcpTransport;
@@ -18,12 +20,28 @@ public class CapabilityRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(CapabilityRegistry.class);
 
+    private static List<ToolSpecification> standardToolSpecs;
+
+    private static synchronized List<ToolSpecification> getStandardToolSpecs() {
+        if (standardToolSpecs == null) {
+            standardToolSpecs = ToolRegistry.builder().standard(false).build().getSpecifications();
+        }
+        return standardToolSpecs;
+    }
+
     private final List<Path> skillDirectories;
     private final List<McpServerConfig> mcpServers;
+    private final boolean includeStandardTools;
 
     public CapabilityRegistry(List<Path> skillDirectories, List<McpServerConfig> mcpServers) {
+        this(skillDirectories, mcpServers, false);
+    }
+
+    public CapabilityRegistry(List<Path> skillDirectories, List<McpServerConfig> mcpServers,
+                               boolean includeStandardTools) {
         this.skillDirectories = List.copyOf(skillDirectories);
         this.mcpServers = List.copyOf(mcpServers);
+        this.includeStandardTools = includeStandardTools;
     }
 
     public List<Path> skillDirectories() { return skillDirectories; }
@@ -36,7 +54,9 @@ public class CapabilityRegistry {
             .findFirst().orElse(null);
     }
 
-    public List<Capability> discoverAll() {
+    public boolean isIncludeStandardTools() { return includeStandardTools; }
+
+    public List<Capability> discoverSkills() {
         var results = new ArrayList<Capability>();
         for (var dir : skillDirectories) {
             try {
@@ -50,31 +70,45 @@ public class CapabilityRegistry {
                     dir.toString(), CapabilityType.SKILL));
             }
         }
+        return results;
+    }
+
+    public List<Capability> discoverTools() {
+        var results = new ArrayList<Capability>();
+        if (includeStandardTools) {
+            for (var spec : getStandardToolSpecs()) {
+                results.add(new Capability(spec.name(),
+                    spec.description() != null ? spec.description() : "",
+                    "default", CapabilityType.DEFAULT));
+            }
+        }
         for (var mcp : mcpServers) {
+            McpClient client = null;
             try {
-                var client = mcp.toDirectClient();
+                client = mcp.toDirectClient();
                 var tools = client.listTools();
                 for (var spec : tools) {
                     results.add(new Capability(spec.name(),
                         spec.description() != null ? spec.description() : "",
                         mcp.name(), CapabilityType.MCP_TOOL));
                 }
-                client.close();
             } catch (Exception e) {
                 results.add(new Capability("error", "Failed to connect: " + mcp.name() + " - " + e.getMessage(),
                     mcp.name(), CapabilityType.MCP_TOOL));
+            } finally {
+                if (client != null) {
+                    try { client.close(); } catch (Exception ignored) {}
+                }
             }
         }
         return results;
     }
 
-    public List<Capability> search(String query) {
-        if (query == null || query.isBlank()) return discoverAll();
-        var q = query.toLowerCase();
-        return discoverAll().stream()
-            .filter(c -> c.name().toLowerCase().contains(q)
-                || c.description().toLowerCase().contains(q))
-            .toList();
+    public List<Capability> discoverAll() {
+        var results = new ArrayList<Capability>();
+        results.addAll(discoverTools());
+        results.addAll(discoverSkills());
+        return results;
     }
 
     public static Builder builder() {
@@ -82,7 +116,7 @@ public class CapabilityRegistry {
     }
 
     public record Capability(String name, String description, String source, CapabilityType type) {}
-    public enum CapabilityType { SKILL, MCP_TOOL }
+    public enum CapabilityType { SKILL, MCP_TOOL, DEFAULT }
 
     public enum TransportType { SSE, STREAMABLE_HTTP }
 
@@ -162,6 +196,7 @@ public class CapabilityRegistry {
     public static class Builder {
         private final List<Path> skillDirectories = new ArrayList<>();
         private final List<McpServerConfig> mcpServers = new ArrayList<>();
+        private boolean includeStandardTools = false;
 
         public Builder skillDir(Path dir) { skillDirectories.add(dir); return this; }
         public Builder mcpServer(String name, String url) {
@@ -172,9 +207,13 @@ public class CapabilityRegistry {
             mcpServers.add(config);
             return this;
         }
+        public Builder includeStandardTools(boolean include) {
+            this.includeStandardTools = include;
+            return this;
+        }
 
         public CapabilityRegistry build() {
-            return new CapabilityRegistry(skillDirectories, mcpServers);
+            return new CapabilityRegistry(skillDirectories, mcpServers, includeStandardTools);
         }
     }
 }

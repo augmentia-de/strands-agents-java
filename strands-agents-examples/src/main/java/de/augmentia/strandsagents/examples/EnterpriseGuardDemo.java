@@ -130,13 +130,18 @@ public class EnterpriseGuardDemo {
         //   SUITABLE FOR: all production agent calls where reproducibility
         //   matters (compliance, auditing, testing).
         //   NOT SUITABLE FOR: creative tasks (brainstorming, text generation).
+        //
+        // NOTE: maxRetries(0) on OpenAiChatModel because strands handles
+        //       retries via ResilienceConfig (see Step 7). Otherwise
+        //       OpenAiChatModel would retry internally AND strands would
+        //       retry again, resulting in up to 9 attempts instead of 3.
         var model = OpenAiChatModel.builder()
             .apiKey(System.getenv("OPENAI_API_KEY"))
             .modelName(config.modelName())
             .baseUrl(config.baseUrl())
             .temperature(0.0)
             .seed(42)
-            .maxRetries(3)
+            .maxRetries(0)
             .logRequests(true)
             .logResponses(true)
             .build();
@@ -230,18 +235,16 @@ public class EnterpriseGuardDemo {
         var audit = new AuditLogger(auditLogPath);
 
         // ---- Step 9: Build agent ----
-        var agent = new Agent(
-            model,
-            tools,
-            new ToolExecutor(),
-            new SlidingWindowConversationManager(10),
-            null,
-            resilience,
-            List.of(guardrails, hitl),
-            hooks
-        );
-        agent.setEventListener(audit);
-        agent.setSystemPrompt("You are a secure enterprise assistant. Always be precise and concise.");
+        var agent = Agent.builder()
+            .model(model)
+            .toolRegistry(tools)
+            .conversationManager(new SlidingWindowConversationManager(10))
+            .resilienceConfig(resilience)
+            .plugins(List.of(guardrails, hitl))
+            .hookRegistry(hooks)
+            .eventListener(audit)
+            .systemPrompt("You are a secure enterprise assistant. Always be precise and concise.")
+            .build();
 
         // ---- Scenario 1: Normal call (should complete) ----
         System.out.println("-".repeat(72));

@@ -2,6 +2,7 @@ package de.augmentia.strandsagents.quarkus.service;
 
 import de.augmentia.strandsagents.core.*;
 import de.augmentia.strandsagents.core.MockChatModel;
+import de.augmentia.strandsagents.features.conversation.SummarizingSlidingWindowConversationManager;
 import de.augmentia.strandsagents.features.routing.LlmRouter;
 import de.augmentia.strandsagents.prompt.PromptRegistry;
 import de.augmentia.strandsagents.core.MockStreamingChatModel;
@@ -14,7 +15,6 @@ import de.augmentia.strandsagents.config.ModelProviderType;
 import de.augmentia.strandsagents.config.ModelTier;
 import de.augmentia.strandsagents.config.TieredModelConfig;
 import de.augmentia.strandsagents.core.RoutingAgent;
-import de.augmentia.strandsagents.features.conversation.SummarizingConversationManager;
 import de.augmentia.strandsagents.features.telemetry.FileLlmLogger;
 import de.augmentia.strandsagents.features.telemetry.LoggingChatModel;
 import de.augmentia.strandsagents.model.event.AgentStateChangedEvent;
@@ -58,7 +58,9 @@ import de.augmentia.strandsagents.features.resilience.ResilienceConfig;
 import de.augmentia.strandsagents.features.resilience.RetryConfig;
 import de.augmentia.strandsagents.features.tools.BashTool;
 import de.augmentia.strandsagents.features.tools.HumanInTheLoopTool;
+import de.augmentia.strandsagents.features.tools.FileReaderFactory;
 import de.augmentia.strandsagents.features.tools.ReadTool;
+import de.augmentia.strandsagents.quarkus.service.pdf.PdfFileReader;
 import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.features.conversation.ConversationManager;
 import de.augmentia.strandsagents.features.sessions.SessionManager;
@@ -164,6 +166,11 @@ public class AgentService implements de.augmentia.strandsagents.features.service
         this.fullRegistry = AgentFactory.createToolRegistry(config);
         this.allSkills = loadSkills();
         this.sessionManager = AgentFactory.createSessionManager(Path.of(config.sessionDir()));
+
+        var pdfFactory = FileReaderFactory.withDefaults()
+            .register(new PdfFileReader());
+        fullRegistry.remove("read");
+        fullRegistry.register(new ReadTool(config.resolvedWorkspace(), pdfFactory));
 
         this.sseChannel = new SSEChannel();
         this.checkpointService = AgentFactory.createCheckpointService(config, sseChannel);
@@ -297,8 +304,8 @@ public class AgentService implements de.augmentia.strandsagents.features.service
                 new RetryConfig(3, 1000, 2.0),
                 new CircuitBreakerConfig(0.5f, 10L, 30L)
             );
-            SummarizingConversationManager conversationManager = new SummarizingConversationManager(
-                wrappedSimple, 2048);
+            SummarizingSlidingWindowConversationManager conversationManager = new SummarizingSlidingWindowConversationManager(
+                wrappedSimple, 15384, 3);
 
             if (effectiveTier == ModelTier.ROUTING) {
                 var router = new LlmRouter(wrappedSimple);
@@ -316,8 +323,8 @@ public class AgentService implements de.augmentia.strandsagents.features.service
                     new RetryConfig(3, 1000, 2.0),
                     new CircuitBreakerConfig(0.5f, 10L, 30L)
             );
-            SummarizingConversationManager conversationManager = new SummarizingConversationManager(
-                    ModelFactory.createOpenAiFromEnv(), 2048);
+            SummarizingSlidingWindowConversationManager conversationManager = new SummarizingSlidingWindowConversationManager(
+                    ModelFactory.createOpenAiFromEnv(), 15384, 3);
             agent = new StreamingAgent(streamingModel, selectedTools, new ToolExecutor(),
                     conversationManager, sessionManager, resilienceConfig, plugins);
         } else {

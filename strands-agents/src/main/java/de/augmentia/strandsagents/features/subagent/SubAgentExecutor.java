@@ -36,12 +36,22 @@ public class SubAgentExecutor {
     }
 
     public SubAgentResult call(Agent agent, String prompt, String agentName) {
+        return call(agent, prompt, agentName, null);
+    }
+
+    public SubAgentResult call(Agent agent, String prompt, String agentName, String sessionId) {
+        return runCall(agent, prompt, agentName, sessionId);
+    }
+
+    private SubAgentResult runCall(Agent agent, String prompt, String agentName, String sessionId) {
         var start = System.nanoTime();
         try {
             var mergedMetadata = metadata;
 
             Callable<AgentResult> agentCall = () -> {
-                var future = CompletableFuture.supplyAsync(() -> agent.execute(prompt), VIRTUAL_EXECUTOR);
+                var future = CompletableFuture.supplyAsync(
+                    () -> sessionId != null ? agent.execute(sessionId, prompt) : agent.execute(prompt),
+                    VIRTUAL_EXECUTOR);
                 return future.get(timeoutSeconds, TimeUnit.SECONDS);
             };
 
@@ -75,7 +85,15 @@ public class SubAgentExecutor {
     }
 
     public CompletableFuture<SubAgentResult> callAsync(Agent agent, String prompt, String agentName) {
-        return CompletableFuture.supplyAsync(() -> call(agent, prompt, agentName), VIRTUAL_EXECUTOR);
+        return callAsync(agent, prompt, agentName, null);
+    }
+
+    public CompletableFuture<SubAgentResult> callAsync(Agent agent, String prompt, String agentName, String sessionId) {
+        var p = prompt;
+        var a = agent;
+        var n = agentName;
+        var s = sessionId;
+        return CompletableFuture.supplyAsync(() -> call(a, p, n, s), VIRTUAL_EXECUTOR);
     }
 
     public Map<String, String> getMetadata() {

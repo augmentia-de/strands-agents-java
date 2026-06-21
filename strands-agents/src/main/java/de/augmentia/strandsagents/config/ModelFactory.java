@@ -118,7 +118,7 @@ public class ModelFactory {
             builder.modelName(config.modelName() != null && !config.modelName().isBlank()
                 ? config.modelName() : "gpt-4o-mini");
             if (config.temperature() != null) builder.temperature(config.temperature());
-            if (config.maxRetries() != null) builder.maxRetries(config.maxRetries());
+            builder.maxRetries(0);
             return builder.build();
         }
 
@@ -148,7 +148,7 @@ public class ModelFactory {
             builder.modelName(config.modelName() != null && !config.modelName().isBlank()
                 ? config.modelName() : "default");
             if (config.temperature() != null) builder.temperature(config.temperature());
-            if (config.maxRetries() != null) builder.maxRetries(config.maxRetries());
+            builder.maxRetries(0);
             return builder.build();
         }
 

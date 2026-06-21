@@ -1,10 +1,13 @@
 package de.augmentia.strandsagents.examples;
 
+import de.augmentia.strandsagents.config.LlmConfig;
 import de.augmentia.strandsagents.core.*;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.config.AgentConfig;
 import de.augmentia.strandsagents.config.ModelFactory;
-import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.features.conversation.SummarizingSlidingWindowConversationManager;
+import de.augmentia.strandsagents.examples.hooks.CacheLoggingHook;
+import de.augmentia.strandsagents.features.pipeline.HookRegistry;
 import de.augmentia.strandsagents.model.agent.AgentResult;
 import de.augmentia.strandsagents.model.event.*;
 import de.augmentia.strandsagents.features.plugin.Plugin;
@@ -14,11 +17,19 @@ import de.augmentia.strandsagents.features.sessions.FileSessionManager;
 import de.augmentia.strandsagents.features.skills.AgentSkillsPlugin;
 import de.augmentia.strandsagents.features.skills.Skill;
 import de.augmentia.strandsagents.features.skills.SkillParser;
+import de.augmentia.strandsagents.model.message.Message;
+import de.augmentia.strandsagents.model.message.SystemMessage;
+import de.augmentia.strandsagents.model.message.UserMessage;
+import de.augmentia.strandsagents.model.message.AssistantMessage;
+import de.augmentia.strandsagents.model.message.ToolMessage;
+import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.mcp.client.DefaultMcpClient;
 import dev.langchain4j.mcp.client.McpClient;
 import dev.langchain4j.mcp.client.transport.http.StreamableHttpMcpTransport;
 import dev.langchain4j.mcp.client.transport.stdio.StdioMcpTransport;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -51,7 +62,20 @@ public class ChatCLI {
                 System.err.println("OPENAI_API_KEY not set. Use --mock for demo mode.");
                 System.exit(1);
             }
-            model = ModelFactory.createOpenAiFromEnv();
+            LlmConfig config = LlmConfig.fromEnv();
+
+            // ---- Model ----
+            model = OpenAiChatModel.builder()
+                    .apiKey(apiKey)
+                    .modelName(config.modelName())
+                    .baseUrl(config.baseUrl())
+                    .temperature(0.0)
+                    .seed(42)
+                    .maxRetries(0)
+                    .logRequests(true)
+                    .logResponses(true)
+                    .build();
+
             var baseUrl = System.getenv("OPENAI_BASE_URL");
             var modelName = System.getenv("OPENAI_MODEL");
             System.out.println("=== Strands Chat (OpenAI) ===");
@@ -75,7 +99,8 @@ public class ChatCLI {
             connectMcpSse(registry, mcpUrl);
         }
 
-        var conversationManager = new SlidingWindowConversationManager(20);
+        var conversationManager = new SummarizingSlidingWindowConversationManager(model, 15384, 3);
+        System.out.println("  Conversation: SummarizingSlidingWindow (maxTokens=4000, keepLastUser=3)");
         var sessionManager = new FileSessionManager(sessionDir);
         var chatMemoryStore = new FileChatMemoryStore(Path.of(".chat-memory"));
 
@@ -93,6 +118,9 @@ public class ChatCLI {
             }
         }
 
+        var hookRegistry = new HookRegistry();
+        hookRegistry.register(new CacheLoggingHook());
+
         var agent = AgentConfig.builder()
             .toolRegistry(registry)
             .conversationManager(conversationManager)
@@ -101,10 +129,11 @@ public class ChatCLI {
             .plugins(plugins)
             .logLlmCalls(Path.of("logs/llm-calls.log"))
             .build()
+
             .createAgent(model);
+        agent.setHookRegistry(hookRegistry);
 
         var actualSessionId = sessionId != null ? sessionId : UUID.randomUUID().toString();
-        var session = sessionManager.createSession("chat-user", Map.of());
 
         agent.setEventListener(event -> {
             switch (event) {
@@ -125,7 +154,7 @@ public class ChatCLI {
         System.out.println("  Tools: " + registry.getToolNames());
         System.out.println("  Session-Dir: " + sessionDir.toAbsolutePath());
         System.out.println();
-        System.out.println("Commands: /exit, /tools, /session, /help");
+        System.out.println("Commands: /exit, /tools, /session, /memory, /help");
         System.out.println("-".repeat(50));
 
         try (var scanner = new Scanner(System.in)) {
@@ -155,6 +184,7 @@ public class ChatCLI {
                     + result.metrics().outputTokens() + " out, "
                     + durationMs + " ms, "
                     + result.metrics().toolCallsCount() + " Tool-Calls");
+                printMemoryDebug(agent);
             }
         }
         closeMcp();
@@ -176,15 +206,7 @@ public class ChatCLI {
             }
             case "/session" -> {
                 System.out.println("  Session-ID: " + sessionId);
-                var history = agent.getChatMemory().messages();
-                System.out.println("  Messages: " + history.size());
-                for (var msg : history) {
-                    var role = msg.type().name();
-                    var text = msg instanceof dev.langchain4j.data.message.AiMessage ai
-                        ? ai.text() : msg instanceof dev.langchain4j.data.message.UserMessage um
-                        ? um.singleText() : msg.toString();
-                    System.out.println("    [" + role + "] " + truncate(text, 100));
-                }
+                printMemoryDebug(agent);
             }
             case "/mcp" -> {
                 if (mcpClient == null) {
@@ -203,11 +225,15 @@ public class ChatCLI {
                     }
                 }
             }
+            case "/memory" -> {
+                printMemoryDebug(agent);
+            }
             case "/help" -> {
                 System.out.println("  Commands:");
                 System.out.println("    /exit            Exit");
                 System.out.println("    /tools           Show registered tools");
-                System.out.println("    /session         Show current session & history");
+                System.out.println("    /session         Show current session & chat memory");
+                System.out.println("    /memory          Detailed chat memory debug (types, tokens)");
                 System.out.println("    /mcp             MCP server status & tools");
                 System.out.println("    /help            This help");
                 System.out.println("  Everything else is sent as a prompt to the agent.");
@@ -250,6 +276,55 @@ public class ChatCLI {
             System.out.println("  MCP error: " + e.getMessage());
             if (mcpClient != null) try { mcpClient.close(); } catch (Exception ignored) {}
             mcpClient = null;
+        }
+    }
+
+    static void printMemoryDebug(Agent agent) {
+        var lcMessages = agent.getChatMemory().messages();
+        if (lcMessages.isEmpty()) {
+            System.out.println("  [Memory] (empty)");
+            return;
+        }
+
+        int sysCount = 0, userCount = 0, aiCount = 0, toolCount = 0, otherCount = 0;
+        int sysTokens = 0, userTokens = 0, aiTokens = 0, toolTokens = 0;
+        for (var msg : lcMessages) {
+            var text = switch (msg) {
+                case dev.langchain4j.data.message.SystemMessage m -> { sysCount++; yield m.text(); }
+                case dev.langchain4j.data.message.UserMessage m -> { userCount++; yield m.singleText(); }
+                case dev.langchain4j.data.message.AiMessage m -> { aiCount++; yield m.text(); }
+                case dev.langchain4j.data.message.ToolExecutionResultMessage m -> { toolCount++; yield m.text(); }
+                default -> { otherCount++; yield ""; }
+            };
+            int est = (text != null ? text.length() : 0) / 4 + 4;
+            switch (msg.type()) {
+                case SYSTEM -> sysTokens += est;
+                case USER -> userTokens += est;
+                case AI -> aiTokens += est;
+                case TOOL_EXECUTION_RESULT -> toolTokens += est;
+            }
+        }
+        int total = lcMessages.size();
+        int totalEst = sysTokens + userTokens + aiTokens + toolTokens;
+
+        System.out.println("  [Memory] Messages: " + total
+            + " (S:" + sysCount + " U:" + userCount + " A:" + aiCount + " T:" + toolCount + ")");
+        System.out.println("  [Memory] Est.Tokens: " + totalEst
+            + " (S:" + sysTokens + " U:" + userTokens + " A:" + aiTokens + " T:" + toolTokens + ")");
+
+        for (int i = 0; i < lcMessages.size(); i++) {
+            var msg = lcMessages.get(i);
+            var text = switch (msg) {
+                case dev.langchain4j.data.message.SystemMessage m -> m.text();
+                case dev.langchain4j.data.message.UserMessage m -> m.singleText();
+                case dev.langchain4j.data.message.AiMessage m -> m.text();
+                case dev.langchain4j.data.message.ToolExecutionResultMessage m -> m.text();
+                default -> msg.toString();
+            };
+            var role = msg.type().name();
+            int est = (text != null ? text.length() : 0) / 4 + 4;
+            System.out.println("    [" + i + "] " + role + " ~" + est + "t "
+                + truncate(text != null ? text : "", 80));
         }
     }
 

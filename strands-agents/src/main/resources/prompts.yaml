@@ -80,11 +80,13 @@ prompts:
   structured_output.force_prompt: "You must format the previous response as structured output."
 
   # ============================================================
-  # Summarizing Conversation Manager
+  # Summarizing Sliding Window Conversation Manager (Hybrid)
   # ============================================================
-  summarizing.instruction: |
-    Summarize the following conversation. Output only the summary, no preamble:
-  summarizing.prefix: "Summary of the previous conversation: "
+  summarizing_sliding.instruction: |
+    Summarize the following conversation excerpt concisely. Focus on key information, decisions, and results. Preserve factual details, tool outputs, and user requests. Output only the summary, no preamble:
+  summarizing_sliding.prefix: "Conversation summary: "
+  summarizing_sliding.aggregate_instruction: |
+    Combine the following system instructions into a single coherent set of instructions. Remove redundancies and contradictions. Keep all important rules, constraints, and behavioral guidelines. Output only the combined instructions, no preamble:
 
   # ============================================================
   # Guardrail Plugin

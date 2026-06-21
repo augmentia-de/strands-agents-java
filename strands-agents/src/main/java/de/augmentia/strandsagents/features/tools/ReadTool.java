@@ -1,28 +1,29 @@
 package de.augmentia.strandsagents.features.tools;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import de.augmentia.strandsagents.features.internal.WorkspacePaths;
-import de.augmentia.strandsagents.features.tools.AgentTool;
-import de.augmentia.strandsagents.features.tools.TextContent;
-import de.augmentia.strandsagents.features.tools.ToolResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class ReadTool implements AgentTool<ReadTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(ReadTool.class);
-    private static final int MAX_LINES = 300;
-    private static final int MAX_BYTES = 30_720;
     private final WorkspacePaths workspacePaths;
+    private final FileReaderFactory readerFactory;
 
     public ReadTool(Path cwd) {
+        this(cwd, FileReaderFactory.withDefaults());
+    }
+
+    public ReadTool(Path cwd, FileReaderFactory readerFactory) {
         try {
             this.workspacePaths = new WorkspacePaths(cwd);
+            this.readerFactory = readerFactory;
         } catch (java.io.IOException e) {
             throw new IllegalArgumentException("Invalid workspace path: " + cwd, e);
         }
@@ -35,7 +36,7 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
 
     @Override
     public String description() {
-        return "Read the contents of a file. Supports text files and images. "
+        return "Read the contents of a file. Supported formats: text files, images (.jpg/.png/.gif/.webp), PDFs (.pdf). "
             + "Use offset/limit for large files.";
     }
 
@@ -84,82 +85,17 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
         }
 
         try {
-            var mimeType = detectImageMimeType(path);
-            if (mimeType != null) {
-                var bytes = Files.readAllBytes(path);
-                var base64 = Base64.getEncoder().encodeToString(bytes);
-                return new ToolResult(
-                    List.of(new TextContent("Read image file [" + mimeType + "]"), new ImageContent(base64, mimeType)),
-                    null);
+            var reader = readerFactory.findReader(path);
+            if (reader == null) {
+                return ToolResult.error("Unsupported file type: " + params.path()
+                    + " — use a plain text file (.txt, .json, .md, etc.),"
+                    + " an image (.jpg, .png, .gif, .webp),"
+                    + " or a PDF (.pdf).");
             }
-
-            var lines = Files.readAllLines(path);
-            var total = lines.size();
-
-            // Handle offset / line_start
-            Integer effectiveStartLine = params.offset();
-            if (effectiveStartLine == null) effectiveStartLine = params.line_start();
-            
-            var start = effectiveStartLine != null ? Math.max(0, effectiveStartLine - 1) : 0;
-            if (start >= lines.size() && total > 0) {
-                throw new IOException("Offset beyond file end");
-            }
-
-            // Handle limit / line_end
-            int end;
-            if (params.line_end() != null) {
-                end = Math.min(params.line_end(), lines.size());
-            } else if (params.limit() != null) {
-                end = Math.min(start + params.limit(), lines.size());
-            } else {
-                end = lines.size();
-            }
-
-            if (end < start) end = start;
-
-            List<String> selected = lines.subList(start, end);
-
-            var sb = new StringBuilder();
-            var outLines = 0;
-            var outBytes = 0L;
-            var truncated = false;
-
-            for (var line : selected) {
-                var lb = line.getBytes().length + 1;
-                if (outLines >= MAX_LINES || outBytes + lb > MAX_BYTES) {
-                    truncated = true;
-                    break;
-                }
-                sb.append(line).append("\n");
-                outLines++;
-                outBytes += lb;
-            }
-
-            if (truncated) {
-                sb.append("\n[Truncated. Total lines: ").append(total).append("]");
-            }
-
-            return new ToolResult(List.of(new TextContent(sb.toString())), null);
+            return reader.read(path, params);
         } catch (IOException e) {
             throw new RuntimeException(e.getMessage(), e);
         }
-    }
-
-    private String detectImageMimeType(Path path) {
-        var n = path.getFileName().toString().toLowerCase();
-        if (n.endsWith(".jpg") || n.endsWith(".jpeg")) {
-            return "image/jpeg";
-        }
-        if (n.endsWith(".png")) {
-            return "image/png";
-        }
-        if (n.endsWith(".gif")) {
-            return "image/gif";
-        }
-        if (n.endsWith(".webp")) {
-            return "image/webp";
-        }
-        return null;
     }
 
     public record Params(String path, Integer offset, Integer limit, Integer line_start, Integer line_end) {}

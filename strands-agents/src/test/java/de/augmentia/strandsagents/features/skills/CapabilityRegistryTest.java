@@ -50,116 +50,6 @@ class CapabilityRegistryTest {
     }
 
     @Test
-    void search_byName_returnsMatching(@TempDir Path tempDir) throws IOException {
-        var skillDir = tempDir.resolve("skills");
-        Files.createDirectories(skillDir);
-        var alphaSkill = skillDir.resolve("alpha");
-        Files.createDirectories(alphaSkill);
-        Files.writeString(alphaSkill.resolve("SKILL.md"), """
-            ---
-            name: alpha
-            description: Alpha skill
-            ---
-            Do alpha.
-            """);
-        var betaSkill = skillDir.resolve("beta");
-        Files.createDirectories(betaSkill);
-        Files.writeString(betaSkill.resolve("SKILL.md"), """
-            ---
-            name: beta
-            description: Beta skill
-            ---
-            Do beta.
-            """);
-
-        var registry = new CapabilityRegistry(List.of(skillDir), List.of());
-
-        var results = registry.search("alpha");
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).name()).isEqualTo("alpha");
-    }
-
-    @Test
-    void search_byDescription_returnsMatching(@TempDir Path tempDir) throws IOException {
-        var skillDir = tempDir.resolve("skills");
-        Files.createDirectories(skillDir);
-        var skill = skillDir.resolve("tool-finder");
-        Files.createDirectories(skill);
-        Files.writeString(skill.resolve("SKILL.md"), """
-            ---
-            name: tool-finder
-            description: Searches for files
-            ---
-            Use grep and find.
-            """);
-
-        var registry = new CapabilityRegistry(List.of(skillDir), List.of());
-
-        var results = registry.search("searches");
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).name()).isEqualTo("tool-finder");
-    }
-
-    @Test
-    void search_caseInsensitive_returnsMatching(@TempDir Path tempDir) throws IOException {
-        var skillDir = tempDir.resolve("skills");
-        Files.createDirectories(skillDir);
-        var skill = skillDir.resolve("FileManager");
-        Files.createDirectories(skill);
-        Files.writeString(skill.resolve("SKILL.md"), """
-            ---
-            name: FileManager
-            description: Manages files
-            ---
-            Read and write.
-            """);
-
-        var registry = new CapabilityRegistry(List.of(skillDir), List.of());
-
-        assertThat(registry.search("filemanager")).isNotEmpty();
-        assertThat(registry.search("FILEMANAGER")).isNotEmpty();
-        assertThat(registry.search("FileManager")).isNotEmpty();
-    }
-
-    @Test
-    void search_nullQuery_returnsAll(@TempDir Path tempDir) throws IOException {
-        var skillDir = tempDir.resolve("skills");
-        Files.createDirectories(skillDir);
-        var skill = skillDir.resolve("only-skill");
-        Files.createDirectories(skill);
-        Files.writeString(skill.resolve("SKILL.md"), """
-            ---
-            name: only-skill
-            description: Only skill
-            ---
-            instructions
-            """);
-
-        var registry = new CapabilityRegistry(List.of(skillDir), List.of());
-
-        assertThat(registry.search(null)).hasSize(1);
-        assertThat(registry.search("  ")).hasSize(1);
-    }
-
-    @Test
-    void search_noMatch_returnsEmptyList(@TempDir Path tempDir) throws IOException {
-        var skillDir = tempDir.resolve("skills");
-        Files.createDirectories(skillDir);
-        var skill = skillDir.resolve("alpha");
-        Files.createDirectories(skill);
-        Files.writeString(skill.resolve("SKILL.md"), """
-            ---
-            name: alpha
-            description: Alpha skill
-            ---
-            instructions
-            """);
-
-        var registry = new CapabilityRegistry(List.of(skillDir), List.of());
-        assertThat(registry.search("omega")).isEmpty();
-    }
-
-    @Test
     void builder_createsRegistryFromScratch(@TempDir Path tempDir) throws IOException {
         var skillDir = tempDir.resolve("skills");
         Files.createDirectories(skillDir);
@@ -212,5 +102,39 @@ class CapabilityRegistryTest {
             .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new CapabilityRegistry.McpServerConfig("bad", null))
             .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void discoverSkills_withSkillDirectories_returnsSkillCapabilities(@TempDir Path tempDir) throws IOException {
+        var skillDir = tempDir.resolve("skills");
+        Files.createDirectories(skillDir);
+        var mySkill = skillDir.resolve("my-skill");
+        Files.createDirectories(mySkill);
+        Files.writeString(mySkill.resolve("SKILL.md"), """
+            ---
+            name: my-skill
+            description: A test skill
+            ---
+            Do something useful.
+            """);
+
+        var registry = new CapabilityRegistry(List.of(skillDir), List.of());
+        var caps = registry.discoverSkills();
+
+        assertThat(caps).isNotEmpty();
+        assertThat(caps).allMatch(c -> c.type() == CapabilityRegistry.CapabilityType.SKILL);
+        assertThat(caps).anyMatch(c -> c.name().equals("my-skill"));
+    }
+
+    @Test
+    void discoverSkills_emptyRegistry_returnsEmptyList() {
+        var registry = new CapabilityRegistry(List.of(), List.of());
+        assertThat(registry.discoverSkills()).isEmpty();
+    }
+
+    @Test
+    void discoverTools_emptyRegistry_returnsEmptyList() {
+        var registry = new CapabilityRegistry(List.of(), List.of());
+        assertThat(registry.discoverTools()).isEmpty();
     }
 }

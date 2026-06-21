@@ -2,10 +2,7 @@ package de.augmentia.strandsagents.features.skills;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.core.ToolExecutor;
-import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.prompt.PromptRegistry;
 import de.augmentia.strandsagents.features.tools.AgentTool;
 import de.augmentia.strandsagents.features.tools.ToolResult;
 import dev.langchain4j.model.chat.ChatModel;
@@ -19,29 +16,36 @@ public class CapabilitySearchTool implements AgentTool<CapabilitySearchTool.Para
     private final CapabilityRegistry registry;
     private final ChatModel subAgentModel;
     private final ToolExecutor toolExecutor;
+    private final CapabilityEmbeddingService embeddingService;
 
     public CapabilitySearchTool(CapabilityRegistry registry, ChatModel subAgentModel) {
-        this(registry, subAgentModel, new ToolExecutor());
+        this(registry, subAgentModel, new ToolExecutor(), null);
     }
 
     public CapabilitySearchTool(CapabilityRegistry registry, ChatModel subAgentModel,
                                  ToolExecutor toolExecutor) {
+        this(registry, subAgentModel, toolExecutor, null);
+    }
+
+    public CapabilitySearchTool(CapabilityRegistry registry, ChatModel subAgentModel,
+                                 ToolExecutor toolExecutor,
+                                 CapabilityEmbeddingService embeddingService) {
         this.registry = registry;
         this.subAgentModel = subAgentModel;
         this.toolExecutor = toolExecutor;
+        this.embeddingService = embeddingService;
     }
 
-    public record Params(String task, String query) {}
+    public record Params(String task) {}
 
     @Override
     public String name() { return "capability_search"; }
 
     @Override
     public String description() {
-        return "Search for capabilities (skills and MCP tools) relevant to a task. "
-            + "Provide a 'task' description for AI-powered analysis across all configured sources, "
-            + "or a 'query' for simple keyword filtering. "
-            + "Returns structured recommendations with skills and MCP tools matching your needs.";
+        return "Analyze a task and recommend matching capabilities (skills, default tools, and MCP tools). "
+            + "Provide a 'task' description for AI-powered analysis across all configured sources. "
+            + "Returns structured recommendations.";
     }
 
     @Override
@@ -59,24 +63,38 @@ public class CapabilitySearchTool implements AgentTool<CapabilitySearchTool.Para
         taskProp.put("description", "A task description for AI-powered analysis across all capability sources");
         props.set("task", taskProp);
 
-        var queryProp = factory.objectNode();
-        queryProp.put("type", "string");
-        queryProp.put("description", "Optional keyword filter when no task is provided");
-        props.set("query", queryProp);
-
         schema.set("properties", props);
+        schema.set("required", factory.arrayNode().add("task"));
         return schema;
     }
 
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
-        if (params.task() != null && !params.task().isBlank()) {
-            return analyzeWithSubAgent(params.task());
+        if (params.task() == null || params.task().isBlank()) {
+            return ToolResult.success("Please provide a 'task' describing what you want to do.");
         }
-        var capabilities = params.query() != null
-            ? registry.search(params.query())
-            : registry.discoverAll();
-        return formatCapabilities(capabilities);
+
+        if (embeddingService != null) {
+            var matches = embeddingService.search(params.task());
+            if (!matches.isEmpty()) {
+                return formatCapabilities(matches);
+            }
+        }
+
+        return analyzeWithSubAgent(params.task());
+    }
+
+    private ToolResult formatCapabilities(List<CapabilityRegistry.Capability> capabilities) {
+        var sb = new StringBuilder();
+        sb.append("## Vector Search Results\n\n");
+        sb.append("**Task:** ").append(capabilities.isEmpty() ? "" : "Found ").append(capabilities.size())
+            .append(" matching capabilities:\n\n");
+        for (var cap : capabilities) {
+            sb.append("- **").append(cap.name()).append("**");
+            if (!cap.description().isBlank()) sb.append(": ").append(cap.description());
+            sb.append("\n");
+        }
+        return ToolResult.success(sb.toString());
     }
 
     private ToolResult analyzeWithSubAgent(String task) {
@@ -90,16 +108,12 @@ public class CapabilitySearchTool implements AgentTool<CapabilitySearchTool.Para
             })
             .collect(Collectors.toMap(Skill::name, s -> s, (a, b) -> a));
 
-        var subRegistry = new ToolRegistry();
-        subRegistry.register(new SkillSearchTool(skills, null, "all configured directories"));
-        if (!registry.mcpServers().isEmpty()) {
-            subRegistry.register(new McpListTool(registry.mcpServers()));
-        }
+        var defaultCapabilities = allCapabilities.stream()
+            .filter(c -> c.type() == CapabilityRegistry.CapabilityType.DEFAULT)
+            .toList();
 
-        var systemPrompt = PromptRegistry.get("capability_search_tool.system");
-
-        var subAgent = new Agent(subAgentModel, subRegistry, toolExecutor);
-        subAgent.setSystemPrompt(systemPrompt);
+        var subAgent = new CapabilitySearchAgent(subAgentModel, skills, registry.mcpServers(),
+            defaultCapabilities, toolExecutor);
         var result = subAgent.execute(task);
 
         var sb = new StringBuilder();
@@ -115,22 +129,6 @@ public class CapabilitySearchTool implements AgentTool<CapabilitySearchTool.Para
             sb.append("\n");
         }
 
-        return ToolResult.success(sb.toString());
-    }
-
-    private ToolResult formatCapabilities(List<CapabilityRegistry.Capability> capabilities) {
-        var sb = new StringBuilder();
-        if (capabilities.isEmpty()) {
-            sb.append("No capabilities found.");
-        } else {
-            sb.append("Capabilities (").append(capabilities.size()).append("):\n\n");
-            for (var cap : capabilities) {
-                sb.append("- [").append(cap.type()).append("] ").append(cap.name());
-                sb.append(" (").append(cap.source()).append(")");
-                if (!cap.description().isBlank()) sb.append(": ").append(cap.description());
-                sb.append("\n");
-            }
-        }
         return ToolResult.success(sb.toString());
     }
 }

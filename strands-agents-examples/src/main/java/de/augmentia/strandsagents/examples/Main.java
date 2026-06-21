@@ -39,9 +39,13 @@ public class Main {
         var skills = loadDemoSkills();
         var skillsPlugin = new AgentSkillsPlugin(skills, List.of("example-skills"));
 
-        var agent = new Agent(createModel(), registry, new ToolExecutor(),
-            null, null, null, List.of(skillsPlugin));
-        agent.setSystemPrompt("You are a helpful assistant. Skills have been pre-loaded.");
+        var agent = Agent.builder()
+            .model(createModel())
+            .toolRegistry(registry)
+
+            //.plugins(List.of(skillsPlugin))
+            .systemPrompt("You are a helpful assistant. Skills have been pre-loaded.")
+            .build();
         setupEvents(agent);
 
         var result = agent.execute("What skills are available to you?");
@@ -60,10 +64,13 @@ public class Main {
         var model = createModel();
         registry.register(ToolRegistry.createMethod(new McpIngestTool(registry)));
 
-        var agent = new Agent(model, registry, new ToolExecutor(),
-            null, null, null, List.of(skillsPlugin));
-        agent.setSystemPrompt("You have skill_search to discover and activate skills, "
-            + "and mcp_ingest to connect external MCP servers.");
+        var agent = Agent.builder()
+            .model(model)
+            .toolRegistry(registry)
+            .plugins(List.of(skillsPlugin))
+            .systemPrompt("You have skill_search to discover and activate skills, "
+                + "and mcp_ingest to connect external MCP servers.")
+            .build();
         setupEvents(agent);
 
         var result = agent.execute("Search for available skills and activate 'example-skills'.");
@@ -81,15 +88,19 @@ public class Main {
 
         var capRegistry = CapabilityRegistry.builder()
             .skillDir(java.nio.file.Path.of("skills"))
+            .includeStandardTools(true)
             .build();
 
         var model = createModel();
         var capTool = new de.augmentia.strandsagents.features.skills.CapabilitySearchTool(capRegistry, model);
         registry.register(ToolRegistry.createMethod(capTool));
 
-        var agent = new Agent(model, registry, new ToolExecutor(),
-            null, null, null, List.of(skillsPlugin));
-        agent.setSystemPrompt("Use capability_search to discover skills and tools relevant to your task.");
+        var agent = Agent.builder()
+            .model(model)
+            .toolRegistry(registry)
+            .plugins(List.of(skillsPlugin))
+            .systemPrompt("Use capability_search to discover skills and tools relevant to your task.")
+            .build();
         setupEvents(agent);
 
         var result = agent.execute("What capabilities are available for my task?");
@@ -115,16 +126,18 @@ public class Main {
     }
 
     private static List<Skill> loadDemoSkills() {
+        var result = new java.util.ArrayList<Skill>();
         try {
             var dir = java.nio.file.Path.of("skills");
             if (java.nio.file.Files.isDirectory(dir)) {
-                return SkillParser.fromDirectory(dir);
+                result.addAll(SkillParser.fromDirectory(dir));
             }
         } catch (Exception ignored) {}
-        return List.of(new Skill("example-skills",
+        result.add(new Skill("example-skills",
             "An example skill for demonstration purposes",
             "You are skilled in general problem solving and can help with any task.",
             null, List.of(), java.util.Map.of(), null, null));
+        return List.copyOf(result);
     }
 
     private static void setupEvents(Agent agent) {

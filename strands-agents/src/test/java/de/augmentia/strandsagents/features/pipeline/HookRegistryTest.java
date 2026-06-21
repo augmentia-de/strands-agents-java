@@ -83,7 +83,7 @@ class HookRegistryTest {
 
     @Test
     void afterModelCallContext() {
-        var ctx = new HookContexts.AfterModelCallContext("s1", "resp", 10, 20);
+        var ctx = new HookContexts.AfterModelCallContext("s1", "resp", 10, 20, null);
         assertThat(ctx.llmResponse()).isEqualTo("resp");
         assertThat(ctx.inputTokens()).isEqualTo(10);
         assertThat(ctx.outputTokens()).isEqualTo(20);
@@ -321,7 +321,7 @@ class HookRegistryTest {
     void triggerAfterModelCallModify() {
         var registry = new HookRegistry();
         registry.register(new ModifyAfterModelCallHook("modifier", "rewritten"));
-        var ctx = new HookContexts.AfterModelCallContext("s1", "original", 5, 10);
+        var ctx = new HookContexts.AfterModelCallContext("s1", "original", 5, 10, null);
         var result = registry.triggerAfterModelCall(ctx, "original");
         assertThat(result).isInstanceOf(HookResult.Modify.class);
         assertThat(((HookResult.Modify<?>) result).value()).isEqualTo("rewritten");
@@ -331,7 +331,7 @@ class HookRegistryTest {
     void triggerAfterModelCallRetry() {
         var registry = new HookRegistry();
         registry.register(new RetryAfterModelCallHook("retry-hook", "needs retry"));
-        var ctx = new HookContexts.AfterModelCallContext("s1", "bad", 0, 0);
+        var ctx = new HookContexts.AfterModelCallContext("s1", "bad", 0, 0, null);
         assertThat(registry.triggerAfterModelCall(ctx, "bad"))
             .isInstanceOfSatisfying(HookResult.Retry.class, r ->
                 assertThat(r.reason()).contains("needs retry"));
@@ -341,7 +341,7 @@ class HookRegistryTest {
     void triggerAfterModelCallCancel() {
         var registry = new HookRegistry();
         registry.register(new CancelHook("cancel-after-mc"));
-        var ctx = new HookContexts.AfterModelCallContext("s1", "resp", 0, 0);
+        var ctx = new HookContexts.AfterModelCallContext("s1", "resp", 0, 0, null);
         assertThat(registry.triggerAfterModelCall(ctx, "resp"))
             .isInstanceOf(HookResult.Cancel.class);
     }

@@ -4,8 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.augmentia.strandsagents.core.MockChatModel;
 import de.augmentia.strandsagents.core.ToolExecutor;
+import dev.langchain4j.data.embedding.Embedding;
+import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.model.output.Response;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 class CapabilitySearchToolTest {
@@ -19,10 +24,10 @@ class CapabilitySearchToolTest {
     }
 
     @Test
-    void description_containsCapabilitiesAndSearch() {
+    void description_containsCapabilitiesAndAnalyze() {
         var tool = new CapabilitySearchTool(emptyRegistry, new MockChatModel());
         assertThat(tool.description()).containsIgnoringCase("capabilities");
-        assertThat(tool.description()).containsIgnoringCase("search");
+        assertThat(tool.description()).containsIgnoringCase("analyze");
     }
 
     @Test
@@ -32,39 +37,92 @@ class CapabilitySearchToolTest {
     }
 
     @Test
-    void parameterSchema_hasTaskAndQueryProperties() {
+    void parameterSchema_hasTaskProperty() {
         var tool = new CapabilitySearchTool(emptyRegistry, new MockChatModel());
         var schema = tool.parameterSchema();
         assertThat(schema.has("properties")).isTrue();
         var props = schema.get("properties");
         assertThat(props.has("task")).isTrue();
-        assertThat(props.has("query")).isTrue();
+        assertThat(props.has("query")).isFalse();
     }
 
     @Test
-    void execute_withQuery_callsRegistrySearch() throws Exception {
+    void parameterSchema_taskIsRequired() {
         var tool = new CapabilitySearchTool(emptyRegistry, new MockChatModel());
-        var result = tool.execute("call-1", new CapabilitySearchTool.Params(null, "test"),
-            new java.util.concurrent.atomic.AtomicBoolean(false));
-        assertThat(result.content()).isNotEmpty();
-        assertThat(result.content().get(0).toString()).contains("No capabilities");
+        var schema = tool.parameterSchema();
+        assertThat(schema.has("required")).isTrue();
+        assertThat(schema.get("required")).hasSize(1);
+        assertThat(schema.get("required").get(0).asText()).isEqualTo("task");
     }
 
     @Test
-    void execute_withoutParams_returnsAll() throws Exception {
+    void execute_withoutTask_returnsHelpMessage() throws Exception {
         var tool = new CapabilitySearchTool(emptyRegistry, new MockChatModel());
-        var result = tool.execute("call-1", new CapabilitySearchTool.Params(null, null),
-            new java.util.concurrent.atomic.AtomicBoolean(false));
+        var result = tool.execute("call-1", new CapabilitySearchTool.Params(null),
+            new AtomicBoolean(false));
         assertThat(result.content()).isNotEmpty();
-        assertThat(result.content().get(0).toString()).contains("No capabilities found");
+        assertThat(result.content().get(0).toString()).containsIgnoringCase("provide a 'task'");
+    }
+
+    @Test
+    void execute_withBlankTask_returnsHelpMessage() throws Exception {
+        var tool = new CapabilitySearchTool(emptyRegistry, new MockChatModel());
+        var result = tool.execute("call-1", new CapabilitySearchTool.Params("  "),
+            new AtomicBoolean(false));
+        assertThat(result.content()).isNotEmpty();
+        assertThat(result.content().get(0).toString()).containsIgnoringCase("provide a 'task'");
+    }
+
+    @Test
+    void execute_withVectorSearchMatch_returnsFastPath() throws Exception {
+        var writeCap = new CapabilityRegistry.Capability("write", "Write content", "default",
+            CapabilityRegistry.CapabilityType.DEFAULT);
+        var embeddingModel = new EmbeddingModel() {
+            @Override
+            public Response<List<Embedding>> embedAll(List<TextSegment> segments) {
+                return Response.from(segments.stream()
+                    .map(s -> new Embedding(new float[]{1, 0, 0}))
+                    .toList());
+            }
+        };
+        var embeddingService = new CapabilityEmbeddingService(embeddingModel, List.of(writeCap), 0.5);
+        var tool = new CapabilitySearchTool(emptyRegistry, new MockChatModel(),
+            new ToolExecutor(), embeddingService);
+        var result = tool.execute("call-1", new CapabilitySearchTool.Params("write"),
+            new AtomicBoolean(false));
+        var output = result.content().get(0).toString();
+        assertThat(output).contains("Vector Search");
+        assertThat(output).contains("write");
+    }
+
+    @Test
+    void execute_withVectorSearchNoMatch_fallsBackToSubAgent() throws Exception {
+        var writeCap = new CapabilityRegistry.Capability("write", "Write content", "default",
+            CapabilityRegistry.CapabilityType.DEFAULT);
+        var embeddingModel = new EmbeddingModel() {
+            @Override
+            public Response<List<Embedding>> embedAll(List<TextSegment> segments) {
+                return Response.from(segments.stream()
+                    .map(s -> new Embedding(new float[]{0, 0, 0}))
+                    .toList());
+            }
+        };
+        var embeddingService = new CapabilityEmbeddingService(embeddingModel, List.of(writeCap), 0.99);
+        var tool = new CapabilitySearchTool(emptyRegistry, new MockChatModel("LLM: %s"),
+            new ToolExecutor(), embeddingService);
+        var result = tool.execute("call-1", new CapabilitySearchTool.Params("write"),
+            new AtomicBoolean(false));
+        var output = result.content().get(0).toString();
+        assertThat(output).contains("Capability Analysis");
+        assertThat(output).contains("LLM");
     }
 
     @Test
     void execute_withTask_routesToSubAgent() throws Exception {
         var registry = new CapabilityRegistry(List.of(), List.of());
         var tool = new CapabilitySearchTool(registry, new MockChatModel("Analysis result: %s"));
-        var result = tool.execute("call-1", new CapabilitySearchTool.Params("find files", null),
-            new java.util.concurrent.atomic.AtomicBoolean(false));
+        var result = tool.execute("call-1", new CapabilitySearchTool.Params("find files"),
+            new AtomicBoolean(false));
         var output = result.content().get(0).toString();
         assertThat(output).contains("Capability Analysis");
         assertThat(output).contains("find files");
@@ -88,8 +146,8 @@ class CapabilitySearchToolTest {
 
             var registry = new CapabilityRegistry(List.of(skillDir), List.of());
             var tool = new CapabilitySearchTool(registry, new MockChatModel("Result: %s"));
-            var result = tool.execute("call-1", new CapabilitySearchTool.Params("find files", null),
-                new java.util.concurrent.atomic.AtomicBoolean(false));
+            var result = tool.execute("call-1", new CapabilitySearchTool.Params("find files"),
+                new AtomicBoolean(false));
             var output = result.content().get(0).toString();
             assertThat(output).contains("file-finder");
             assertThat(output).contains("Finds files");
@@ -104,8 +162,8 @@ class CapabilitySearchToolTest {
     void execute_withTaskAndSubAgentError_returnsErrorMessage() throws Exception {
         var registry = new CapabilityRegistry(List.of(), List.of());
         var tool = new CapabilitySearchTool(registry, new MockChatModel("Error: %s"));
-        var result = tool.execute("call-1", new CapabilitySearchTool.Params("do something", null),
-            new java.util.concurrent.atomic.AtomicBoolean(false));
+        var result = tool.execute("call-1", new CapabilitySearchTool.Params("do something"),
+            new AtomicBoolean(false));
         assertThat(result.content().get(0).toString()).contains("Capability Analysis");
     }
 

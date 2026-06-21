@@ -6,10 +6,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.augmentia.strandsagents.core.MockChatModel;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.features.conversation.SummarizingConversationManager;
+import de.augmentia.strandsagents.features.conversation.SummarizingSlidingWindowConversationManager;
 import de.augmentia.strandsagents.model.agent.StopReason;
+import de.augmentia.strandsagents.model.message.AssistantMessage;
 import de.augmentia.strandsagents.model.message.Message;
 import de.augmentia.strandsagents.model.message.SystemMessage;
+import de.augmentia.strandsagents.model.message.ToolMessage;
 import de.augmentia.strandsagents.model.message.UserMessage;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -69,11 +71,11 @@ class ConversationManagerTest {
         assertThat(pruned).isEmpty();
     }
 
-    // ── Summarizing ───────────────────────────────────────────────────
+    // ── SummarizingSlidingWindow ──────────────────────────────────────
 
     @Test
-    void summarizingDoesNothingWhenUnderMaxTokens() {
-        var manager = new SummarizingConversationManager(new MockChatModel(), 10_000);
+    void hybridDoesNothingWhenUnderMaxTokens() {
+        var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 10_000, 3);
         var messages = createMessages(3);
 
         var pruned = manager.prune(messages);
@@ -83,36 +85,36 @@ class ConversationManagerTest {
     }
 
     @Test
-    void summarizingReplacesOldMessagesWhenOverBudget() {
-        var manager = new SummarizingConversationManager(new MockChatModel(), 10);
-        var messages = createLongMessages(4);
+    void hybridReplacesOldMessagesWhenOverBudget() {
+        var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 100, 3);
+        var messages = createLongMessages(12);
 
         var pruned = manager.prune(messages);
 
         assertThat(pruned).isNotEmpty();
         assertThat(pruned.get(0)).isInstanceOf(SystemMessage.class);
         var summary = (SystemMessage) pruned.get(0);
-        assertThat(summary.content()).startsWith("Summary of the previous conversation:");
+        assertThat(summary.content()).startsWith("Conversation summary:");
     }
 
     @Test
-    void summarizingPreservesRecentMessages() {
-        var manager = new SummarizingConversationManager(new MockChatModel(), 10);
-        var messages = createLongMessages(4);
+    void hybridPreservesRecentMessages() {
+        var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 100, 3);
+        var messages = createLongMessages(12);
 
         var pruned = manager.prune(messages);
 
         var contents = pruned.stream().map(Message::content).toList();
-        boolean hasNewest = contents.stream().anyMatch(c -> c.contains("Nachricht Nummer 3"));
+        boolean hasNewest = contents.stream().anyMatch(c -> c.contains("Nachricht Nummer 11"));
         assertThat(hasNewest)
             .as("Expected newest message in pruned contents: %s", contents)
             .isTrue();
     }
 
     @Test
-    void summarizingResultStartsWithSystemMessage() {
-        var manager = new SummarizingConversationManager(new MockChatModel(), 10);
-        var messages = createLongMessages(4);
+    void hybridResultStartsWithSystemMessage() {
+        var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 100, 3);
+        var messages = createLongMessages(12);
 
         var pruned = manager.prune(messages);
 
@@ -122,20 +124,133 @@ class ConversationManagerTest {
     }
 
     @Test
-    void summarizingRejectsInvalidMaxTokens() {
-        assertThatThrownBy(() -> new SummarizingConversationManager(new MockChatModel(), 0))
+    void hybridRejectsInvalidMaxTokens() {
+        assertThatThrownBy(() -> new SummarizingSlidingWindowConversationManager(new MockChatModel(), 0, 3))
             .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    void summarizingKeepsSingleMessageAlways() {
-        var manager = new SummarizingConversationManager(new MockChatModel(), 1);
+    void hybridKeepsSingleMessageAlways() {
+        var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 1, 3);
         var messages = createLongMessages(1);
 
         var pruned = manager.prune(messages);
 
         assertThat(pruned).hasSize(1);
         assertThat(pruned.get(0)).isInstanceOf(UserMessage.class);
+    }
+
+    @Test
+    void hybridKeepsAllWhenFewerUsersThanKeep() {
+        var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 10_000, 5);
+        var messages = createLongMessages(3);
+
+        var pruned = manager.prune(messages);
+
+        assertThat(pruned).hasSize(3);
+    }
+
+    @Test
+    void hybridPreservesSystemMessages() {
+        var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 10_000, 3);
+        var messages = new ArrayList<Message>();
+        messages.add(new SystemMessage("id-1", Instant.now(), "Sys-Anweisung", Map.of()));
+        for (int i = 0; i < 5; i++) {
+            messages.add(new UserMessage("id-" + (i + 2), Instant.now(), "Frage " + i, Map.of()));
+        }
+
+        var pruned = manager.prune(messages);
+
+        assertThat(pruned).anyMatch(m -> m instanceof SystemMessage);
+    }
+
+    @Test
+    void hybridHandlesEmptyList() {
+        var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 100, 3);
+        assertThat(manager.prune(List.of())).isEmpty();
+    }
+
+    @Test
+    void hybridKeepsSystemMessagesUnaggregatedWhenUnderThreshold() {
+        var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 10_000, 3);
+        var messages = List.<Message>of(
+            new SystemMessage("id-1", Instant.now(), "Regel A", Map.of()),
+            new SystemMessage("id-2", Instant.now(), "Regel B", Map.of()));
+
+        var pruned = manager.prune(messages);
+
+        assertThat(pruned).hasSize(2);
+        assertThat(pruned.get(0)).isInstanceOf(SystemMessage.class);
+    }
+
+    @Test
+    void hybridAggregatesSystemMessagesWhenOverThreshold() {
+        var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 1, 3);
+        var messages = new ArrayList<Message>();
+        for (int i = 0; i < 6; i++) {
+            messages.add(new SystemMessage("s-" + i, Instant.now(), "Regel " + i, Map.of()));
+        }
+        for (int i = 0; i < 11; i++) {
+            messages.add(new UserMessage("u-" + i, Instant.now(), "Frage " + i, Map.of()));
+        }
+
+        var pruned = manager.prune(messages);
+
+        assertThat(pruned).hasSize(5);
+        assertThat(pruned.get(0)).isInstanceOf(SystemMessage.class);
+    }
+
+    @Test
+    void hybridRejectsInvalidKeepLast() {
+        assertThatThrownBy(() -> new SummarizingSlidingWindowConversationManager(new MockChatModel(), 100, 0))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new SummarizingSlidingWindowConversationManager(new MockChatModel(), 100, -1))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void hybridHandlesMixedTypes() {
+        var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 4000, 3);
+        var messages = new ArrayList<Message>();
+        messages.add(new SystemMessage("s1", Instant.now(), "Anweisung", Map.of()));
+        messages.add(new UserMessage("u1", Instant.now(), "Hallo", Map.of()));
+        messages.add(new AssistantMessage("a1", Instant.now(), "Hi!", Map.of(), List.of()));
+        messages.add(new UserMessage("u2", Instant.now(), "Wetter?", Map.of()));
+        messages.add(new AssistantMessage("a2", Instant.now(), "Sonnig", Map.of(), List.of()));
+        messages.add(new ToolMessage("t1", Instant.now(), "tool-result", Map.of(), "call-1", "get_weather"));
+        messages.add(new UserMessage("u3", Instant.now(), "Danke", Map.of()));
+
+        var pruned = manager.prune(messages);
+
+        assertThat(pruned).isNotEmpty();
+        var sysCount = pruned.stream().filter(m -> m instanceof SystemMessage).count();
+        assertThat(sysCount).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    void hybridPrunesWhenOverTokenBudget() {
+        var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 50, 3);
+        var messages = createLongMessages(12);
+
+        var pruned = manager.prune(messages);
+
+        assertThat(pruned).hasSizeLessThan(12);
+        assertThat(pruned.get(0)).isInstanceOf(SystemMessage.class);
+    }
+
+    @Test
+    void slidingWindowPreservesSystemMessages() {
+        var manager = new SlidingWindowConversationManager(3);
+        var messages = new ArrayList<Message>();
+        messages.add(new SystemMessage("s1", Instant.now(), "System", Map.of()));
+        for (int i = 1; i <= 5; i++) {
+            messages.add(new UserMessage("id-" + i, Instant.now(), "Nachricht " + i, Map.of()));
+        }
+
+        var pruned = manager.prune(messages);
+
+        assertThat(pruned.get(0)).isInstanceOf(SystemMessage.class);
+        assertThat(pruned).hasSize(4);
     }
 
     // ── Integration: SlidingWindow + Agent ─────────────────────
@@ -165,12 +280,12 @@ class ConversationManagerTest {
         assertThat(memory.messages()).hasSizeLessThanOrEqualTo(2);
     }
 
-    // ── Integration: Summarizing + Agent ───────────────────────
+    // ── Integration: SummarizingSlidingWindow + Agent ──────────
 
     @Test
-    void agentWithSummarizingProducesSummary() {
+    void agentWithHybridProducesSummary() {
         var summarizer = new MockChatModel();
-        var manager = new SummarizingConversationManager(summarizer, 5);
+        var manager = new SummarizingSlidingWindowConversationManager(summarizer, 5, 3);
         var agent = new Agent(new MockChatModel(), new ToolRegistry(), new ToolExecutor(), manager);
 
         agent.execute("Dies ist eine sehr lange erste Nachricht, die viele Token verbraucht.");

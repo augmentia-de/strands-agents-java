@@ -37,3 +37,4 @@ deploy/serverless/set_cloud_credentials.sh
 /.chat-memory/
 /docker/google/credentials.json
 /docker/google/
+/strands-gdpr-proxy/

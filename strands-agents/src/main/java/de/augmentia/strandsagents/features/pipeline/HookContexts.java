@@ -3,6 +3,8 @@ package de.augmentia.strandsagents.features.pipeline;
 import de.augmentia.strandsagents.model.agent.AgentResult;
 import de.augmentia.strandsagents.model.message.Message;
 import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -29,11 +31,16 @@ public final class HookContexts {
         List<Message> additionalMessages
     ) {}
 
+    // TODO: ChatResponse here is a demo shortcut.
+    //   In production, prefer an abstraction like ModelCallMetadata (cachedTokens,
+    //   modelName, responseId) to avoid exposing rawHttpResponse with
+    //   potential organization/request-IDs from the HTTP round-trip.
     public record AfterModelCallContext(
         String sessionId,
         String llmResponse,
         int inputTokens,
-        int outputTokens
+        int outputTokens,
+        ChatResponse chatResponse
     ) {}
 
     public record BeforeToolCallContext(
@@ -46,6 +53,11 @@ public final class HookContexts {
         String sessionId,
         String toolName,
         String result,
-        boolean isError
-    ) {}
+        boolean isError,
+        List<Message> additionalMessages
+    ) {
+        public AfterToolCallContext(String sessionId, String toolName, String result, boolean isError) {
+            this(sessionId, toolName, result, isError, new ArrayList<>());
+        }
+    }
 }

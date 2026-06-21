@@ -22,6 +22,8 @@ public class ConfigModel {
     private ModelProviderType provider;
     private Integer maxIterations;
     private Integer maxMessages;
+    private Integer maxTokens;
+    private Integer keepLastUserMessages;
     private String sessionManager;
     private String conversationManager;
     private String chatMemoryStore;
@@ -63,6 +65,12 @@ public class ConfigModel {
 
     public Integer getMaxMessages() { return maxMessages; }
     public void setMaxMessages(Integer maxMessages) { this.maxMessages = maxMessages; }
+
+    public Integer getMaxTokens() { return maxTokens; }
+    public void setMaxTokens(Integer maxTokens) { this.maxTokens = maxTokens; }
+
+    public Integer getKeepLastUserMessages() { return keepLastUserMessages; }
+    public void setKeepLastUserMessages(Integer keepLastUserMessages) { this.keepLastUserMessages = keepLastUserMessages; }
 
     public String getSessionManager() { return sessionManager; }
     public void setSessionManager(String sessionManager) { this.sessionManager = sessionManager; }
@@ -284,6 +292,8 @@ public class ConfigModel {
         model.provider = ModelProviderType.OPENAI;
         model.maxIterations = 10;
         model.maxMessages = 20;
+        model.maxTokens = 4000;
+        model.keepLastUserMessages = 3;
         model.temperature = 0.7;
         model.resilience = new ResilienceModel();
         model.resilience.retry = new RetryModel();

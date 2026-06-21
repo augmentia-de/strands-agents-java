@@ -34,7 +34,8 @@ import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.memory.ChatMemory;
-import dev.langchain4j.memory.chat.MessageWindowChatMemory;
+
+
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
@@ -45,6 +46,7 @@ import dev.langchain4j.model.chat.request.json.JsonSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -86,37 +88,38 @@ public class Agent {
 
     static int MAX_TOOL_ITERATIONS = 10;
     static final int MAX_HOOK_RETRIES = 3;
-    static final int DEFAULT_MAX_MESSAGES = 20;
+    static final int DEFAULT_MAX_MESSAGES = 75;
     static final ExecutorService VIRTUAL_EXECUTOR =
         Executors.newVirtualThreadPerTaskExecutor();
 
     private final ChatModel model;
     private ChatModel advancedModel;
     private ModelTier currentTier;
-    private final ChatMemory chatMemory;
+    final ChatMemory chatMemory;
     private ToolRegistry toolRegistry;
-    private final ToolExecutor toolExecutor;
-    private volatile List<String> lastToolNames = List.of();
+    final ToolExecutor toolExecutor;
+    volatile List<String> lastToolNames = List.of();
     private String sessionId;
     private ChatModel simpleModel;
-    private final ConversationManager conversationManager;
+    final ConversationManager conversationManager;
     private final SessionManager sessionManager;
-    private final RetryConfig retryConfig;
-    private final CircuitBreaker circuitBreaker;
+    final RetryConfig retryConfig;
+    final CircuitBreaker circuitBreaker;
+    final Duration modelTimeout;
     private final SubmissionPublisher<AgentEvent> eventPublisher;
     private final List<AgentEventListener> eventListeners = new CopyOnWriteArrayList<>();
     private String systemPrompt = "";
     private List<Plugin> plugins = new ArrayList<>();
-    private CheckpointService checkpointService;
-    private volatile AgentPhase phase = AgentPhase.IDLE;
-    private final ReentrantLock pauseLock = new ReentrantLock();
-    private final Condition pauseCondition = pauseLock.newCondition();
+    CheckpointService checkpointService;
+    volatile AgentPhase phase = AgentPhase.IDLE;
+    final ReentrantLock pauseLock = new ReentrantLock();
+    final Condition pauseCondition = pauseLock.newCondition();
     private StructuredOutputConfig structuredOutputConfig;
     private HookRegistry hookRegistry;
     private final ChatMemoryStore chatMemoryStore;
-    private volatile String lastThinking;
-    private volatile boolean cancelled = false;
-    private volatile Thread executionThread;
+    volatile String lastThinking;
+    volatile boolean cancelled = false;
+    volatile Thread executionThread;
 
     /**
      * Mutable runtime configuration snapshot source.
@@ -134,7 +137,7 @@ public class Agent {
      * even if the Agent's fields are mutated concurrently by a different thread
      * (e.g. via {@link #setToolRegistry(ToolRegistry)}).
      */
-    private final AgentRunConfig runConfig = new AgentRunConfig();
+    final AgentRunConfig runConfig = new AgentRunConfig();
 
     /**
      * Constructs an Agent with only a chat model and default components.
@@ -223,15 +226,15 @@ public class Agent {
         this.circuitBreaker = resilienceConfig != null && resilienceConfig.circuitBreakerConfig() != null
             ? new CircuitBreaker(resilienceConfig.circuitBreakerConfig())
             : null;
+        this.modelTimeout = resilienceConfig != null ? resilienceConfig.modelTimeout() : null;
         this.chatMemoryStore = chatMemoryStore;
-        var chatMemoryBuilder = MessageWindowChatMemory.builder()
-            .maxMessages(conversationManager instanceof SlidingWindowConversationManager sw
-                ? sw.windowSize() : DEFAULT_MAX_MESSAGES);
+        int maxMessages = conversationManager instanceof SlidingWindowConversationManager sw
+            ? sw.windowSize() : DEFAULT_MAX_MESSAGES;
+        this.chatMemory = new MultiSystemMessageChatMemory(maxMessages);
         if (chatMemoryStore != null) {
-            chatMemoryBuilder.chatMemoryStore(chatMemoryStore);
-            log.debug("ChatMemoryStore: {}", chatMemoryStore.getClass().getSimpleName());
+            log.warn("ChatMemoryStore {} ignored — use SessionManager for persistence",
+                chatMemoryStore.getClass().getSimpleName());
         }
-        this.chatMemory = chatMemoryBuilder.build();
         this.sessionId = UUID.randomUUID().toString();
         this.eventPublisher = new SubmissionPublisher<>();
         this.hookRegistry = new HookRegistry();
@@ -465,14 +468,16 @@ public class Agent {
             var session = sessionManager.loadSession(sid)
                 .orElseGet(() -> {
                     log.debug("Session {} not found, creating new one", sid);
-                    return sessionManager.createSession("default", Map.of());
+                    var now = Instant.now();
+                    var state = new AgentState(sid, List.of(), Map.of(), AgentStatus.IDLE);
+                    var newSession = new Session(sid, "default", List.of(), state, Map.of(), now, now);
+                    sessionManager.saveSession(newSession);
+                    return newSession;
                 });
             log.debug("Session {} loaded — {} messages", sid, session.messages().size());
-            if (chatMemory instanceof MessageWindowChatMemory mwcm) {
-                mwcm.clear();
-                ChatMessageConverter.toLangChain4jMessages(session.messages())
-                    .forEach(mwcm::add);
-            }
+            chatMemory.clear();
+            ChatMessageConverter.toLangChain4jMessages(session.messages())
+                .forEach(chatMemory::add);
         }
 
         var result = executeLoop(sid, prompt, contextVariables);
@@ -501,515 +506,13 @@ public class Agent {
 
     private AgentResult executeLoop(String sid, String prompt, Map<String, Object> contextVariables) {
         log.debug("executeLoop start — sessionId={}", sid);
-        var run = runConfig.snapshot();
-        cancelled = false;
-        executionThread = Thread.currentThread();
-        try {
-        var start = System.nanoTime();
-        int totalInputTokens = 0;
-        int totalOutputTokens = 0;
-        int toolCallCount = 0;
-        boolean structuredForceAttempted = false;
-        boolean structuredForceActive = false;
-        String structuredOutputResult = null;
-
-        phase = AgentPhase.EXECUTING;
-        fire(new AgentStartedEvent(sid, Instant.now(), prompt));
-
-        var beforeAgentResult = run.hookRegistry().triggerBeforeAgent(
-            new HookContexts.BeforeAgentContext(sid, prompt, contextVariables));
-        if (beforeAgentResult instanceof HookResult.Modify<?> m) {
-            log.debug("beforeAgent hook modified prompt — was '{}', now '{}'",
-                truncate(prompt), truncate((String) m.value()));
-            prompt = (String) m.value();
-        } else if (beforeAgentResult instanceof HookResult.Cancel c) {
-            log.debug("beforeAgent hook cancelled — reason={}", c.reason());
-            var durationMs = (System.nanoTime() - start) / 1_000_000;
-            var result = new AgentResult(sid, PromptRegistry.get("agent.hook_cancelled", c.reason()),
-                ChatMessageConverter.toDomainMessages(chatMemory.messages()),
-                new ExecutionMetrics(durationMs, 0, 0, 0),
-                StopReason.INTERRUPTED);
-            fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
-            return result;
-        }
-
-        prompt = prompt.trim();
-        chatMemory.add(UserMessage.from(prompt));
-
-        for (int iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-            checkPaused();
-            if (cancelled) throw new RuntimeException("Agent execution cancelled by user");
-
-            log.debug("Iteration {}/{} — chatMemory messages={}",
-                iteration + 1, MAX_TOOL_ITERATIONS, chatMemory.messages().size());
-
-            var currentMessages = chatMemory.messages();
-            var domainMessages = ChatMessageConverter.toDomainMessages(currentMessages);
-
-            if (conversationManager != null) {
-                domainMessages = conversationManager.prune(domainMessages);
-                var prunedLangChain = ChatMessageConverter.toLangChain4jMessages(domainMessages);
-                if (chatMemory instanceof MessageWindowChatMemory mwcm) {
-                    mwcm.clear();
-                    for (var msg : prunedLangChain) {
-                        mwcm.add(msg);
-                    }
-                }
-                currentMessages = prunedLangChain;
-                domainMessages = ChatMessageConverter.toDomainMessages(currentMessages);
-            }
-
-            // Input guardrails (iterate all plugins)
-            var orderedPlugins = getOrderedPlugins();
-            for (var plugin : orderedPlugins) {
-                for (var g : plugin.getInputGuardrails()) {
-                    var result = g.validate(domainMessages, plugin.name());
-                    if (!result.pass()) {
-                        var guardResult = handlePluginGuardrail(sid, start, plugin, result,
-                            totalInputTokens, totalOutputTokens, toolCallCount);
-                        if (guardResult != null) {
-                            log.debug("Input guardrail blocked — stopReason={}, answer={}",
-                                guardResult.stopReason(), truncate(guardResult.finalAnswer()));
-                            return guardResult;
-                        }
-                        // null means ESCALATE approved — continue
-                    }
-                }
-            }
-
-            var sb = new StringBuilder(run.systemPrompt() != null ? run.systemPrompt() : "");
-            var bie = new BeforeInvocationEvent(sid, Instant.now(), sb, domainMessages);
-            fire(bie);
-            var effectivePrompt = sb.toString().trim();
-
-            List<dev.langchain4j.agent.tool.ToolSpecification> toolSpecs = structuredForceActive
-                ? java.util.Collections.emptyList()
-                : run.toolRegistry() != null ? run.toolRegistry().getSpecifications()
-                  : java.util.Collections.emptyList();
-
-            // Hook: beforeModelCall
-            var beforeMcCtx = new HookContexts.BeforeModelCallContext(
-                sid, new StringBuilder(effectivePrompt), domainMessages, toolSpecs, new ArrayList<>());
-            var beforeMcResult = run.hookRegistry().triggerBeforeModelCall(beforeMcCtx);
-            effectivePrompt = beforeMcCtx.systemPrompt().toString();
-            if (beforeMcResult instanceof HookResult.Modify<?> m
-                    && m.value() instanceof List<?> list) {
-                @SuppressWarnings("unchecked")
-                var modifiedTools = (List<dev.langchain4j.agent.tool.ToolSpecification>) list;
-                log.debug("beforeModelCall hook modified tools — {} → {} tools",
-                    toolSpecs.size(), modifiedTools.size());
-                toolSpecs = modifiedTools;
-            }
-            if (beforeMcResult instanceof HookResult.Cancel c) {
-                log.debug("beforeModelCall hook cancelled — reason={}", c.reason());
-                phase = AgentPhase.FAILED;
-                var durationMs = (System.nanoTime() - start) / 1_000_000;
-                var result = new AgentResult(sid, PromptRegistry.get("agent.hook_cancelled", c.reason()),
-                    ChatMessageConverter.toDomainMessages(chatMemory.messages()),
-                    new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
-                    StopReason.INTERRUPTED);
-                fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
-                return result;
-            }
-
-            // Detect tool changes and notify the LLM
-            var currentToolNames = toolSpecs.stream()
-                .map(ToolSpecification::name)
-                .sorted()
-                .toList();
-            if (!currentToolNames.equals(lastToolNames)) {
-                if (!lastToolNames.isEmpty()) {
-                    var added = new ArrayList<>(currentToolNames);
-                    added.removeAll(lastToolNames);
-                    var removed = new ArrayList<>(lastToolNames);
-                    removed.removeAll(currentToolNames);
-                    var notice = new StringBuilder("SYSTEM NOTE: Your available tools have been updated.");
-                    if (!added.isEmpty()) {
-                        notice.append(" Added: ").append(String.join(", ", added));
-                    }
-                    if (!removed.isEmpty()) {
-                        notice.append(" Removed: ").append(String.join(", ", removed));
-                    }
-                    log.debug("Tool change detected — added={}, removed={}", added, removed);
-                    beforeMcCtx.additionalMessages().add(
-                        new de.augmentia.strandsagents.model.message.SystemMessage(
-                            UUID.randomUUID().toString(), Instant.now(), notice.toString(), Map.of()));
-                }
-                lastToolNames = currentToolNames;
-            }
-
-            // Persist additional messages from hooks and tool change notifications into chatMemory
-            if (!beforeMcCtx.additionalMessages().isEmpty()) {
-                for (var msg : beforeMcCtx.additionalMessages()) {
-                    chatMemory.add(ChatMessageConverter.toLangChain4j(msg));
-                }
-                currentMessages = chatMemory.messages();
-                domainMessages = ChatMessageConverter.toDomainMessages(currentMessages);
-            }
-
-            // LLM call with afterModelCall hook & retry support
-            var responseText = "";
-            AiMessage aiMessage = null;
-            ChatResponse response = null;
-
-            modelCall:
-            for (int hookRetry = 0; hookRetry < MAX_HOOK_RETRIES; hookRetry++) {
-                fire(new ModelRequestedEvent(sid, Instant.now(), domainMessages));
-
-                try {
-                    response = callWithResilience(currentMessages, toolSpecs, effectivePrompt);
-                } catch (Exception e) {
-                    phase = AgentPhase.FAILED;
-                    var durationMs = (System.nanoTime() - start) / 1_000_000;
-                    var result = new AgentResult(sid, PromptRegistry.get("agent.llm_error", e.getMessage()),
-                        ChatMessageConverter.toDomainMessages(chatMemory.messages()),
-                        new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
-                        StopReason.ERROR);
-                    fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
-                    return result;
-                }
-
-                aiMessage = response.aiMessage();
-                responseText = aiMessage.text() != null ? aiMessage.text() : "";
-                lastThinking = aiMessage.thinking();
-
-                var inputTokens = response.tokenUsage() != null ? response.tokenUsage().inputTokenCount() : 0;
-                var outputTokens = response.tokenUsage() != null ? response.tokenUsage().outputTokenCount() : 0;
-
-                totalInputTokens += inputTokens;
-                totalOutputTokens += outputTokens;
-
-                log.debug("LLM call — hookRetry={}, inputTokens={}, outputTokens={}, responseLen={}",
-                    hookRetry, inputTokens, outputTokens, responseText.length());
-
-                // Hook: afterModelCall
-                var afterMc = run.hookRegistry().triggerAfterModelCall(
-                    new HookContexts.AfterModelCallContext(sid, responseText, inputTokens, outputTokens), responseText);
-                if (afterMc instanceof HookResult.Cancel c) {
-                    log.debug("afterModelCall hook cancelled — reason={}", c.reason());
-                    phase = AgentPhase.FAILED;
-                    var durationMs = (System.nanoTime() - start) / 1_000_000;
-                    var result = new AgentResult(sid, PromptRegistry.get("agent.hook_cancelled", c.reason()),
-                        ChatMessageConverter.toDomainMessages(chatMemory.messages()),
-                        new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
-                        StopReason.INTERRUPTED);
-                    fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
-                    return result;
-                }
-                if (afterMc instanceof HookResult.Modify<?> m) {
-                    log.debug("afterModelCall hook modified response — was '{}', now '{}'",
-                        truncate(responseText), truncate((String) m.value()));
-                    responseText = (String) m.value();
-                }
-                if (afterMc instanceof HookResult.Retry) {
-                    log.debug("afterModelCall hook requested retry — reason={}", ((HookResult.Retry) afterMc).reason());
-                    continue;
-                }
-                break modelCall;
-            }
-
-            // Output guardrails (iterate all plugins)
-            fire(new AfterInvocationEvent(sid, Instant.now(), responseText, domainMessages));
-            for (var plugin : getOrderedPlugins()) {
-                for (var g : plugin.getOutputGuardrails()) {
-                    var result = g.validate(domainMessages, "output:" + responseText);
-                    if (!result.pass()) {
-                        var guardResult = handlePluginGuardrail(sid, start, plugin, result,
-                            totalInputTokens, totalOutputTokens, toolCallCount);
-                        if (guardResult != null) {
-                            log.debug("Output guardrail blocked — stopReason={}, answer={}",
-                                guardResult.stopReason(), truncate(guardResult.finalAnswer()));
-                            return guardResult;
-                        }
-                    }
-                }
-            }
-
-            chatMemory.add(aiMessage);
-
-            // Structured output: try to extract JSON if enabled
-            var soConfig = run.structuredOutputConfig();
-            if (soConfig != null && soConfig.isEnabled()
-                && !aiMessage.hasToolExecutionRequests()) {
-                try {
-                    OBJECT_MAPPER.readTree(responseText);
-                    structuredOutputResult = responseText;
-                    log.debug("Structured output parsed successfully — {} chars", responseText.length());
-                } catch (JsonProcessingException e) {
-                    if (!structuredForceAttempted) {
-                        log.debug("Structured output parse failed, forcing with prompt");
-                        structuredForceAttempted = true;
-                        structuredForceActive = true;
-                        chatMemory.add(UserMessage.from(soConfig.forcePrompt()));
-                        continue;
-                    }
-                    log.debug("Structured output force attempt also failed");
-                }
-            }
-
-
-
-            if (!aiMessage.hasToolExecutionRequests()) {
-                // Hook: afterAgent
-                var doneResult = new AgentResult(
-                    sid,
-                    responseText,
-                    ChatMessageConverter.toDomainMessages(chatMemory.messages()),
-                    new ExecutionMetrics((System.nanoTime() - start) / 1_000_000, totalInputTokens, totalOutputTokens, toolCallCount),
-                    StopReason.COMPLETED,
-                    structuredOutputResult
-                );
-                var afterAgent = run.hookRegistry().triggerAfterAgent(
-                    new HookContexts.AfterAgentContext(sid, doneResult), doneResult.finalAnswer());
-                var finalAnswer = afterAgent instanceof HookResult.Modify<?> m
-                    ? (String) m.value() : doneResult.finalAnswer();
-                if (afterAgent instanceof HookResult.Modify<?> m) {
-                    log.debug("afterAgent hook — answer was modified={} (len {}→{})",
-                            afterAgent instanceof HookResult.Modify,
-                            doneResult.finalAnswer().length(), finalAnswer.length());
-                }
-
-                phase = AgentPhase.COMPLETED;
-                var result = new AgentResult(sid, finalAnswer, doneResult.generatedMessages(),
-                    doneResult.metrics(), doneResult.stopReason(), doneResult.structuredOutput());
-                fire(new AgentFinishedEvent(sid, Instant.now(), result.finalAnswer()));
-                return result;
-            }
-
-            toolCallCount += aiMessage.toolExecutionRequests().size();
-
-            // Execute tools one by one with before/after hooks
-            for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
-                var args = parseArgs(req.arguments());
-
-                // Hook: beforeToolCall
-                var beforeTc = run.hookRegistry().triggerBeforeToolCall(
-                    new HookContexts.BeforeToolCallContext(sid, req.name(), args));
-                if (beforeTc instanceof HookResult.Cancel c) {
-                    log.debug("beforeToolCall hook cancelled tool '{}' — reason={}", req.name(), c.reason());
-                    fire(new ToolExecutionStartedEvent(sid, Instant.now(),
-                        new ToolCall(req.id(), req.name(), req.arguments())));
-                    fire(new ToolExecutionFinishedEvent(sid, Instant.now(),
-                        new ToolExecutionResult(req.id(), req.name(), "Skipped: " + c.reason(), false)));
-                    continue;
-                }
-
-                fire(new ToolExecutionStartedEvent(sid, Instant.now(),
-                    new ToolCall(req.id(), req.name(), req.arguments())));
-
-                try {
-                    ToolExecutionResult toolResult;
-                    if (contextVariables.isEmpty()) {
-                        toolResult = wrapWithRetry(() ->
-                            toolExecutor.execute(req, run.toolRegistry()));
-                    } else {
-                        var prevSession = AgentContext.SESSION.get();
-                        AgentContext.SESSION.set(contextVariables);
-                        try {
-                            toolResult = wrapWithRetry(() ->
-                                toolExecutor.execute(req, run.toolRegistry()));
-                        } finally {
-                            if (prevSession != null) {
-                                AgentContext.SESSION.set(prevSession);
-                            } else {
-                                AgentContext.SESSION.remove();
-                            }
-                        }
-                    }
-
-                    // Hook: afterToolCall
-                    var afterTcResult = run.hookRegistry().triggerAfterToolCall(
-                        new HookContexts.AfterToolCallContext(sid, req.name(), toolResult.result(), toolResult.isError()),
-                        toolResult.result());
-                    var modifiedResult = afterTcResult instanceof HookResult.Modify<?>(Object value)
-                            ? (String) value : toolResult.result();
-                    if (afterTcResult instanceof HookResult.Modify<?>) {
-                        log.debug("afterToolCall '{}' — isError={}, modified={}",
-                                req.name(), toolResult.isError(), afterTcResult instanceof HookResult.Modify);
-                    }
-                    var finalToolResult = new ToolExecutionResult(req.id(), req.name(), modifiedResult, toolResult.isError());
-
-                    var request = findRequest(aiMessage.toolExecutionRequests(), req.name());
-                    if (request != null) {
-                        chatMemory.add(ToolExecutionResultMessage.from(request, modifiedResult));
-                    }
-                    fire(new ToolExecutionFinishedEvent(sid, Instant.now(), finalToolResult));
-                } catch (Exception e) {
-                    Throwable cause = e;
-                    while ((cause instanceof java.util.concurrent.ExecutionException ||
-                            cause instanceof java.lang.reflect.InvocationTargetException) &&
-                           cause.getCause() != null) {
-                        cause = cause.getCause();
-                    }
-                    log.error("Tool execution error in '{}': {}", req.name(), cause.getMessage());
-                    var errorMessage = retryConfig != null
-                        ? "Tool '" + req.name() + "' failed after "
-                            + retryConfig.maxAttempts() + " attempts: " + cause.getMessage()
-                        : "Tool error: " + cause.getMessage();
-                    var toolResult = new ToolExecutionResult(req.id(), req.name(), errorMessage, true);
-
-                    var request = findRequest(aiMessage.toolExecutionRequests(), req.name());
-                    if (request != null) {
-                        log.debug("Tool execution error — request={}", truncate(String.valueOf(request)));
-                        chatMemory.add(ToolExecutionResultMessage.from(request, errorMessage));
-                    }
-                    fire(new ToolExecutionFinishedEvent(sid, Instant.now(), toolResult));
-                }
-            }
-        }
-
-        log.debug("Max iterations ({}) reached — returning result", MAX_TOOL_ITERATIONS);
-        phase = AgentPhase.FAILED;
-        var durationMs = (System.nanoTime() - start) / 1_000_000;
-        var result = new AgentResult(
-            sid,
-            PromptRegistry.getOrDefault("agent.max_iterations", "Maximum iterations reached"),
-            ChatMessageConverter.toDomainMessages(chatMemory.messages()),
-            new ExecutionMetrics(durationMs, totalInputTokens, totalOutputTokens, toolCallCount),
-            StopReason.MAX_ITERATIONS
-        );
-        var afterAgent = run.hookRegistry().triggerAfterAgent(
-            new HookContexts.AfterAgentContext(sid, result), result.finalAnswer());
-        var finalAnswer = afterAgent instanceof HookResult.Modify<?>(Object value)
-            ? (String) value : result.finalAnswer();
-        var modifiedResult = new AgentResult(sid, finalAnswer, result.generatedMessages(),
-            result.metrics(), result.stopReason(), result.structuredOutput());
-        fire(new AgentFinishedEvent(sid, Instant.now(), modifiedResult.finalAnswer()));
-        return modifiedResult;
-        } finally {
-            executionThread = null;
-        }
+        return new AgentLoop(this, sid, prompt, contextVariables).execute();
     }
 
-    private AgentResult handlePluginGuardrail(String sid, long startNanos, Plugin plugin,
-                                               GuardrailResult guardResult,
-                                               int totalInputTokens, int totalOutputTokens, int toolCallCount) {
-        log.debug("Guardrail blocked by '{}' — action={}, reason='{}'",
-            plugin.name(), plugin.getBlockAction(), guardResult.reason());
-        var sanitized = guardResult.sanitized();
-        return switch (plugin.getBlockAction()) {
-            case THROW -> {
-                var msg = sanitized != null
-                    ? guardResult.reason() + " (sanitized: " + sanitized + ")"
-                    : guardResult.reason();
-                throw new GuardrailException(msg);
-            }
-            case FALLBACK -> {
-                phase = AgentPhase.FAILED;
-                var answer = sanitized != null ? sanitized : plugin.getFallbackMessage();
-                fire(new AgentFinishedEvent(sid, Instant.now(), answer));
-                yield new AgentResult(
-                    sid,
-                    answer,
-                    ChatMessageConverter.toDomainMessages(chatMemory.messages()),
-                    new ExecutionMetrics((System.nanoTime() - startNanos) / 1_000_000,
-                        totalInputTokens, totalOutputTokens, toolCallCount),
-                    StopReason.ERROR
-                );
-            }
-            case ESCALATE -> {
-                if (checkpointService != null) {
-                    var cp = checkpointService.createCheckpoint(sid, "guardrail:" + plugin.name(), guardResult.reason());
-                    phase = AgentPhase.WAITING_FOR_HUMAN;
-                    try {
-                        var resolved = checkpointService.await(cp);
-                        if (resolved.status() == Checkpoint.Status.APPROVED) {
-                            phase = AgentPhase.EXECUTING;
-                            yield null; // continue execution
-                        }
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                }
-                phase = AgentPhase.FAILED;
-                var answer = sanitized != null ? sanitized : plugin.getFallbackMessage();
-                fire(new AgentFinishedEvent(sid, Instant.now(), answer));
-                yield new AgentResult(
-                    sid,
-                    answer,
-                    ChatMessageConverter.toDomainMessages(chatMemory.messages()),
-                    new ExecutionMetrics((System.nanoTime() - startNanos) / 1_000_000,
-                        totalInputTokens, totalOutputTokens, toolCallCount),
-                    StopReason.ERROR
-                );
-            }
-        };
-    }
+
 
     protected ChatResponse doChat(ChatRequest request) {
         return model.chat(request);
-    }
-
-    private ChatResponse callWithResilience(List<ChatMessage> currentMessages, List<ToolSpecification> toolSpecs, String effectivePrompt) {
-        var recovery = new TokenRecovery();
-        var msgs = currentMessages;
-
-        while (true) {
-            try {
-                var request = buildRequest(msgs, toolSpecs, effectivePrompt);
-
-                Callable<ChatResponse> chatCall = () -> doChat(request);
-
-                if (circuitBreaker != null) {
-                    RetryConfig cfg = effectiveRetryConfig();
-                    return circuitBreaker.call(
-                        () -> Retry.run(chatCall, cfg),
-                        () -> { throw new RuntimeException("CircuitBreaker: Service temporarily unavailable"); });
-                }
-
-                return Retry.run(chatCall, effectiveRetryConfig());
-            } catch (Exception e) {
-                if (TokenRecovery.isTokenLimitError(e) && recovery.recover(chatMemory)) {
-                    msgs = chatMemory.messages();
-                    continue;
-                }
-                if (e instanceof RuntimeException re) {
-                    throw re;
-                }
-                throw new RuntimeException("LLM call failed", e);
-            }
-        }
-    }
-
-    private ChatRequest buildRequest(List<ChatMessage> messages, List<ToolSpecification> toolSpecs, String effectivePrompt) {
-        var builder = ChatRequest.builder();
-        if (effectivePrompt != null && !effectivePrompt.isBlank()) {
-            var allMessages = new ArrayList<ChatMessage>();
-            allMessages.add(SystemMessage.from(effectivePrompt));
-            allMessages.addAll(messages);
-            builder.messages(allMessages);
-        } else {
-            builder.messages(messages);
-        }
-        if (toolSpecs != null && !toolSpecs.isEmpty()) {
-            builder.toolSpecifications(toolSpecs);
-        }
-        if (structuredOutputConfig != null && structuredOutputConfig.isEnabled()) {
-            var schemaStr = structuredOutputConfig.effectiveSchema();
-            if (schemaStr != null) {
-                var rawSchema = JsonRawSchema.from(schemaStr);
-                var jsonSchema = JsonSchema.builder()
-                    .name(structuredOutputConfig.mode().name())
-                    .rootElement(rawSchema)
-                    .build();
-                builder.responseFormat(ResponseFormat.builder()
-                    .type(ResponseFormatType.JSON)
-                    .jsonSchema(jsonSchema)
-                    .build());
-            }
-        }
-        return builder.build();
-    }
-
-    private <T> T wrapWithRetry(Callable<T> callable) throws Exception {
-        if (retryConfig != null) {
-            return Retry.run(callable, retryConfig);
-        }
-        return callable.call();
-    }
-
-    private RetryConfig effectiveRetryConfig() {
-        return retryConfig != null ? retryConfig : RetryConfig.DEFAULT;
     }
 
     protected void fire(AgentEvent event) {
@@ -1021,25 +524,6 @@ public class Agent {
             }
         }
         eventPublisher.submit(event);
-    }
-
-    private ToolExecutionRequest findRequest(List<ToolExecutionRequest> requests, String toolName) {
-        return requests.stream()
-            .filter(r -> r.name().equals(toolName))
-            .findFirst()
-            .orElse(null);
-    }
-
-    private Map<String, Object> parseArgs(String arguments) {
-        if (arguments == null || arguments.isBlank()) {
-            return Map.of();
-        }
-        try {
-            return OBJECT_MAPPER.readValue(arguments,
-                new TypeReference<Map<String, Object>>() {});
-        } catch (Exception e) {
-            return Map.of();
-        }
     }
 
     public ChatMemory getChatMemory() {
@@ -1145,25 +629,6 @@ public class Agent {
         }
     }
 
-    private void checkPaused() {
-        if (phase == AgentPhase.WAITING_FOR_HUMAN) {
-            pauseLock.lock();
-            try {
-                while (phase == AgentPhase.WAITING_FOR_HUMAN) {
-                    pauseCondition.await();
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException("HITL interrupted", e);
-            } finally {
-                pauseLock.unlock();
-            }
-            if (phase == AgentPhase.FAILED) {
-                throw new RuntimeException("HITL rejected");
-            }
-        }
-    }
-
     public ChatModel getCurrentModel() {
         if (currentTier == ModelTier.ADVANCED && advancedModel != null) {
             return advancedModel;
@@ -1193,6 +658,122 @@ public class Agent {
             log.debug("Switched to ADVANCED model tier");
         } else {
             log.debug("Switched to SIMPLE model tier");
+        }
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private ChatModel model;
+        private ToolRegistry toolRegistry = new ToolRegistry();
+        private ToolExecutor toolExecutor = new ToolExecutor();
+        private ConversationManager conversationManager;
+        private SessionManager sessionManager;
+        private ChatMemoryStore chatMemoryStore;
+        private ResilienceConfig resilienceConfig;
+        private HookRegistry hookRegistry;
+        private List<Plugin> plugins;
+        private String systemPrompt;
+        private StructuredOutputConfig structuredOutputConfig;
+        private CheckpointService checkpointService;
+        private AgentEventListener eventListener;
+
+        Builder() {}
+
+        public Builder model(ChatModel model) {
+            this.model = model;
+            return this;
+        }
+
+        public Builder toolRegistry(ToolRegistry toolRegistry) {
+            this.toolRegistry = toolRegistry;
+            return this;
+        }
+
+        public Builder toolExecutor(ToolExecutor toolExecutor) {
+            this.toolExecutor = toolExecutor;
+            return this;
+        }
+
+        public Builder conversationManager(ConversationManager conversationManager) {
+            this.conversationManager = conversationManager;
+            return this;
+        }
+
+        public Builder sessionManager(SessionManager sessionManager) {
+            this.sessionManager = sessionManager;
+            return this;
+        }
+
+        public Builder chatMemoryStore(ChatMemoryStore chatMemoryStore) {
+            this.chatMemoryStore = chatMemoryStore;
+            return this;
+        }
+
+        public Builder resilienceConfig(ResilienceConfig resilienceConfig) {
+            this.resilienceConfig = resilienceConfig;
+            return this;
+        }
+
+        public Builder hookRegistry(HookRegistry hookRegistry) {
+            this.hookRegistry = hookRegistry;
+            return this;
+        }
+
+        public Builder plugins(List<Plugin> plugins) {
+            this.plugins = plugins;
+            return this;
+        }
+
+        public Builder systemPrompt(String systemPrompt) {
+            this.systemPrompt = systemPrompt;
+            return this;
+        }
+
+        public Builder structuredOutputConfig(StructuredOutputConfig structuredOutputConfig) {
+            this.structuredOutputConfig = structuredOutputConfig;
+            return this;
+        }
+
+        public Builder checkpointService(CheckpointService checkpointService) {
+            this.checkpointService = checkpointService;
+            return this;
+        }
+
+        public Builder eventListener(AgentEventListener eventListener) {
+            this.eventListener = eventListener;
+            return this;
+        }
+
+        public Agent build() {
+            if (model == null) {
+                throw new IllegalStateException("Agent model is required");
+            }
+            var agent = new Agent(model, toolRegistry, toolExecutor,
+                conversationManager, sessionManager,
+                chatMemoryStore, resilienceConfig);
+            if (hookRegistry != null) {
+                agent.hookRegistry = hookRegistry;
+                agent.runConfig.setHookRegistry(hookRegistry);
+            }
+            if (plugins != null && !plugins.isEmpty()) {
+                agent.initPlugins(plugins);
+            }
+            if (systemPrompt != null && !systemPrompt.isBlank()) {
+                agent.setSystemPrompt(systemPrompt);
+            }
+            if (structuredOutputConfig != null) {
+                agent.setStructuredOutputConfig(structuredOutputConfig);
+            }
+            if (checkpointService != null) {
+                agent.checkpointService = checkpointService;
+            }
+            if (eventListener != null) {
+                agent.setEventListener(eventListener);
+            }
+            return agent;
         }
     }
 }

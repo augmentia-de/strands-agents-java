@@ -8,7 +8,7 @@ import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.features.conversation.ConversationManager;
-import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.features.conversation.SummarizingSlidingWindowConversationManager;
 import de.augmentia.strandsagents.features.plugin.Plugin;
 import de.augmentia.strandsagents.features.sessions.SessionManager;
 import de.augmentia.strandsagents.features.structured.StructuredOutputConfig;
@@ -202,7 +202,7 @@ public class StrandsAgentBuilder {
         var chatModel = createChatModel(merged);
         var toolRegistry = buildToolRegistry(merged);
         var plugins = buildPlugins(merged);
-        var convManager = buildConversationManager(merged);
+        var convManager = buildConversationManager(merged, chatModel);
         var sessionManager = buildSessionManager(merged);
         var chatMemoryStore = buildChatMemoryStore(merged);
         var resilienceConfig = merged.toResilienceConfig();
@@ -247,6 +247,8 @@ public class StrandsAgentBuilder {
         if (source.getProvider() != null) target.setProvider(source.getProvider());
         if (source.getMaxIterations() != null) target.setMaxIterations(source.getMaxIterations());
         if (source.getMaxMessages() != null) target.setMaxMessages(source.getMaxMessages());
+        if (source.getMaxTokens() != null) target.setMaxTokens(source.getMaxTokens());
+        if (source.getKeepLastUserMessages() != null) target.setKeepLastUserMessages(source.getKeepLastUserMessages());
         if (source.getSessionManager() != null) target.setSessionManager(source.getSessionManager());
         if (source.getConversationManager() != null) target.setConversationManager(source.getConversationManager());
         if (source.getChatMemoryStore() != null) target.setChatMemoryStore(source.getChatMemoryStore());
@@ -352,7 +354,7 @@ public class StrandsAgentBuilder {
         return result;
     }
 
-    private ConversationManager buildConversationManager(ConfigModel cfg) {
+    private ConversationManager buildConversationManager(ConfigModel cfg, ChatModel chatModel) {
         if (cfg.getConversationManager() != null) {
             try {
                 var clazz = Class.forName(cfg.getConversationManager());
@@ -361,7 +363,9 @@ public class StrandsAgentBuilder {
                 throw new StrandsAgentException("Failed to create ConversationManager: " + cfg.getConversationManager(), e);
             }
         }
-        return new SlidingWindowConversationManager(cfg.getMaxMessages());
+        int maxTokens = cfg.getMaxTokens() != null ? cfg.getMaxTokens() : 4000;
+        int keepLast = cfg.getKeepLastUserMessages() != null ? cfg.getKeepLastUserMessages() : 3;
+        return new SummarizingSlidingWindowConversationManager(chatModel, maxTokens, keepLast);
     }
 
     private SessionManager buildSessionManager(ConfigModel cfg) {
