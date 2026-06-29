@@ -5,10 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.prompt.PromptRegistry;
+import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -19,14 +21,20 @@ public class CoTPlanner implements Planner {
 
     private final ChatModel model;
     private final int maxRevisions;
+    private final ToolRegistry toolRegistry;
 
     public CoTPlanner(ChatModel model) {
-        this(model, DEFAULT_MAX_REVISIONS);
+        this(model, DEFAULT_MAX_REVISIONS, null);
     }
 
     public CoTPlanner(ChatModel model, int maxRevisions) {
+        this(model, maxRevisions, null);
+    }
+
+    public CoTPlanner(ChatModel model, int maxRevisions, ToolRegistry toolRegistry) {
         this.model = model;
         this.maxRevisions = maxRevisions;
+        this.toolRegistry = toolRegistry;
     }
 
     @Override
@@ -146,9 +154,37 @@ public class CoTPlanner implements Planner {
         }
     }
 
-    private static String formatToolNames(List<String> names) {
+    private String formatToolNames(List<String> names) {
         if (names == null || names.isEmpty()) return "none (only 'none' allowed)";
-        return names.stream().collect(Collectors.joining(", "));
+        if (toolRegistry == null) return names.stream().collect(Collectors.joining(", "));
+        var specs = toolRegistry.getSpecifications().stream()
+            .collect(Collectors.toMap(ToolSpecification::name, s -> s, (a, b) -> a));
+        return names.stream()
+            .map(n -> {
+                var spec = specs.get(n);
+                if (spec == null) return "- " + n;
+                return formatToolSpec(spec);
+            })
+            .collect(Collectors.joining("\n"));
+    }
+
+    private static String formatToolSpec(ToolSpecification spec) {
+        var sb = new StringBuilder();
+        sb.append("- ").append(spec.name());
+        if (spec.description() != null) {
+            sb.append(": ").append(spec.description());
+        }
+        var params = spec.parameters();
+        if (params != null && params.properties() != null && !params.properties().isEmpty()) {
+            sb.append("  Parameters:");
+            for (var prop : params.properties().entrySet()) {
+                sb.append("\n    * ").append(prop.getKey());
+            }
+            if (params.required() != null && !params.required().isEmpty()) {
+                sb.append("\n    Required: ").append(String.join(", ", params.required()));
+            }
+        }
+        return sb.toString();
     }
 
     private static String resolveTemplate(String template, Map<String, Object> context) {

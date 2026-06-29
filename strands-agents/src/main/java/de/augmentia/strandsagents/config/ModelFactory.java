@@ -50,7 +50,7 @@ public class ModelFactory {
 
     public static ChatModel createOpenAiFromEnv(String api_key) {
         LlmConfig config = LlmConfig.fromEnv();
-        if (api_key!=null) config = new LlmConfig(api_key, config.baseUrl(), config.modelName(), config.temperature(), config.maxRetries());
+        if (api_key!=null) config = new LlmConfig(api_key, config.baseUrl(), config.modelName(), config.temperature(), config.maxRetries(), config.logRequests(), config.logResponses());
         log.info("createOpenAiFromEnv: apiKey={} baseUrl={} model={}",
             ConfigReader.mask(config.apiKey()), config.baseUrl(), config.modelName());
         return createOpenAi(config);
@@ -72,14 +72,16 @@ public class ModelFactory {
             config.modelName(),
             config.temperature(),
             config.maxRetries(),
-            null
+            null,
+            config.logRequests(),
+            config.logResponses()
         );
         return provider(ModelProviderType.OPENAI).createChatModel(c);
     }
 
     public static StreamingChatModel createOpenAiStreamingFromEnv(String api_key) {
         LlmConfig config = LlmConfig.fromEnv();
-        if (api_key!=null) config = new LlmConfig(api_key, config.baseUrl(), config.modelName(), config.temperature(), config.maxRetries());
+        if (api_key!=null) config = new LlmConfig(api_key, config.baseUrl(), config.modelName(), config.temperature(), config.maxRetries(), config.logRequests(), config.logResponses());
         return createOpenAiStreaming(config);
     }
     public static StreamingChatModel createOpenAiStreaming(LlmConfig config) {
@@ -90,7 +92,9 @@ public class ModelFactory {
             config.modelName(),
             config.temperature(),
             config.maxRetries(),
-            null
+            null,
+            config.logRequests(),
+            config.logResponses()
         );
         var streaming = provider(ModelProviderType.OPENAI).createStreamingChatModel(c);
         if (streaming != null) return streaming;
@@ -119,6 +123,8 @@ public class ModelFactory {
                 ? config.modelName() : "gpt-4o-mini");
             if (config.temperature() != null) builder.temperature(config.temperature());
             builder.maxRetries(0);
+            if (config.logRequests() != null) builder.logRequests(config.logRequests());
+            if (config.logResponses() != null) builder.logResponses(config.logResponses());
             return builder.build();
         }
 
@@ -133,6 +139,8 @@ public class ModelFactory {
             builder.modelName(config.modelName() != null && !config.modelName().isBlank()
                 ? config.modelName() : "gpt-4o");
             if (config.temperature() != null) builder.temperature(config.temperature());
+            if (config.logRequests() != null) builder.logRequests(config.logRequests());
+            if (config.logResponses() != null) builder.logResponses(config.logResponses());
             return builder.build();
         }
     }
@@ -149,6 +157,8 @@ public class ModelFactory {
                 ? config.modelName() : "default");
             if (config.temperature() != null) builder.temperature(config.temperature());
             builder.maxRetries(0);
+            if (config.logRequests() != null) builder.logRequests(config.logRequests());
+            if (config.logResponses() != null) builder.logResponses(config.logResponses());
             return builder.build();
         }
 
@@ -162,6 +172,8 @@ public class ModelFactory {
             builder.modelName(config.modelName() != null && !config.modelName().isBlank()
                 ? config.modelName() : "default");
             if (config.temperature() != null) builder.temperature(config.temperature());
+            if (config.logRequests() != null) builder.logRequests(config.logRequests());
+            if (config.logResponses() != null) builder.logResponses(config.logResponses());
             return builder.build();
         }
     }

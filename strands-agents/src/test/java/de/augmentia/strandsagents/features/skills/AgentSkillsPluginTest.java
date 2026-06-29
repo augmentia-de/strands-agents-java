@@ -14,11 +14,11 @@ class AgentSkillsPluginTest {
 
     private static final Skill TEST_SKILL = new Skill("test-skill",
         "A test skill", "Do the test thing", null,
-        List.of("bash", "calc"), Map.of("author", "me"), "MIT", "java21");
+        List.of("bash", "calc"), Map.of("author", "me"), "MIT", "java21", null);
 
     private static final Skill WEATHER_SKILL = new Skill("weather",
         "Weather lookup", "Check the weather", null,
-        null, Map.of(), null, null);
+        null, Map.of(), null, null, null);
 
     @Test
     void pluginName() {
@@ -42,8 +42,8 @@ class AgentSkillsPluginTest {
     @Test
     void initialSkillsMax3() {
         var skills = List.of(TEST_SKILL, WEATHER_SKILL,
-            new Skill("a", "a", "a", null, null, Map.of(), null, null),
-            new Skill("b", "b", "b", null, null, Map.of(), null, null));
+            new Skill("a", "a", "a", null, null, Map.of(), null, null, null),
+            new Skill("b", "b", "b", null, null, Map.of(), null, null, null));
         assertThatThrownBy(() -> new AgentSkillsPlugin(skills, List.of("a", "b", "c", "d")))
             .isInstanceOf(IllegalArgumentException.class);
     }
@@ -100,7 +100,7 @@ class AgentSkillsPluginTest {
 
     @Test
     void activateSkillWithLicense() {
-        var skill = new Skill("licensed", "Has license", "Instructions", null, null, Map.of(), "MIT", null);
+        var skill = new Skill("licensed", "Has license", "Instructions", null, null, Map.of(), "MIT", null, null);
         var plugin = new AgentSkillsPlugin(List.of(skill));
         var result = plugin.activateSkill("licensed");
         assertThat(result).contains("Instructions");
@@ -116,7 +116,7 @@ class AgentSkillsPluginTest {
 
     @Test
     void activateSkillWithCompatibility() {
-        var skill = new Skill("compat", "Has compatibility", "Instr", null, null, Map.of(), null, "java21");
+        var skill = new Skill("compat", "Has compatibility", "Instr", null, null, Map.of(), null, "java21", null);
         var plugin = new AgentSkillsPlugin(List.of(skill));
         var result = plugin.activateSkill("compat");
         assertThat(result).contains("java21");

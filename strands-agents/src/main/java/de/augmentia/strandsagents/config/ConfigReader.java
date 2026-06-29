@@ -56,4 +56,9 @@ public final class ConfigReader {
         if (s == null || s.isBlank()) return null;
         try { return Integer.parseInt(s); } catch (NumberFormatException e) { return null; }
     }
+
+    public static Boolean parseBoolean(String s) {
+        if (s == null || s.isBlank()) return null;
+        return Boolean.parseBoolean(s);
+    }
 }

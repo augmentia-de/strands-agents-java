@@ -70,7 +70,7 @@ public record AgentConfig(
         return createAgent(model);
     }
 
-    public Agent createTieredAgent() {
+    public Agent createTieredAgent(Boolean useAdvancedModel) {
         var effectiveRegistry = toolRegistry != null ? toolRegistry : new ToolRegistry();
         var effectivePlugins = plugins != null ? plugins : List.<Plugin>of();
         var tc = resolveTieredConfig();

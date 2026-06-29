@@ -28,6 +28,9 @@ public class FileSessionManager implements SessionManager {
     public FileSessionManager(Path baseDir) {
         this.baseDir = baseDir;
         this.mapper = createMapper();
+    }
+
+    private void ensureDir() {
         try {
             Files.createDirectories(baseDir);
             ensureWritable(baseDir);
@@ -61,6 +64,7 @@ public class FileSessionManager implements SessionManager {
 
     @Override
     public Session createSession(String agentName, Map<String, Object> metadata) {
+        ensureDir();
         var now = Instant.now();
         var sessionId = UUID.randomUUID().toString();
         var state = new AgentState(sessionId, List.of(), Map.of(), AgentStatus.IDLE);
@@ -105,6 +109,7 @@ public class FileSessionManager implements SessionManager {
 
     @Override
     public List<Session> listSessions(String agentName) {
+        ensureDir();
         List<Session> results = new ArrayList<>();
         try (var files = Files.list(baseDir)) {
             files.filter(f -> f.toString().endsWith(".json"))
@@ -124,6 +129,7 @@ public class FileSessionManager implements SessionManager {
 
     @Override
     public List<Session> searchByMetadata(String key, String value) {
+        ensureDir();
         List<Session> results = new ArrayList<>();
         try (var files = Files.list(baseDir)) {
             files.filter(f -> f.toString().endsWith(".json"))

@@ -23,7 +23,9 @@ public record TieredModelConfig(
             get("OPENAI_MODEL", null),
             parseDouble(get("LLM_TEMPERATURE", null)),
             parseInt(get("LLM_MAX_RETRIES", null)),
-            null
+            null,
+            parseBoolean(get("LLM_LOG_REQUESTS", null)),
+            parseBoolean(get("LLM_LOG_RESPONSES", null))
         );
 
         var simple = ChatModelConfig.fromEnvWithFallback("SIMPLE_", globalFallback);
@@ -43,7 +45,9 @@ public record TieredModelConfig(
                 get("ADVANCED_MODEL", get("OPENAI_MODEL", "gpt-4o")),
                 simple.temperature(),
                 simple.maxRetries(),
-                simple.ollamaBaseUrl()
+                simple.ollamaBaseUrl(),
+                simple.logRequests(),
+                simple.logResponses()
             );
             log.info("TieredModelConfig: advanced derived from simple, model={}", advanced.modelName());
         }

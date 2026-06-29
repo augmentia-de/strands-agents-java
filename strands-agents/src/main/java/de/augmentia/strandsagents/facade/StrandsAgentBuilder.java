@@ -302,7 +302,9 @@ public class StrandsAgentBuilder {
             cfg.getModelName() != null ? cfg.getModelName() : "gpt-4o-mini",
             cfg.getTemperature(),
             cfg.getMaxRetries(),
-            cfg.getOllamaBaseUrl()
+            cfg.getOllamaBaseUrl(),
+            cfg.getLogRequests(),
+            cfg.getLogResponses()
         );
     }
 

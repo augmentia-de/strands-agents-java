@@ -179,8 +179,7 @@ public class AgentService implements de.augmentia.strandsagents.features.service
             fullRegistry.register(new McpIngestTool(fullRegistry));
         }
         if (capabilityRegistry != null) {
-            fullRegistry.register(ToolRegistry.createMethod(
-                new CapabilitySearchTool(capabilityRegistry, model)));
+            fullRegistry.register(new CapabilitySearchTool(capabilityRegistry, model));
         }
 
         setupLogging();
@@ -220,8 +219,7 @@ public class AgentService implements de.augmentia.strandsagents.features.service
             : System.getProperty("strands.agent.capabilities.dirs", "");
         var sessionCapRegistry = buildCapabilityRegistry(effectiveCapDirs, "");
         if (sessionCapRegistry != null && this.capabilityRegistry == null) {
-            selectedTools.register(ToolRegistry.createMethod(
-                new CapabilitySearchTool(sessionCapRegistry, model)));
+            selectedTools.register(new CapabilitySearchTool(sessionCapRegistry, model));
         }
 
         var selectedSkills = req.skills != null && !req.skills.isEmpty()
@@ -282,14 +280,16 @@ public class AgentService implements de.augmentia.strandsagents.features.service
                             ModelProviderType.fromString(req.simpleProvider),
                             simpleBase.apiKey(), simpleBase.baseUrl(),
                             req.simpleModel != null ? req.simpleModel : simpleBase.modelName(),
-                            simpleBase.temperature(), simpleBase.maxRetries(), simpleBase.ollamaBaseUrl())
+                            simpleBase.temperature(), simpleBase.maxRetries(), simpleBase.ollamaBaseUrl(),
+                            simpleBase.logRequests(), simpleBase.logResponses())
                         : simpleBase,
                     req.advancedProvider != null
                         ? new ChatModelConfig(
                             ModelProviderType.fromString(req.advancedProvider),
                             advancedBase.apiKey(), advancedBase.baseUrl(),
                             req.advancedModel != null ? req.advancedModel : advancedBase.modelName(),
-                            advancedBase.temperature(), advancedBase.maxRetries(), advancedBase.ollamaBaseUrl())
+                            advancedBase.temperature(), advancedBase.maxRetries(), advancedBase.ollamaBaseUrl(),
+                            advancedBase.logRequests(), advancedBase.logResponses())
                         : advancedBase,
                     effectiveTier
                 );

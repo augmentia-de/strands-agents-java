@@ -10,10 +10,10 @@ import org.junit.jupiter.api.Test;
 class SkillSearchToolTest {
 
     private static final Skill MATH_SKILL = new Skill("math",
-        "Math helper", "Do math", null, java.util.List.of("calc"), Map.of(), null, null);
+        "Math helper", "Do math", null, java.util.List.of("calc"), Map.of(), null, null, null);
 
     private static final Skill WEATHER_SKILL = new Skill("weather",
-        "Weather lookup", "Check weather", null, null, Map.of(), null, null);
+        "Weather lookup", "Check weather", null, null, Map.of(), null, null, null);
 
     @Test
     void toolName() {

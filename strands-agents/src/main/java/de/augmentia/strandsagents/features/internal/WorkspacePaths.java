@@ -31,6 +31,24 @@ public final class WorkspacePaths {
             }
             return resolvedCanonical;
         } catch (IOException e) {
+            // Workspace-relative path doesn't exist on disk.
+            // Try CWD-relative (matches LLM's mental model, e.g. "workspace/File.java"
+            // from project root when the tool base is already "workspace/").
+            if (!p.isAbsolute() && !path.isEmpty()) {
+                var cwd = Paths.get("").toAbsolutePath().normalize();
+                var fromCwd = cwd.resolve(p).normalize();
+                if (fromCwd.startsWith(workspaceCanonical)) {
+                    try {
+                        var fromCwdCanonical = fromCwd.toRealPath();
+                        if (fromCwdCanonical.startsWith(workspaceCanonical)) {
+                            return fromCwdCanonical;
+                        }
+                    } catch (IOException ignored) {
+                    }
+                    return fromCwd;
+                }
+            }
+
             var parent = resolved.getParent();
             if (parent != null && Files.exists(parent)) {
                 try {

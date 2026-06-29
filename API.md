@@ -411,7 +411,7 @@ Supports `AbortFlag` for cooperative cancellation of long-running tools.
 | `ask_user` | Human-in-the-loop prompt | `askUser(question)` | `tools.HumanInTheLoopTool` |
 | `run` | Docker run (container sandbox) | `image: string, command: string?` | `tools.DockerRunTool` |
 | `list_tools` | List available tools | `query: string?` | `tools.ListToolsTool` |
-| `capability_search` | Search capabilities via sub-agent | `query: string` | `skills.CapabilitySearchTool` |
+| `capability_search` | Analyze task, recommend matching capabilities (skills + tools) | `task: string` | `skills.CapabilitySearchTool` |
 | `skill_search` | Search skills | `query: string` | `skills.SkillSearchTool` |
 | `mcp_list` | List MCP server tools | — | `skills.McpListTool` |
 | `mcp_ingest` | Ingest MCP tools as skills | — | `skills.McpIngestTool` |
@@ -857,7 +857,7 @@ record TieredModelConfig(ChatModelConfig simple, ChatModelConfig advanced, Model
 
 record ChatModelConfig(ModelProviderType provider, String apiKey, String baseUrl,
                        String modelName, Double temperature, Integer maxRetries,
-                       String ollamaBaseUrl)
+                       String ollamaBaseUrl, Boolean logRequests, Boolean logResponses)
 
 enum ModelProviderType { OPENAI, OLLAMA, OPENAI_COMPATIBLE }
 enum ModelTier { SIMPLE, ADVANCED, ROUTING }
@@ -895,14 +895,26 @@ ra.applyRouting();                  // applies the resolved tier
 
 ## 10. Skills & Capabilities
 
+### 10.1 Skill Model
+
 ```java
 record Skill(String name, String description, String instructions, Path path,
              List<String> allowedTools, Map<String,Object> metadata,
-             String license, String compatibility)
+             String license, String compatibility, List<String> declaredTools)
+```
 
+- `allowedTools` — from `allowed-tools:` frontmatter; controls auto-injection of skill instructions when these tools are activated
+- `declaredTools` — from `tools:` frontmatter; tools the skill declares it uses/needs. **New:** used by `CapabilitySearchTool` for tool resolution and LLM enrichment.
+
+### 10.2 SkillParser
+
+```java
 class SkillParser {
-    static Skill parse(Path file) throws IOException
-    static List<Skill> parseDirectory(Path dir) throws IOException
+    static Skill fromContent(String content)
+    static Skill fromFile(Path path)
+    static List<Skill> fromDirectory(Path dir)
+    static CompletableFuture<Skill> fromUrl(String url)
+    static Path findSkillMdFile(Path dir)
 }
 ```
 
@@ -913,30 +925,104 @@ Skills are markdown files with YAML frontmatter:
 name: code-review
 description: Review code for bugs and style issues
 allowedTools: [ReadTool, GrepTool]
+tools: [find, grep, read]
 ---
 Instructions for the agent...
 ```
 
+### 10.3 CapabilityRegistry
+
 ```java
 class CapabilityRegistry {
     CapabilityRegistry(List<Path> skillDirectories, List<McpServerConfig> mcpServers)
-    List<Capability> discoverAll()
-    List<Capability> search(String query)
 
-    record Capability(String name, String description, CapabilityType type, Path path)
-    enum CapabilityType { SKILL, MCP_TOOL }
+    List<Capability> discoverAll()
+    List<Capability> discoverSkills()
+    List<Capability> discoverTools()
+    List<Skill> discoverAllSkills()        // full Skill objects from all dirs
+    Skill getSkill(String name)             // look up a skill by name
+    Set<String> knownToolNames()            // all registered default tool names
+
+    record Capability(String name, String description, String source, CapabilityType type)
+    enum CapabilityType { SKILL, MCP_TOOL, DEFAULT }
 
     static Builder builder()
     class Builder {
         Builder skillDir(Path dir)
         Builder mcpServer(String name, String url)
         Builder mcpServer(McpServerConfig config)
+        Builder includeStandardTools(boolean include)
+        Builder registerDefaultTool(String name, String description)
         CapabilityRegistry build()
     }
 }
 ```
 
-**CapabilitySearchTool** creates a sub-agent with `SkillSearchTool` + `McpListTool` for LLM-driven runtime analysis of all available capabilities.
+### 10.4 CapabilitySearchTool
+
+```java
+class CapabilitySearchTool implements AgentTool<CapabilitySearchTool.Params>
+
+record Params(String task)
+```
+
+Creates a sub-agent (`CapabilitySearchAgent`) for LLM-driven runtime analysis of available capabilities.
+
+**Output JSON (skill entry):**
+
+```json
+{
+  "name": "java-coding-standards",
+  "description": "...",
+  "allowedTools": ["write", "read"],
+  "declaredTools": ["find", "read", "grep"],
+  "resolvedTools": ["find", "read", "grep", "ls"],
+  "resolveSource": "llm_enriched",
+  "unknownDeclared": []
+}
+```
+
+| Field | Description |
+|---|---|
+| `declaredTools` | 1:1 from SKILL.md `tools:` frontmatter |
+| `resolvedTools` | `declaredTools` + LLM enrichments (or `declaredTools` if unenriched) |
+| `resolveSource` | `"skill_file"` (no enrichment) or `"llm_enriched"` |
+| `unknownDeclared` | Tools in `declaredTools` not found in the registry |
+
+### 10.5 CapabilitySearchAgent
+
+```java
+class CapabilitySearchAgent extends Agent
+
+record Analysis(
+    String analysis,
+    List<String> recommendedSkills,
+    List<String> recommendedTools,
+    String reasoning,
+    List<ToolEnrichment> toolEnrichments
+)
+
+record ToolEnrichment(String skillName, List<String> enrichedTools)
+```
+
+The sub-agent reviews each skill's `declaredTools` for completeness, suggests missing standard tools, flags typos, and explains reasoning in `analysis`.
+
+### 10.6 SkillResolvedEvent
+
+```java
+record SkillResolvedEvent(
+    String skillName,
+    List<String> declaredTools,
+    List<String> resolvedTools,
+    String resolveSource,
+    Instant timestamp
+) {
+    SkillResolvedEvent(String skillName, List<String> declaredTools,
+                       List<String> resolvedTools, String resolveSource)
+}
+```
+
+Fired after each skill match in `CapabilitySearchTool`. Consumers (e.g., agent loop) can listen and persist.
 
 ---
 

@@ -1,5 +1,6 @@
 package de.augmentia.strandsagents.features.tools;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.*;
@@ -7,7 +8,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import de.augmentia.strandsagents.features.internal.WorkspacePaths;
 import de.augmentia.strandsagents.features.tools.AgentTool;
@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 
 public class FindTool implements AgentTool<FindTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(FindTool.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final int MAX_OUTPUT_BYTES = 50_000;
 
     private static final Set<String> SKIP_DIRS = Set.of(
@@ -50,7 +51,10 @@ public class FindTool implements AgentTool<FindTool.Params> {
 
     @Override
     public String description() {
-        return "Find files by glob pattern (e.g., *.java, src/**/*.ts). Skips common build/ dependency directories.";
+        return "Find files by glob pattern (e.g., *.java, src/**/*.ts). "
+            + "PATH is relative to workspace root. "
+            + "Returns JSON: {\"pattern\":\"...\",\"totalResults\":N,\"results\":[\"...\"],\"truncated\":true|false}. "
+            + "Skips common build/dependency directories.";
     }
 
     @Override
@@ -65,7 +69,7 @@ public class FindTool implements AgentTool<FindTool.Params> {
         schema.put("type", "object");
         var props = schema.putObject("properties");
         addStr(props, "pattern", "Glob pattern (e.g., *.java, src/**/*.ts)");
-        addStr(props, "path", "Directory to search in (default: current directory)");
+        addStr(props, "path", "Subdirectory relative to workspace root (default: workspace root)");
         addInt(props, "maxResults", "Maximum number of results (default: 100)");
         schema.putArray("required").add("pattern");
         return schema;
@@ -91,17 +95,16 @@ public class FindTool implements AgentTool<FindTool.Params> {
             throw new RuntimeException("Operation aborted");
         }
 
-        var searchPath = params.path() != null ? workspacePaths.resolve(params.path()) : workspacePaths.workspace();
+        var searchPath = resolveSearchPath(params);
         var matcher = FileSystems.getDefault().getPathMatcher("glob:" + params.pattern());
         var maxResults = params.maxResults() != null ? params.maxResults() : 100;
         var results = new ArrayList<String>();
-        var totalBytes = new int[1];
 
         try {
             Files.walkFileTree(searchPath, new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                    if (abortFlag.get() || results.size() >= maxResults || totalBytes[0] >= MAX_OUTPUT_BYTES) {
+                    if (abortFlag.get() || results.size() >= maxResults) {
                         return FileVisitResult.TERMINATE;
                     }
                     if (dir.equals(searchPath)) return FileVisitResult.CONTINUE;
@@ -114,7 +117,7 @@ public class FindTool implements AgentTool<FindTool.Params> {
 
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                    if (abortFlag.get() || results.size() >= maxResults || totalBytes[0] >= MAX_OUTPUT_BYTES) {
+                    if (abortFlag.get() || results.size() >= maxResults) {
                         return FileVisitResult.TERMINATE;
                     }
                     var fileName = file.getFileName().toString();
@@ -141,20 +144,40 @@ public class FindTool implements AgentTool<FindTool.Params> {
             throw new RuntimeException("Search failed: " + e.getMessage());
         }
 
-        var output = results.isEmpty()
-            ? "No files found matching pattern: " + params.pattern()
-            : results.stream().sorted().collect(Collectors.joining("\n"));
+        Collections.sort(results);
 
-        if (results.size() >= maxResults) {
-            output += "\n\n[Results truncated at " + maxResults + " matches.]";
-        } else if (totalBytes[0] >= MAX_OUTPUT_BYTES) {
-            output += "\n\n[Output truncated at " + MAX_OUTPUT_BYTES + " bytes.]";
+        var root = MAPPER.createObjectNode();
+        root.put("pattern", params.pattern());
+        var arr = root.putArray("results");
+        for (var r : results) {
+            arr.add(r);
         }
+        root.put("totalResults", results.size());
+        boolean truncated = results.size() >= maxResults;
+        root.put("truncated", truncated);
 
         log.debug("Tool: find DONE results={}", results.size());
         return new ToolResult(
-            List.of(new TextContent(output)),
+            List.of(new TextContent(root.toString())),
             new FindDetails(results.size(), params.pattern()));
+    }
+
+    private Path resolveSearchPath(Params params) {
+        if (params.path() == null) return workspacePaths.workspace();
+        try {
+            var resolved = workspacePaths.resolve(params.path());
+            if (Files.exists(resolved)) return resolved;
+            var wsName = workspacePaths.workspace().getFileName().toString();
+            if (params.path().equals(wsName)) {
+                log.debug("path '{}' resolved to non-existent '{}', using workspace root", params.path(), resolved);
+                return workspacePaths.workspace();
+            }
+            log.debug("path '{}' resolved to non-existent '{}', searching anyway", params.path(), resolved);
+            return resolved;
+        } catch (RuntimeException e) {
+            log.warn("path '{}' resolution failed: {}, using workspace root", params.path(), e.getMessage());
+            return workspacePaths.workspace();
+        }
     }
 
     public record Params(String pattern, String path, Integer maxResults) {}

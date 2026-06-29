@@ -62,7 +62,7 @@ public class Main {
         skillsPlugin.setSkillSearchEnabled(true);
 
         var model = createModel();
-        registry.register(ToolRegistry.createMethod(new McpIngestTool(registry)));
+        registry.register(new McpIngestTool(registry));
 
         var agent = Agent.builder()
             .model(model)
@@ -93,7 +93,7 @@ public class Main {
 
         var model = createModel();
         var capTool = new de.augmentia.strandsagents.features.skills.CapabilitySearchTool(capRegistry, model);
-        registry.register(ToolRegistry.createMethod(capTool));
+        registry.register(capTool);
 
         var agent = Agent.builder()
             .model(model)
@@ -136,7 +136,7 @@ public class Main {
         result.add(new Skill("example-skills",
             "An example skill for demonstration purposes",
             "You are skilled in general problem solving and can help with any task.",
-            null, List.of(), java.util.Map.of(), null, null));
+            null, List.of(), java.util.Map.of(), null, null, null));
         return List.copyOf(result);
     }
 

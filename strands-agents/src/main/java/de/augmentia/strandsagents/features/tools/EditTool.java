@@ -1,5 +1,6 @@
 package de.augmentia.strandsagents.features.tools;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.github.difflib.DiffUtils;
 import java.io.IOException;
@@ -17,6 +18,7 @@ import org.slf4j.LoggerFactory;
 
 public class EditTool implements AgentTool<EditTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(EditTool.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private final WorkspacePaths workspacePaths;
 
     public EditTool(Path cwd) {
@@ -34,7 +36,9 @@ public class EditTool implements AgentTool<EditTool.Params> {
 
     @Override
     public String description() {
-        return "Edit a file by replacing exact text. The oldText must match exactly.";
+        return "Edit a file by replacing exact text. "
+            + "Returns JSON: {\"path\":\"...\",\"success\":true,\"diff\":\"...\"}. "
+            + "The oldText must match exactly.";
     }
 
     @Override
@@ -48,7 +52,7 @@ public class EditTool implements AgentTool<EditTool.Params> {
         var schema = mapper.createObjectNode();
         schema.put("type", "object");
         var props = schema.putObject("properties");
-        addStr(props, "path", "Path to the file to edit");
+        addStr(props, "path", "Path to the file relative to workspace root");
         addStr(props, "oldText", "Exact text to find and replace");
         addStr(props, "newText", "Replacement text");
         schema.putArray("required").add("path").add("oldText").add("newText");
@@ -99,9 +103,14 @@ public class EditTool implements AgentTool<EditTool.Params> {
                 }
             }
 
+            var root = MAPPER.createObjectNode();
+            root.put("path", params.path());
+            root.put("success", true);
+            root.put("diff", diff.toString().trim());
+
             log.debug("Tool: edit DONE path={}", params.path());
             return new ToolResult(
-                List.of(new TextContent("Successfully replaced text in " + params.path())),
+                List.of(new TextContent(root.toString())),
                 new EditDetails(diff.toString()));
         } catch (IOException e) {
             log.debug("Tool: edit ERROR: {}", e.getMessage());

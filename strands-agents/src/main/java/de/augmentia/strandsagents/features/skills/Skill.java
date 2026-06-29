@@ -14,12 +14,14 @@ public record Skill(
     List<String> allowedTools,
     Map<String, Object> metadata,
     String license,
-    String compatibility
+    String compatibility,
+    List<String> declaredTools
 ) {
     public Skill {
         if (name == null || name.isBlank())
             throw new IllegalArgumentException("Skill name must not be empty");
         if (description == null || description.isBlank())
             throw new IllegalArgumentException("Skill description must not be empty");
+        if (declaredTools == null) declaredTools = List.of();
     }
 }

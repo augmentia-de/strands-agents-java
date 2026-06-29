@@ -38,3 +38,6 @@ deploy/serverless/set_cloud_credentials.sh
 /docker/google/credentials.json
 /docker/google/
 /strands-gdpr-proxy/
+/base/
+/.sessions/
+/.opencode/

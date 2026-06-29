@@ -1,5 +1,6 @@
 package de.augmentia.strandsagents.features.tools;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.net.URI;
 import java.net.http.*;
@@ -16,6 +17,7 @@ import org.slf4j.LoggerFactory;
 
 public class WebSearchTool implements AgentTool<WebSearchTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(WebSearchTool.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final int MAX_RESULTS = 5;
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final String apiKey;
@@ -39,7 +41,7 @@ public class WebSearchTool implements AgentTool<WebSearchTool.Params> {
 
     @Override
     public String description() {
-        return "Search the web using Tavily Search API. Returns top " + MAX_RESULTS + " results.";
+        return "Search the web using Tavily Search API. Returns JSON: {\"query\":\"...\",\"totalResults\":N,\"results\":[{\"title\":\"...\",\"url\":\"...\",\"content\":\"...\"}]}.";
     }
 
     @Override
@@ -99,48 +101,71 @@ public class WebSearchTool implements AgentTool<WebSearchTool.Params> {
     }
 
     private ToolResult parseResults(String query, String json) {
-        var results = new StringBuilder();
-        results.append("Search results for: ").append(query).append("\n\n");
-
         try {
-            var root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
+            var root = MAPPER.readTree(json);
             var arr = root.get("results");
-            if (arr == null || !arr.isArray()) {
-                return ToolResult.success("No results found");
+            if (arr == null || !arr.isArray() || arr.isEmpty()) {
+                return ToolResult.success(buildEmptyJson(query));
             }
+
+            var resultRoot = MAPPER.createObjectNode();
+            resultRoot.put("query", query);
+            var resultsArr = resultRoot.putArray("results");
             int count = 0;
             for (var item : arr) {
                 if (count >= MAX_RESULTS) {
                     break;
                 }
-                var title = item.has("title") ? item.get("title").asText() : null;
-                var url = item.has("url") ? item.get("url").asText() : null;
-                var content = item.has("content") ? item.get("content").asText() : null;
-                results.append(++count).append(". ");
-                if (title != null) {
-                    results.append(title).append("\n");
-                }
-                if (url != null) {
-                    results.append(url).append("\n");
-                }
-                if (content != null && content.length() > 100) {
-                    results.append(content, 0, 100).append("...\n");
-                }
-                results.append("\n");
+                var obj = resultsArr.addObject();
+                obj.put("title", item.has("title") ? item.get("title").asText() : "");
+                obj.put("url", item.has("url") ? item.get("url").asText() : "");
+                obj.put("content", item.has("content") ? item.get("content").asText() : "");
+                count++;
             }
-            if (count == 0) {
-                return ToolResult.success("No results found");
-            }
+            resultRoot.put("totalResults", resultsArr.size());
+
+            return new ToolResult(List.of(new TextContent(resultRoot.toString())), null);
         } catch (Exception e) {
             log.debug("Tool: web_search parse error: {}", e.getMessage());
             return ToolResult.error("Failed to parse results: " + e.getMessage());
         }
+    }
 
-        return new ToolResult(List.of(new TextContent(results.toString())), null);
+    private String buildEmptyJson(String query) {
+        try {
+            return MAPPER.createObjectNode()
+                .put("query", query)
+                .put("totalResults", 0)
+                .toString();
+        } catch (Exception e) {
+            return "{\"query\":\"" + query + "\",\"totalResults\":0}";
+        }
     }
 
     private ToolResult mockSearch(String query) {
-        return ToolResult.success(PromptRegistry.get("web_search_tool.mock_result", query));
+        var mockText = PromptRegistry.get("web_search_tool.mock_result", query);
+        try {
+            var root = MAPPER.createObjectNode();
+            root.put("query", query);
+            // Wrap mock text as a single result
+            var arr = root.putArray("results");
+            arr.addObject()
+                .put("title", "Mock Result")
+                .put("url", "https://example.com")
+                .put("content", mockText);
+            root.put("totalResults", 1);
+            return ToolResult.success(root.toString());
+        } catch (Exception e) {
+            var root = MAPPER.createObjectNode();
+            root.put("query", query);
+            var arr = root.putArray("results");
+            arr.addObject()
+                .put("title", "Mock Result")
+                .put("url", "https://example.com")
+                .put("content", mockText);
+            root.put("totalResults", 1);
+            return ToolResult.success(root.toString());
+        }
     }
 
     public record Params(String query) {}

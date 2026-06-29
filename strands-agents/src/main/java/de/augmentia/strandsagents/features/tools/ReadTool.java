@@ -51,7 +51,7 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
         var schema = mapper.createObjectNode();
         schema.put("type", "object");
         var props = schema.putObject("properties");
-        addStr(props, "path", "Path to the file to read (relative or absolute)");
+        addStr(props, "path", "Path to the file relative to workspace root");
         addInt(props, "offset", "Line number to start reading from (1-indexed)");
         addInt(props, "line_start", "Line number to start reading from (1-indexed, alias for offset)");
         addInt(props, "limit", "Maximum number of lines to read");
@@ -82,6 +82,23 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
         var path = workspacePaths.resolve(params.path());
         if (!Files.isReadable(path)) {
             throw new RuntimeException("File not readable: " + params.path());
+        }
+
+        if (Files.isDirectory(path)) {
+            try (var files = Files.list(path)) {
+                var listing = files
+                    .map(p -> p.getFileName().toString() + (Files.isDirectory(p) ? "/" : ""))
+                    .sorted()
+                    .toList();
+                var sb = new StringBuilder();
+                sb.append("Directory: ").append(params.path()).append("\n");
+                for (var f : listing) {
+                    sb.append("  ").append(f).append("\n");
+                }
+                return ToolResult.success(sb.toString());
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to list directory: " + params.path(), e);
+            }
         }
 
         try {

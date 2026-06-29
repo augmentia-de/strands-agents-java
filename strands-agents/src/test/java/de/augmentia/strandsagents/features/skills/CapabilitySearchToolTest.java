@@ -74,7 +74,7 @@ class CapabilitySearchToolTest {
     }
 
     @Test
-    void execute_withVectorSearchMatch_returnsFastPath() throws Exception {
+    void execute_withSingleVectorMatch_returnsViaSubAgent() throws Exception {
         var writeCap = new CapabilityRegistry.Capability("write", "Write content", "default",
             CapabilityRegistry.CapabilityType.DEFAULT);
         var embeddingModel = new EmbeddingModel() {
@@ -91,7 +91,7 @@ class CapabilitySearchToolTest {
         var result = tool.execute("call-1", new CapabilitySearchTool.Params("write"),
             new AtomicBoolean(false));
         var output = result.content().get(0).toString();
-        assertThat(output).contains("Vector Search");
+        assertThat(output).contains("\"task\"");
         assertThat(output).contains("write");
     }
 
@@ -113,7 +113,7 @@ class CapabilitySearchToolTest {
         var result = tool.execute("call-1", new CapabilitySearchTool.Params("write"),
             new AtomicBoolean(false));
         var output = result.content().get(0).toString();
-        assertThat(output).contains("Capability Analysis");
+        assertThat(output).contains("analysis");
         assertThat(output).contains("LLM");
     }
 
@@ -124,8 +124,9 @@ class CapabilitySearchToolTest {
         var result = tool.execute("call-1", new CapabilitySearchTool.Params("find files"),
             new AtomicBoolean(false));
         var output = result.content().get(0).toString();
-        assertThat(output).contains("Capability Analysis");
+        assertThat(output).contains("\"task\"");
         assertThat(output).contains("find files");
+        assertThat(output).contains("instruction");
     }
 
     @Test
@@ -149,8 +150,10 @@ class CapabilitySearchToolTest {
             var result = tool.execute("call-1", new CapabilitySearchTool.Params("find files"),
                 new AtomicBoolean(false));
             var output = result.content().get(0).toString();
-            assertThat(output).contains("file-finder");
-            assertThat(output).contains("Finds files");
+            assertThat(output).contains("\"task\"");
+            assertThat(output).contains("find files");
+            assertThat(output).contains("Result");
+            assertThat(output).contains("Proceed with the matching tools");
         } finally {
             java.nio.file.Files.walk(tempDir)
                 .sorted(java.util.Comparator.reverseOrder())
@@ -164,7 +167,7 @@ class CapabilitySearchToolTest {
         var tool = new CapabilitySearchTool(registry, new MockChatModel("Error: %s"));
         var result = tool.execute("call-1", new CapabilitySearchTool.Params("do something"),
             new AtomicBoolean(false));
-        assertThat(result.content().get(0).toString()).contains("Capability Analysis");
+        assertThat(result.content().get(0).toString()).contains("\"task\"");
     }
 
     @Test

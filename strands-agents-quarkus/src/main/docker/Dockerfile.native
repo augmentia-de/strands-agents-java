@@ -18,6 +18,11 @@ RUN mkdir -p strands-agents-examples strands-agenttest strands-agents-mcp-server
     for d in strands-agents-examples strands-agenttest strands-agents-mcp-server; do \
       printf '<project><modelVersion>4.0.0</modelVersion><parent><groupId>de.augmentia.strandsagents</groupId><artifactId>strands-agents-java</artifactId><version>0.1.1-SNAPSHOT</version></parent><artifactId>%s</artifactId></project>' "$d" > "$d/pom.xml"; \
     done
+# strands-mcp-client-google ist Test-Dependency, aber kein Modul -> Dummy installieren
+RUN mkdir -p strands-mcp-client-google/src/main/java && \
+    printf '<project><modelVersion>4.0.0</modelVersion><parent><groupId>de.augmentia.strandsagents</groupId><artifactId>strands-agents-java</artifactId><version>0.1.1-SNAPSHOT</version></parent><artifactId>strands-mcp-client-google</artifactId><packaging>jar</packaging></project>' > strands-mcp-client-google/pom.xml && \
+    mvn install -f strands-mcp-client-google/pom.xml -DskipTests -q && \
+    rm -rf strands-mcp-client-google
 RUN mvn install -DskipTests -q -pl strands-agents-quarkus -am
 
 # ==== Stage 2: Native build with Mandrel ====
@@ -36,6 +41,7 @@ RUN mvn package -Pnative -DskipTests -pl strands-agents-quarkus \
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libc6 libstdc++6 zlib1g \
+    docker.io \
     && rm -rf /var/lib/apt/lists/*
 RUN groupadd -r appuser -g 1001 && useradd -r -g appuser -u 1001 -m appuser
 WORKDIR /work/

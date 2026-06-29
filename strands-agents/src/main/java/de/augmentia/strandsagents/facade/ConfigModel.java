@@ -35,6 +35,8 @@ public class ConfigModel {
     private TieredModel tiered;
     private StructuredOutputModel structuredOutput;
     private String ollamaBaseUrl;
+    private Boolean logRequests;
+    private Boolean logResponses;
 
     public ConfigModel() {}
 
@@ -104,6 +106,12 @@ public class ConfigModel {
 
     public String getOllamaBaseUrl() { return ollamaBaseUrl; }
     public void setOllamaBaseUrl(String ollamaBaseUrl) { this.ollamaBaseUrl = ollamaBaseUrl; }
+
+    public Boolean getLogRequests() { return logRequests; }
+    public void setLogRequests(Boolean logRequests) { this.logRequests = logRequests; }
+
+    public Boolean getLogResponses() { return logResponses; }
+    public void setLogResponses(Boolean logResponses) { this.logResponses = logResponses; }
 
     public ConfigModel withInterpolatedEnv() {
         if (apiKey != null) apiKey = interpolate(apiKey);
@@ -230,6 +238,8 @@ public class ConfigModel {
         private Double temperature;
         private Integer maxRetries;
         private String ollamaBaseUrl;
+        private Boolean logRequests;
+        private Boolean logResponses;
 
         public ModelProviderType getProvider() { return provider; }
         public void setProvider(ModelProviderType provider) { this.provider = provider; }
@@ -251,6 +261,12 @@ public class ConfigModel {
 
         public String getOllamaBaseUrl() { return ollamaBaseUrl; }
         public void setOllamaBaseUrl(String ollamaBaseUrl) { this.ollamaBaseUrl = ollamaBaseUrl; }
+
+        public Boolean getLogRequests() { return logRequests; }
+        public void setLogRequests(Boolean logRequests) { this.logRequests = logRequests; }
+
+        public Boolean getLogResponses() { return logResponses; }
+        public void setLogResponses(Boolean logResponses) { this.logResponses = logResponses; }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

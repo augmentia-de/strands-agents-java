@@ -11,8 +11,11 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,16 +35,23 @@ public class CapabilityRegistry {
     private final List<Path> skillDirectories;
     private final List<McpServerConfig> mcpServers;
     private final boolean includeStandardTools;
+    private final List<Capability> extraDefaultTools;
 
     public CapabilityRegistry(List<Path> skillDirectories, List<McpServerConfig> mcpServers) {
-        this(skillDirectories, mcpServers, false);
+        this(skillDirectories, mcpServers, false, List.of());
     }
 
     public CapabilityRegistry(List<Path> skillDirectories, List<McpServerConfig> mcpServers,
                                boolean includeStandardTools) {
+        this(skillDirectories, mcpServers, includeStandardTools, List.of());
+    }
+
+    public CapabilityRegistry(List<Path> skillDirectories, List<McpServerConfig> mcpServers,
+                               boolean includeStandardTools, List<Capability> extraDefaultTools) {
         this.skillDirectories = List.copyOf(skillDirectories);
         this.mcpServers = List.copyOf(mcpServers);
         this.includeStandardTools = includeStandardTools;
+        this.extraDefaultTools = List.copyOf(extraDefaultTools);
     }
 
     public List<Path> skillDirectories() { return skillDirectories; }
@@ -58,12 +68,19 @@ public class CapabilityRegistry {
 
     public List<Capability> discoverSkills() {
         var results = new ArrayList<Capability>();
+        var known = knownToolNames();
         for (var dir : skillDirectories) {
             try {
                 var skills = SkillParser.fromDirectory(dir);
                 for (var s : skills) {
+                    String source = s.path() != null ? s.path().toString() : dir.toString();
                     results.add(new Capability(s.name(), s.description(),
-                        dir.toString(), CapabilityType.SKILL));
+                        source, CapabilityType.SKILL));
+                    for (var dt : s.declaredTools()) {
+                        if (!known.contains(dt)) {
+                            log.warn("Skill '{}' declares tool '{}' which is not in the registry", s.name(), dt);
+                        }
+                    }
                 }
             } catch (Exception e) {
                 results.add(new Capability("error", "Failed to scan: " + dir + " - " + e.getMessage(),
@@ -82,6 +99,7 @@ public class CapabilityRegistry {
                     "default", CapabilityType.DEFAULT));
             }
         }
+        results.addAll(extraDefaultTools);
         for (var mcp : mcpServers) {
             McpClient client = null;
             try {
@@ -109,6 +127,32 @@ public class CapabilityRegistry {
         results.addAll(discoverTools());
         results.addAll(discoverSkills());
         return results;
+    }
+
+    public List<Skill> discoverAllSkills() {
+        return skillDirectories.stream()
+            .flatMap(d -> {
+                try { return SkillParser.fromDirectory(d).stream(); }
+                catch (Exception e) { return java.util.stream.Stream.of(); }
+            })
+            .toList();
+    }
+
+    public Skill getSkill(String name) {
+        return discoverAllSkills().stream()
+            .filter(s -> s.name().equals(name))
+            .findFirst()
+            .orElse(null);
+    }
+
+    public Set<String> knownToolNames() {
+        var names = getStandardToolSpecs().stream()
+            .map(ToolSpecification::name)
+            .collect(Collectors.toCollection(HashSet::new));
+        for (var cap : extraDefaultTools) {
+            names.add(cap.name());
+        }
+        return names;
     }
 
     public static Builder builder() {
@@ -196,6 +240,7 @@ public class CapabilityRegistry {
     public static class Builder {
         private final List<Path> skillDirectories = new ArrayList<>();
         private final List<McpServerConfig> mcpServers = new ArrayList<>();
+        private final List<Capability> extraDefaultTools = new ArrayList<>();
         private boolean includeStandardTools = false;
 
         public Builder skillDir(Path dir) { skillDirectories.add(dir); return this; }
@@ -211,9 +256,13 @@ public class CapabilityRegistry {
             this.includeStandardTools = include;
             return this;
         }
+        public Builder registerDefaultTool(String name, String description) {
+            extraDefaultTools.add(new Capability(name, description, "default", CapabilityType.DEFAULT));
+            return this;
+        }
 
         public CapabilityRegistry build() {
-            return new CapabilityRegistry(skillDirectories, mcpServers, includeStandardTools);
+            return new CapabilityRegistry(skillDirectories, mcpServers, includeStandardTools, extraDefaultTools);
         }
     }
 }

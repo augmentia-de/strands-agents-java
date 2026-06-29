@@ -8,7 +8,9 @@ public record LlmConfig(
     String baseUrl,
     String modelName,
     Double temperature,
-    Integer maxRetries
+    Integer maxRetries,
+    Boolean logRequests,
+    Boolean logResponses
 ) {
 
     public static LlmConfig fromEnv() {
@@ -17,7 +19,9 @@ public record LlmConfig(
             get("OPENAI_BASE_URL"),
             get("OPENAI_MODEL"),
             parseDouble(get("LLM_TEMPERATURE")),
-            parseInt(get("LLM_MAX_RETRIES"))
+            parseInt(get("LLM_MAX_RETRIES")),
+            parseBoolean(get("LLM_LOG_REQUESTS")),
+            parseBoolean(get("LLM_LOG_RESPONSES"))
         );
     }
 
@@ -28,7 +32,9 @@ public record LlmConfig(
             env.baseUrl(),
             modelName != null && !modelName.isBlank() ? modelName : env.modelName(),
             env.temperature(),
-            env.maxRetries()
+            env.maxRetries(),
+            env.logRequests(),
+            env.logResponses()
         );
     }
 
@@ -39,7 +45,9 @@ public record LlmConfig(
             secrets.getOrDefault("base_url", get("OPENAI_BASE_URL")),
             secrets.getOrDefault("model", get("OPENAI_MODEL")),
             parseDouble(secrets.get("temperature")),
-            parseInt(secrets.get("max_retries"))
+            parseInt(secrets.get("max_retries")),
+            parseBoolean(secrets.get("log_requests")),
+            parseBoolean(secrets.get("log_responses"))
         );
     }
 }

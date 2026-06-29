@@ -1,9 +1,14 @@
 package de.augmentia.strandsagents.features.tools;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -17,6 +22,8 @@ import org.slf4j.LoggerFactory;
 
 public class LsTool implements AgentTool<LsTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(LsTool.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final DateTimeFormatter ISO_FORMAT = DateTimeFormatter.ISO_INSTANT.withZone(ZoneId.of("UTC"));
     private final WorkspacePaths workspacePaths;
 
     public LsTool(Path cwd) {
@@ -34,7 +41,8 @@ public class LsTool implements AgentTool<LsTool.Params> {
 
     @Override
     public String description() {
-        return "List directory contents. Use path for specific directory, recursive for subdirectories.";
+        return "List directory contents. Returns JSON with directory, totalEntries, entries array (name, type, size, modified). "
+            + "Use path for specific directory, recursive for subdirectories.";
     }
 
     @Override
@@ -48,7 +56,7 @@ public class LsTool implements AgentTool<LsTool.Params> {
         var schema = mapper.createObjectNode();
         schema.put("type", "object");
         var props = schema.putObject("properties");
-        addStr(props, "path", "Directory to list (default: current directory)");
+        addStr(props, "path", "Directory relative to workspace root (default: workspace root)");
         addBool(props, "recursive", "List recursively (default: false)");
         addInt(props, "depth", "Maximum depth for recursive listing (default: no limit)");
         addBool(props, "details", "Show file size and date (default: false)");
@@ -108,39 +116,40 @@ public class LsTool implements AgentTool<LsTool.Params> {
 
         entries.sort(Comparator.comparing(Path::toString));
 
-        var sb = new StringBuilder();
+        var root = MAPPER.createObjectNode();
+        root.put("directory", targetPath.toString());
+
+        var arr = root.putArray("entries");
+        boolean details = Boolean.TRUE.equals(params.details());
         for (var entry : entries) {
             if (abortFlag.get()) {
                 break;
             }
             var name = targetPath.relativize(entry).toString();
-            if (Boolean.TRUE.equals(params.details())) {
+            var obj = arr.addObject();
+            obj.put("name", Files.isDirectory(entry) ? name + "/" : name);
+            obj.put("type", Files.isDirectory(entry) ? "dir" : "file");
+            if (details) {
                 try {
                     var attrs = Files.readAttributes(entry, BasicFileAttributes.class);
-                    var size = attrs.size();
-                    var isDir = attrs.isDirectory() ? "d" : "-";
-                    sb.append(isDir).append(" ");
-                    sb.append(String.format("%10d", size)).append(" ");
-                    sb.append(name);
-                    if (isDir.equals("d")) {
-                        sb.append("/");
-                    }
-                    sb.append("\n");
+                    obj.put("size", attrs.size());
+                    obj.put("modified", ISO_FORMAT.format(attrs.lastModifiedTime().toInstant()));
                 } catch (IOException ignored) {
-                    sb.append(name).append("\n");
                 }
-            } else {
-                sb.append(name);
-                if (Files.isDirectory(entry)) {
-                    sb.append("/");
-                }
-                sb.append("\n");
             }
         }
 
-        var output = sb.isEmpty()
-            ? "(empty directory)"
-            : sb.toString().trim();
+        root.put("totalEntries", arr.size());
+        root.put("details", details);
+
+        var output = arr.isEmpty()
+            ? MAPPER.createObjectNode()
+                .put("directory", targetPath.toString())
+                .put("totalEntries", 0)
+                .put("details", details)
+                .put("empty", true)
+                .toString()
+            : root.toString();
 
         log.debug("Tool: ls DONE entries={}", entries.size());
         return new ToolResult(

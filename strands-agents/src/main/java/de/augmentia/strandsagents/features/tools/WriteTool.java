@@ -47,7 +47,7 @@ public class WriteTool implements AgentTool<WriteTool.Params> {
         var schema = mapper.createObjectNode();
         schema.put("type", "object");
         var props = schema.putObject("properties");
-        addStr(props, "path", "Path to the file to write (relative or absolute)");
+        addStr(props, "path", "Path to the file relative to workspace root");
         addStr(props, "content", "Content to write to the file");
         schema.putArray("required").add("path").add("content");
         return schema;

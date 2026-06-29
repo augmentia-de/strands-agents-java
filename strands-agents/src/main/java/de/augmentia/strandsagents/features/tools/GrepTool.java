@@ -1,5 +1,6 @@
 package de.augmentia.strandsagents.features.tools;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.*;
@@ -18,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 public class GrepTool implements AgentTool<GrepTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(GrepTool.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final int MAX_LINE_CHARS = 500;
 
     private static final Set<String> SKIP_DIRS = Set.of(
@@ -54,7 +56,7 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
     @Override
     public String description() {
         return "Search file contents for a regex pattern. Skips common build directories and binary files. "
-            + "Returns matching lines in file:path:line format.";
+            + "Returns JSON: {\"pattern\":\"...\",\"totalMatches\":N,\"matches\":[{\"file\":\"...\",\"line\":N,\"match\":\"...\",\"truncated\":true|false}],\"truncated\":true|false}.";
     }
 
     @Override
@@ -70,7 +72,7 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
         var props = schema.putObject("properties");
         addStr(props, "pattern", "Regex pattern to search for");
         addStr(props, "include", "File glob pattern to include (e.g., *.java)");
-        addStr(props, "path", "File or directory to search in (default: current directory)");
+        addStr(props, "path", "File or directory relative to workspace root (default: workspace root)");
         addBool(props, "caseSensitive", "Whether search is case-sensitive (default: false)");
         addInt(props, "maxResults", "Maximum number of results (default: 50)");
         schema.putArray("required").add("pattern");
@@ -103,7 +105,7 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
             throw new RuntimeException("Operation aborted");
         }
 
-        var searchPath = params.path() != null ? workspacePaths.resolve(params.path()) : workspacePaths.workspace();
+        var searchPath = resolveSearchPath(params);
         var flags = Boolean.TRUE.equals(params.caseSensitive()) ? 0 : Pattern.CASE_INSENSITIVE;
         Pattern pattern;
         try {
@@ -116,13 +118,13 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
             ? FileSystems.getDefault().getPathMatcher("glob:" + params.include())
             : null;
         var maxResults = params.maxResults() != null ? params.maxResults() : 50;
-        var results = new ArrayList<String>();
+        var matches = new ArrayList<Map<String, Object>>();
 
         try {
             Files.walkFileTree(searchPath, new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                    if (abortFlag.get() || results.size() >= maxResults) {
+                    if (abortFlag.get() || matches.size() >= maxResults) {
                         return FileVisitResult.TERMINATE;
                     }
                     if (dir.equals(searchPath)) return FileVisitResult.CONTINUE;
@@ -135,7 +137,7 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
 
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                    if (abortFlag.get() || results.size() >= maxResults) {
+                    if (abortFlag.get() || matches.size() >= maxResults) {
                         return FileVisitResult.TERMINATE;
                     }
                     var fileName = file.getFileName().toString();
@@ -150,14 +152,20 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
                     try (var lineStream = Files.lines(file)) {
                         var lineNum = new int[1];
                         lineStream.forEach(line -> {
-                            if (results.size() >= maxResults) return;
+                            if (matches.size() >= maxResults) return;
                             lineNum[0]++;
                             if (pattern.matcher(line).find()) {
-                                var truncated = line.length() > MAX_LINE_CHARS
+                                var truncated = line.length() > MAX_LINE_CHARS;
+                                var matchText = truncated
                                     ? line.substring(0, MAX_LINE_CHARS) + "..."
                                     : line;
                                 var relPath = searchPath.relativize(file);
-                                results.add(relPath + ":" + lineNum[0] + ":" + truncated);
+                                var m = new HashMap<String, Object>();
+                                m.put("file", relPath.toString());
+                                m.put("line", lineNum[0]);
+                                m.put("match", matchText);
+                                m.put("truncated", truncated);
+                                matches.add(m);
                             }
                         });
                     } catch (IOException ignored) {
@@ -178,18 +186,24 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
             throw new RuntimeException("Search failed: " + e.getMessage());
         }
 
-        var output = results.isEmpty()
-            ? "No matches found for pattern: " + params.pattern()
-            : String.join("\n", results);
-
-        if (results.size() >= maxResults) {
-            output += "\n\n[Results truncated at " + maxResults + " matches.]";
+        var root = MAPPER.createObjectNode();
+        root.put("pattern", params.pattern());
+        var arr = root.putArray("matches");
+        for (var m : matches) {
+            var obj = arr.addObject();
+            obj.put("file", (String) m.get("file"));
+            obj.put("line", (int) m.get("line"));
+            obj.put("match", (String) m.get("match"));
+            obj.put("truncated", (boolean) m.get("truncated"));
         }
+        root.put("totalMatches", matches.size());
+        boolean truncated = matches.size() >= maxResults;
+        root.put("truncated", truncated);
 
-        log.debug("Tool: grep DONE matches={}", results.size());
+        log.debug("Tool: grep DONE matches={}", matches.size());
         return new ToolResult(
-            List.of(new TextContent(output)),
-            new GrepDetails(results.size(), params.pattern()));
+            List.of(new TextContent(root.toString())),
+            new GrepDetails(matches.size(), params.pattern()));
     }
 
     private boolean isBinary(Path path) {
@@ -200,6 +214,24 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
             }
         }
         return false;
+    }
+
+    private Path resolveSearchPath(Params params) {
+        if (params.path() == null) return workspacePaths.workspace();
+        try {
+            var resolved = workspacePaths.resolve(params.path());
+            if (Files.exists(resolved)) return resolved;
+            var wsName = workspacePaths.workspace().getFileName().toString();
+            if (params.path().equals(wsName)) {
+                log.debug("path '{}' resolved to non-existent '{}', using workspace root", params.path(), resolved);
+                return workspacePaths.workspace();
+            }
+            log.debug("path '{}' resolved to non-existent '{}', searching anyway", params.path(), resolved);
+            return resolved;
+        } catch (RuntimeException e) {
+            log.warn("path '{}' resolution failed: {}, using workspace root", params.path(), e.getMessage());
+            return workspacePaths.workspace();
+        }
     }
 
     public record Params(String pattern, String include, String path, Boolean caseSensitive, Integer maxResults) {}

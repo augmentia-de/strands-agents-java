@@ -10,7 +10,7 @@ class LlmConfigTest {
 
     @Test
     void constructor_setsAllFields() {
-        var cfg = new LlmConfig("sk-key", "https://api.openai.com", "gpt-4", 0.7, 3);
+        var cfg = new LlmConfig("sk-key", "https://api.openai.com", "gpt-4", 0.7, 3, null, null);
         assertThat(cfg.apiKey()).isEqualTo("sk-key");
         assertThat(cfg.baseUrl()).isEqualTo("https://api.openai.com");
         assertThat(cfg.modelName()).isEqualTo("gpt-4");
@@ -20,7 +20,7 @@ class LlmConfigTest {
 
     @Test
     void constructor_allowsNulls() {
-        var cfg = new LlmConfig(null, null, null, null, null);
+        var cfg = new LlmConfig(null, null, null, null, null, null, null);
         assertThat(cfg.apiKey()).isNull();
         assertThat(cfg.temperature()).isNull();
     }

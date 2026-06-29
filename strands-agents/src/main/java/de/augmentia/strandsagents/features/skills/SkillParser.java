@@ -37,17 +37,18 @@ public class SkillParser {
         if (description == null) throw new IllegalArgumentException("Missing 'description' in frontmatter");
 
         var allowedTools = parseAllowedTools(frontmatter);
+        var declaredTools = parseDeclaredTools(frontmatter);
         var metadata = parseMetadata(frontmatter);
         var license = strField(frontmatter, "license");
         var compatibility = strField(frontmatter, "compatibility");
 
-        return new Skill(name, description, body, null, allowedTools, metadata, license, compatibility);
+        return new Skill(name, description, body, null, allowedTools, metadata, license, compatibility, declaredTools);
     }
 
     public static Skill fromFile(Path path) {
         Path skillMd;
         if (Files.isDirectory(path)) {
-            skillMd = findSkillMd(path);
+            skillMd = findSkillMdFile(path);
         } else if (path.getFileName().toString().equalsIgnoreCase("SKILL.md")) {
             skillMd = path;
         } else {
@@ -63,7 +64,7 @@ public class SkillParser {
         var dir = Files.isDirectory(path) ? path : path.getParent();
         return new Skill(skill.name(), skill.description(), skill.instructions(),
             dir, skill.allowedTools(), skill.metadata(),
-            skill.license(), skill.compatibility());
+            skill.license(), skill.compatibility(), skill.declaredTools());
     }
 
     public static List<Skill> fromDirectory(Path dir) throws IOException {
@@ -93,7 +94,7 @@ public class SkillParser {
         });
     }
 
-    private static Path findSkillMd(Path dir) {
+    public static Path findSkillMdFile(Path dir) {
         for (var name : List.of("SKILL.md", "skill.md")) {
             var candidate = dir.resolve(name);
             if (Files.exists(candidate) && Files.isRegularFile(candidate))
@@ -115,6 +116,14 @@ public class SkillParser {
         if (raw instanceof Collection<?> c)
             return c.stream().map(Object::toString).toList();
         return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> parseDeclaredTools(Map<String, Object> fm) {
+        var raw = fm.get("tools");
+        if (raw instanceof Collection<?> c)
+            return c.stream().map(Object::toString).toList();
+        return List.of();
     }
 
     @SuppressWarnings("unchecked")

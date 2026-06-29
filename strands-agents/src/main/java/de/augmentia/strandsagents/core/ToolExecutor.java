@@ -23,7 +23,8 @@ public class ToolExecutor {
     private Set<CapabilityToken> grantedCapabilities = Set.of();
 
     public ToolExecutor() {
-        this(30);
+        this(Long.getLong("loop.tool-executor.timeout-seconds",
+            Integer.getInteger("loop.tool-executor.timeout-seconds", 300)));
     }
 
     public ToolExecutor(long timeoutSeconds) {

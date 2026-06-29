@@ -42,56 +42,19 @@ public class CapabilityDemo {
                 .logResponses(true)
                 .build();
 
-        // ---- Temp SKILL.md files for capability discovery ----
-        Path tmpDir = Files.createTempDirectory("cap-demo-");
-        tmpDir.toFile().deleteOnExit();
-
-        Path writeSkillDir = tmpDir.resolve("write-files");
-        Files.createDirectories(writeSkillDir);
-        writeSkillDir.toFile().deleteOnExit();
-        Path writeSkillMd = writeSkillDir.resolve("SKILL.md");
-        Files.writeString(writeSkillMd, """
-            ---
-            name: write-files
-            description: "Write files to the workspace"
-            allowed-tools:
-              - write
-            ---
-
-            Instructions for writing files to the workspace.
-            Use the 'write' tool to create or overwrite files.
-            """);
-        writeSkillMd.toFile().deleteOnExit();
-
-        Path readSkillDir = tmpDir.resolve("read-files");
-        Files.createDirectories(readSkillDir);
-        readSkillDir.toFile().deleteOnExit();
-        Path readSkillMd = readSkillDir.resolve("SKILL.md");
-        Files.writeString(readSkillMd, """
-            ---
-            name: read-files
-            description: "Read files from the workspace"
-            allowed-tools:
-              - read
-            ---
-
-            Instructions for reading files from the workspace.
-            Use the 'read' tool to read file contents.
-            """);
-        readSkillMd.toFile().deleteOnExit();
-
-        // ---- Skills ----
-        var skills = SkillParser.fromDirectory(tmpDir);
+        // ---- Load real project skills ----
+        var skillsDir = Path.of("skills");
+        var skills = SkillParser.fromDirectory(skillsDir);
+        System.out.println("Loaded skills: " + skills.stream().map(s -> s.name() + " (" + s.description() + ")").toList());
 
         // ---- Hooks ----
         var skillActivationHook = new SkillActivationHook(skills);
         var hooks = new HookRegistry();
-        hooks.register(new CachingDemo.CacheLoggingHook());
         hooks.register(skillActivationHook);
 
         // ---- Capability registry ----
         var capRegistry = CapabilityRegistry.builder()
-            .skillDir(tmpDir)
+            .skillDir(skillsDir)
             .includeStandardTools(true)
             .build();
 
@@ -106,7 +69,11 @@ public class CapabilityDemo {
             .baseUrl(config.baseUrl())
             .build();
         var embeddingService = new CapabilityEmbeddingService(
-            embeddingModel, capRegistry.discoverAll(), 0.75);
+            embeddingModel, capRegistry.discoverAll(), 0.5);
+
+        // ---- Skills plugin (injects available skills as XML) ----
+        var skillsPlugin = new AgentSkillsPlugin(skills);
+        skillsPlugin.setSkillSearchEnabled(false);
 
         // ---- Tool registry ----
         var toolRegistry = new ToolRegistry();
@@ -114,43 +81,27 @@ public class CapabilityDemo {
         toolRegistry.register(new CapabilitySearchTool(capRegistry, model, new ToolExecutor(), embeddingService));
         toolRegistry.register(new ToolActivator(toolRegistry, ws));
 
-        // ---- Skills plugin (injects skill instructions into system prompt) ----
-        var skillsPlugin = new AgentSkillsPlugin(skills);
-        skillsPlugin.setSkillSearchEnabled(false);
-
-        // ---- Agent ----
+        // ---- Agent with minimal prompt (no skill name hints) ----
         var agent = Agent.builder()
             .model(model)
             .toolRegistry(toolRegistry)
             .plugins(List.of(skillsPlugin))
-                .hookRegistry(hooks)
+            .hookRegistry(hooks)
             .systemPrompt("""
-                You are in a capability-demo sandbox.
+                You are in a sandbox with tools to write and read files.
 
-                INITIAL TOOLS:
-                - capability_search: discover available capabilities (skills/tools)
-                - tool_activator: activate/deactivate tools (action="add"|"remove", tool="write"|"read")
+                Available tools:
+                - capability_search: discover skills and tools that match your task
+                - tool_activator: add or remove tools at runtime
 
-                Follow these steps IN ORDER:
-
-                1. DISCOVER — Use capability_search to find write-file and read-file capabilities.
-                   Look at the description — each mentions (tool: write) or (tool: read).
-
-                2. ACTIVATE — Use tool_activator(action="add", tool="write") to make the write tool available.
-
-                3. CREATE — Write a file called "hello.txt" with content "Hello, world!".
-
-                4. SWAP — Use tool_activator to remove "write" and add "read".
-
-                5. VERIFY — Read "hello.txt" to confirm the content was written correctly.
-
-                Report what you found and did at each step.
+                Always start by discovering what capabilities are available for your task.
+                After discovering, use the tools to complete the task — do not just describe the solution.
                 """)
             .build();
 
-        var prompt = "Discover capabilities, write a file, swap tools, and verify the file content.";
+        var prompt = "Write a Hello.java file that prints \"Hello, world!\" using best Java coding practices.";
 
-        System.out.println("=== Capability Demo (in-session tool hot-swapping) ===\n");
+        System.out.println("=== Capability Demo (independent skill discovery) ===\n");
         System.out.println("Prompt: " + prompt + "\n");
 
         long start = System.nanoTime();
@@ -164,11 +115,5 @@ public class CapabilityDemo {
         System.out.println("  Tools: " + result.metrics().toolCallsCount() + " calls");
         System.out.println("  Tokens: " + result.metrics().inputTokens()
             + " in / " + result.metrics().outputTokens() + " out");
-
-        // Cleanup
-        try (var walk = Files.walk(tmpDir)) {
-            walk.sorted(java.util.Comparator.reverseOrder())
-                .forEach(p -> { try { Files.deleteIfExists(p); } catch (Exception ignored) {} });
-        }
     }
 }

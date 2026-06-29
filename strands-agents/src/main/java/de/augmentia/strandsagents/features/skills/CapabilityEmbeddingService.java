@@ -3,6 +3,7 @@ package de.augmentia.strandsagents.features.skills;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.IntStream;
 
@@ -30,13 +31,25 @@ public class CapabilityEmbeddingService {
     }
 
     public List<CapabilityRegistry.Capability> search(String task) {
+        return searchTopN(task, Integer.MAX_VALUE);
+    }
+
+    public List<CapabilityRegistry.Capability> searchTopN(String task, int n) {
         if (task == null || task.isBlank()) return List.of();
         var queryEmbedding = embeddingModel.embed(task).content();
         return IntStream.range(0, capabilities.size())
-            .filter(i -> cosineSimilarity(queryEmbedding, embeddings.get(i)) >= threshold)
-            .mapToObj(i -> capabilities.get(i))
+            .mapToObj(i -> {
+                var sim = cosineSimilarity(queryEmbedding, embeddings.get(i));
+                return new Scored(i, sim);
+            })
+            .filter(s -> s.similarity >= threshold)
+            .sorted(Comparator.comparingDouble(Scored::similarity).reversed())
+            .limit(n)
+            .map(s -> capabilities.get(s.index()))
             .toList();
     }
+
+    private record Scored(int index, double similarity) {}
 
     static double cosineSimilarity(Embedding a, Embedding b) {
         float[] va = a.vector();

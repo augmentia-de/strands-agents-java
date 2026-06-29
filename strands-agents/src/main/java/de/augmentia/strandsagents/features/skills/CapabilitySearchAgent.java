@@ -9,12 +9,26 @@ import java.util.Map;
 
 public class CapabilitySearchAgent extends Agent {
 
+    public record ToolEnrichment(
+        String skillName,
+        List<String> enrichedTools
+    ) {}
+
+    public record Analysis(
+        String analysis,
+        List<String> recommendedSkills,
+        List<String> recommendedTools,
+        String reasoning,
+        List<ToolEnrichment> toolEnrichments
+    ) {}
+
     public CapabilitySearchAgent(ChatModel model, Map<String, Skill> skills,
                                   List<CapabilityRegistry.McpServerConfig> mcpServers,
                                   List<CapabilityRegistry.Capability> defaultCapabilities,
                                   ToolExecutor toolExecutor) {
         super(model, new ToolRegistry(), toolExecutor);
         setSystemPrompt(buildPrompt(skills, mcpServers, defaultCapabilities));
+        setStructuredOutputModel(Analysis.class);
     }
 
     private static String buildPrompt(Map<String, Skill> skills,
@@ -24,7 +38,12 @@ public class CapabilitySearchAgent extends Agent {
         sb.append("""
             You are a capability analysis agent. Your task is to find the best-matching skills and tools for a given task.
 
-            Below is the full list of available capabilities. Analyze the task and recommend the best matches.
+            The user input will be a JSON object with:
+            - "task": the user's task description
+            - "prefilteredSkills": array of {"name": "...", "description": "..."} for skills that may be relevant
+            - "prefilteredTools": array of {"name": "...", "description": "..."} for default tools that may be relevant
+
+            Below is the full list of available capabilities. Analyze the task against them and recommend the best matches.
 
             RULES:
             1. When both a named skill and a default tool match the same need, PREFER the skill.
@@ -32,26 +51,35 @@ public class CapabilitySearchAgent extends Agent {
             3. CLEARLY separate skills from bare tools in your output.
             4. If the user's task does not match any capability, state that clearly.
 
-            OUTPUT FORMAT:
-            ## Matching Skills
-            - [skill name] (tool: tool_name): description
-
-            ## Matching Default Tools
-            - [tool name]: description
+            TOOL ENRICHMENT:
+            Each skill may declare a list of tools it uses via `declaredTools`. Review these for each recommended skill:
+            - If the skill is missing essential standard tools, add them to `enrichedTools` in `toolEnrichments`
+            - If a declared tool appears to be a typo (e.g. "wite" instead of "write"), correct it
+            - If a declared tool implies a related tool (e.g. "find" implies "read"), add the implied tool
+            - Explain your reasoning for each enrichment in `analysis`
+            - If no enrichment is needed, set `toolEnrichments` to an empty list
 
             """);
 
         if (!skills.isEmpty()) {
             sb.append("## Available Skills\n\n");
             for (var s : skills.values()) {
-                sb.append("- ").append(s.name());
-                sb.append(": ").append(s.description());
-                if (s.allowedTools() != null && !s.allowedTools().isEmpty()) {
-                    sb.append(" (uses tool: ").append(String.join(", ", s.allowedTools())).append(")");
+                sb.append("### ").append(s.name()).append("\n\n");
+                sb.append("**Description:** ").append(s.description()).append("\n\n");
+                sb.append("**Instructions:**\n\n");
+                try {
+                    var skillMd = SkillParser.findSkillMdFile(s.path());
+                    sb.append(java.nio.file.Files.readString(skillMd)).append("\n\n");
+                } catch (Exception e) {
+                    sb.append(s.instructions()).append("\n\n");
                 }
-                sb.append("\n");
+                if (s.allowedTools() != null && !s.allowedTools().isEmpty()) {
+                    sb.append("**Allowed tools:** ").append(String.join(", ", s.allowedTools())).append("\n\n");
+                }
+                if (!s.declaredTools().isEmpty()) {
+                    sb.append("**Declared tools:** ").append(String.join(", ", s.declaredTools())).append("\n\n");
+                }
             }
-            sb.append("\n");
         }
 
         if (mcpServers != null && !mcpServers.isEmpty()) {

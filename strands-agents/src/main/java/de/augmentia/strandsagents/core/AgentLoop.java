@@ -100,7 +100,11 @@ final class AgentLoop {
 
             var sysPrompt = run.systemPrompt();
             if (sysPrompt != null && !sysPrompt.isBlank()) {
-                agent.chatMemory.add(SystemMessage.from(sysPrompt));
+                var hasSystemMessage = agent.chatMemory.messages().stream()
+                    .anyMatch(m -> m instanceof SystemMessage);
+                if (!hasSystemMessage) {
+                    agent.chatMemory.add(SystemMessage.from(sysPrompt));
+                }
             }
 
             prompt = prompt.trim();
@@ -422,7 +426,6 @@ final class AgentLoop {
             ? AiMessage.builder()
                 .text(responseText)
                 .toolExecutionRequests(aiMessage.toolExecutionRequests())
-                .thinking(aiMessage.thinking())
                 .build()
             : null;
     }

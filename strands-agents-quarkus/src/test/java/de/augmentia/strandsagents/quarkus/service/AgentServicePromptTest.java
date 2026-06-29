@@ -45,7 +45,7 @@ class AgentServicePromptTest {
     }
 
     private static List<Skill> skills() {
-        return List.of(new Skill("writer", "Writes concise notes", "", null, List.of(), Map.of(), null, null));
+        return List.of(new Skill("writer", "Writes concise notes", "", null, List.of(), Map.of(), null, null, null));
     }
 
     static class PromptTools {

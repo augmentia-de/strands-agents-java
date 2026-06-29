@@ -21,18 +21,21 @@ prompts:
 
     Each step must be assigned to exactly ONE available tool.
 
-    Available tools: %s
+    Available tools:
+    %s
+
+    For each step, provide "argumentsTemplate" as a JSON object with parameter names matching the tool specification above. Do NOT use shell commands. Example: for a "find" tool with parameters pattern and path, use {"pattern": "**/*.java", "path": "src"}.
 
     Respond ONLY with a JSON array. No explanations, no markdown.
     Each object in the array has the following fields:
     - "id": unique identifier (e.g. "step-1")
     - "description": description of the step
     - "toolName": name of the tool to use (from the list of available tools)
-    - "argumentsTemplate": placeholder for tool arguments, e.g. "${value}"
+    - "argumentsTemplate": JSON object with tool parameters matching the tool's schema
     - "dependsOn": array of IDs this step depends on (empty array if none)
     - "optional": true/false
 
-    If no tool is needed for a step, set "toolName" to "none".
+    If no tool is needed for a step, set "toolName" to "none" and "argumentsTemplate" to "".
   cot_planner.create_plan.user: "Create a plan for the following goal:\n%s"
   cot_planner.revise.system: |
     A previous plan has failed. Create a REVISED plan.
