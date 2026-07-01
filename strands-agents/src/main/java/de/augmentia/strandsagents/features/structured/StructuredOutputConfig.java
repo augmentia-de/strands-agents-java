@@ -129,19 +129,35 @@ public record StructuredOutputConfig(
             if (genericType instanceof ParameterizedType pt) {
                 var args = pt.getActualTypeArguments();
                 if (args.length > 0 && args[0] instanceof Class<?> elementClass) {
-                    sb.append(", \"items\": {\"type\": \"")
-                        .append(mapJavaTypeToJsonType(elementClass))
-                        .append("\"}");
+                    sb.append(", \"items\": ")
+                        .append(simpleTypeSchema(elementClass));
                 }
             }
             sb.append("}");
         } else if (type.isArray()) {
-            sb.append("{\"type\": \"array\", \"items\": {\"type\": \"")
-                .append(mapJavaTypeToJsonType(type.getComponentType()))
-                .append("\"}}");
+            sb.append("{\"type\": \"array\", \"items\": ")
+                .append(simpleTypeSchema(type.getComponentType()))
+                .append("}");
         } else {
-            sb.append("{\"type\": \"").append(mapJavaTypeToJsonType(type)).append("\"}");
+            sb.append(simpleTypeSchema(type));
         }
+    }
+
+    private static String simpleTypeSchema(Class<?> type) {
+        var format = dateTimeFormat(type);
+        var base = "{\"type\": \"" + mapJavaTypeToJsonType(type) + "\"";
+        if (format != null) {
+            return base + ", \"format\": \"" + format + "\"}";
+        }
+        return base + "}";
+    }
+
+    private static String dateTimeFormat(Class<?> type) {
+        if (type == java.time.LocalDate.class) return "date";
+        if (type == java.time.LocalDateTime.class) return "date-time";
+        if (type == java.time.OffsetDateTime.class) return "date-time";
+        if (type == java.time.Instant.class) return "date-time";
+        return null;
     }
 
     private static String mapJavaTypeToJsonType(Class<?> type) {
@@ -150,6 +166,10 @@ public record StructuredOutputConfig(
         if (type == Long.class || type == long.class) return "integer";
         if (type == Double.class || type == double.class || type == Float.class || type == float.class) return "number";
         if (type == Boolean.class || type == boolean.class) return "boolean";
+        if (type == java.time.LocalDate.class) return "string";
+        if (type == java.time.LocalDateTime.class) return "string";
+        if (type == java.time.OffsetDateTime.class) return "string";
+        if (type == java.time.Instant.class) return "string";
         return "string";
     }
 }

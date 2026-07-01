@@ -361,11 +361,11 @@ public class Agent {
     }
 
     public void setStructuredOutputModel(Class<?> modelClass) {
-        this.structuredOutputConfig = StructuredOutputConfig.staticModel(modelClass);
+        setStructuredOutputConfig(StructuredOutputConfig.staticModel(modelClass));
     }
 
     public void setStructuredOutputSchema(String jsonSchema) {
-        this.structuredOutputConfig = StructuredOutputConfig.dynamicSchema(jsonSchema);
+        setStructuredOutputConfig(StructuredOutputConfig.dynamicSchema(jsonSchema));
     }
 
     public void setStructuredOutputConfig(StructuredOutputConfig config) {

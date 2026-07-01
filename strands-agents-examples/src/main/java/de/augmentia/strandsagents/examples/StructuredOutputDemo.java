@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.examples.feature;
+package de.augmentia.strandsagents.examples;
 
 import java.time.Instant;
 
@@ -103,8 +103,8 @@ public class StructuredOutputDemo {
         }
 
         demoStaticRecord();
-        //demoDynamicSchema();
-        //demoShoppingCart();
+        demoDynamicSchema();
+        demoShoppingCart();
     }
 
     // --- Static Mode ---

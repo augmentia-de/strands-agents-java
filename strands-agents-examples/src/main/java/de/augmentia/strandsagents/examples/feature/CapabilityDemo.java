@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.examples;
+package de.augmentia.strandsagents.examples.feature;
 
 import de.augmentia.strandsagents.config.LlmConfig;
 import de.augmentia.strandsagents.core.Agent;

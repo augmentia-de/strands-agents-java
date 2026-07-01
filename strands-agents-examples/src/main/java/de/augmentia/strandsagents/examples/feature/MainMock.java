@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.examples;
+package de.augmentia.strandsagents.examples.feature;
 
 
 import de.augmentia.strandsagents.core.ToolExecutor;

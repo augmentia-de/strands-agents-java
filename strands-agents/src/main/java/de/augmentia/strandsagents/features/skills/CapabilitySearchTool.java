@@ -148,30 +148,28 @@ public class CapabilitySearchTool implements AgentTool<CapabilitySearchTool.Para
         var hasRecommendations = false;
         var toolEnrichments = Map.<String, List<String>>of();
 
-        if (result.structuredOutput() != null) {
-            try {
-                var root = MAPPER.readTree(result.structuredOutput());
-                if (root.has("analysis")) analysis = root.get("analysis").asText();
-                if (root.has("recommendedSkills") && root.get("recommendedSkills").isArray()) {
-                    for (var s : root.get("recommendedSkills")) recommendedSkills.add(s.asText());
-                }
-                if (root.has("recommendedTools") && root.get("recommendedTools").isArray()) {
-                    for (var t : root.get("recommendedTools")) recommendedTools.add(t.asText());
-                }
-                hasRecommendations = !recommendedSkills.isEmpty() || !recommendedTools.isEmpty();
+        try {
+            var root = MAPPER.readTree(result.finalAnswer());
+            if (root.has("analysis")) analysis = root.get("analysis").asText();
+            if (root.has("recommendedSkills") && root.get("recommendedSkills").isArray()) {
+                for (var s : root.get("recommendedSkills")) recommendedSkills.add(s.asText());
+            }
+            if (root.has("recommendedTools") && root.get("recommendedTools").isArray()) {
+                for (var t : root.get("recommendedTools")) recommendedTools.add(t.asText());
+            }
+            hasRecommendations = !recommendedSkills.isEmpty() || !recommendedTools.isEmpty();
 
-                if (root.has("toolEnrichments") && root.get("toolEnrichments").isArray()) {
-                    var enrichMap = new java.util.HashMap<String, List<String>>();
-                    for (var e : root.get("toolEnrichments")) {
-                        var name = e.get("skillName").asText();
-                        var tools = new ArrayList<String>();
-                        for (var t : e.get("enrichedTools")) tools.add(t.asText());
-                        enrichMap.put(name, tools);
-                    }
-                    toolEnrichments = enrichMap;
+            if (root.has("toolEnrichments") && root.get("toolEnrichments").isArray()) {
+                var enrichMap = new java.util.HashMap<String, List<String>>();
+                for (var e : root.get("toolEnrichments")) {
+                    var name = e.get("skillName").asText();
+                    var tools = new ArrayList<String>();
+                    for (var t : e.get("enrichedTools")) tools.add(t.asText());
+                    enrichMap.put(name, tools);
                 }
-            } catch (Exception ignored) {}
-        }
+                toolEnrichments = enrichMap;
+            }
+        } catch (Exception ignored) {}
 
         var knownTools = registry.knownToolNames();
 

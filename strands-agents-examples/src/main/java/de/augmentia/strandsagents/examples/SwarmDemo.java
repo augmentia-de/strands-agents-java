@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.examples.feature;
+package de.augmentia.strandsagents.examples;
 
 import java.lang.reflect.Method;
 import java.util.Map;

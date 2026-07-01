@@ -7,6 +7,7 @@ import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.features.pipeline.HookRegistry;
 import de.augmentia.strandsagents.features.skills.*;
 import de.augmentia.strandsagents.features.tools.ToolActivator;
+import de.augmentia.strandsagents.examples.feature.CachingDemo;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
 

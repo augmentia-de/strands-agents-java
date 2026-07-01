@@ -1,4 +1,4 @@
-package de.augmentia.strandsagents.examples;
+package de.augmentia.strandsagents.examples.feature;
 
 import de.augmentia.strandsagents.config.LlmConfig;
 import de.augmentia.strandsagents.core.Agent;
@@ -142,7 +142,7 @@ public class CachingDemo {
             + " in / " + result.metrics().outputTokens() + " out\n");
     }
 
-    static class CacheLoggingHook implements AgentHook {
+    public static class CacheLoggingHook implements AgentHook {
         @Override
         public String name() {
             return "cache-logger";

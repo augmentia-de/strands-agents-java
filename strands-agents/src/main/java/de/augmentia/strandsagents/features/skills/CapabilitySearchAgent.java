@@ -28,7 +28,6 @@ public class CapabilitySearchAgent extends Agent {
                                   ToolExecutor toolExecutor) {
         super(model, new ToolRegistry(), toolExecutor);
         setSystemPrompt(buildPrompt(skills, mcpServers, defaultCapabilities));
-        setStructuredOutputModel(Analysis.class);
     }
 
     private static String buildPrompt(Map<String, Skill> skills,
@@ -105,6 +104,17 @@ public class CapabilitySearchAgent extends Agent {
             Analyze the user's task against the capabilities listed above.
             Recommend the best-matching skills, default tools, and MCP tools.
             Skills should always be preferred over bare tools when they cover the same functionality.
+
+            Respond with valid JSON in this exact structure:
+            {
+              "analysis": "string",
+              "recommendedSkills": ["string"],
+              "recommendedTools": ["string"],
+              "reasoning": "string",
+              "toolEnrichments": [
+                {"skillName": "string", "enrichedTools": ["string"]}
+              ]
+            }
             """);
 
         return sb.toString();

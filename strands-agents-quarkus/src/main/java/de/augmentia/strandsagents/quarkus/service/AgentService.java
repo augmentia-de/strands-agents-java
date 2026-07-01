@@ -85,6 +85,7 @@ public class AgentService implements de.augmentia.strandsagents.features.service
     private ToolRegistry fullRegistry;
     private List<Skill> allSkills;
     private ChatModel model;
+    private ChatModel wrappedModel;
     private SessionManager sessionManager;
     private Path logDir;
     private CapabilityRegistry capabilityRegistry;
@@ -163,6 +164,7 @@ public class AgentService implements de.augmentia.strandsagents.features.service
         if (model != null) return;
 
         this.model = createModel();
+        this.wrappedModel = wrapModel(model);
         this.fullRegistry = AgentFactory.createToolRegistry(config);
         this.allSkills = loadSkills();
         this.sessionManager = AgentFactory.createSessionManager(Path.of(config.sessionDir()));
@@ -179,7 +181,7 @@ public class AgentService implements de.augmentia.strandsagents.features.service
             fullRegistry.register(new McpIngestTool(fullRegistry));
         }
         if (capabilityRegistry != null) {
-            fullRegistry.register(new CapabilitySearchTool(capabilityRegistry, model));
+            fullRegistry.register(new CapabilitySearchTool(capabilityRegistry, wrappedModel));
         }
 
         setupLogging();
@@ -231,7 +233,7 @@ public class AgentService implements de.augmentia.strandsagents.features.service
         boolean effectiveSkillSearch = req.skillSearchEnabled != null ? req.skillSearchEnabled : config.skillSearchEnabled();
         var plugins = AgentFactory.buildPlugins(selectedSkills, effectiveInitialSkills, effectiveSkillSearch);
 
-        var modelToUse = wrapModel(model);
+        var modelToUse = wrappedModel;
         var streamingModel = findStreamingModel();
 
         var mcpClients = new ArrayList<McpClient>();
@@ -368,7 +370,7 @@ public class AgentService implements de.augmentia.strandsagents.features.service
         var activeTools = filterTools(req);
         var activeSkills = filterSkills(req);
         var plugins = buildPlugins(activeSkills, config.initialSkills());
-        var modelToUse = wrapModel(model);
+        var modelToUse = wrappedModel;
         var agent = AgentFactory.createAgent(modelToUse, activeTools, sessionManager, null, plugins);
         var phases = new CopyOnWriteArrayList<String>();
         agent.addEventListener(event -> {
@@ -509,7 +511,7 @@ public class AgentService implements de.augmentia.strandsagents.features.service
     public Agent createDefaultAgent() {
         ensureInitialized();
         var selectedTools = fullRegistry.withOnly(new HashSet<>(fullRegistry.getToolNames()));
-        var modelToUse = wrapModel(model);
+        var modelToUse = wrappedModel;
         var plugins = buildPlugins(allSkills, config.initialSkills());
         return AgentFactory.createAgent(modelToUse, selectedTools, sessionManager, null, plugins);
     }
@@ -519,7 +521,7 @@ public class AgentService implements de.augmentia.strandsagents.features.service
         var selectedTools = toolNames != null && !toolNames.isEmpty()
             ? fullRegistry.withOnly(toolNames)
             : fullRegistry.withOnly(new HashSet<>(fullRegistry.getToolNames()));
-        var modelToUse = wrapModel(model);
+        var modelToUse = wrappedModel;
         var plugins = buildPlugins(allSkills, config.initialSkills());
         var agent = AgentFactory.createAgent(modelToUse, selectedTools, sessionManager, null, plugins);
         agent.setSystemPrompt(systemPrompt);
