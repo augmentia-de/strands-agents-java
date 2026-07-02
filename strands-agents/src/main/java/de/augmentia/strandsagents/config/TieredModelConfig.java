@@ -1,6 +1,8 @@
 package de.augmentia.strandsagents.config;
 
 import static de.augmentia.strandsagents.config.ConfigReader.*;
+import java.util.HashMap;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +25,7 @@ public record TieredModelConfig(
             get("OPENAI_MODEL", null),
             parseDouble(get("LLM_TEMPERATURE", null)),
             parseInt(get("LLM_MAX_RETRIES", null)),
-            null,
+            Map.of(),
             parseBoolean(get("LLM_LOG_REQUESTS", null)),
             parseBoolean(get("LLM_LOG_RESPONSES", null))
         );
@@ -45,7 +47,7 @@ public record TieredModelConfig(
                 get("ADVANCED_MODEL", get("OPENAI_MODEL", "gpt-4o")),
                 simple.temperature(),
                 simple.maxRetries(),
-                simple.ollamaBaseUrl(),
+                simple.providerProperties(),
                 simple.logRequests(),
                 simple.logResponses()
             );

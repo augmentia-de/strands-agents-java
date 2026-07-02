@@ -1,11 +1,11 @@
 package de.augmentia.strandsagents.examples.feature;
 
-import de.augmentia.strandsagents.core.ToolExecutor;
+import de.augmentia.strandsagents.core.DefaultToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.config.ModelFactory;
-import de.augmentia.strandsagents.features.tools.CalculatorTool;
-import de.augmentia.strandsagents.features.tools.TimeTool;
+import de.augmentia.strandsagents.tools.builtin.CalculatorTool;
+import de.augmentia.strandsagents.tools.builtin.TimeTool;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
@@ -32,7 +32,7 @@ public class SelfImprovementDemo {
         System.out.println("─── Phase 1: calculator tool, math prompt ───");
         var reg = new ToolRegistry();
         reg.register(new CalculatorTool());
-        var agent = new Agent(model, reg, new ToolExecutor());
+        var agent = new Agent(model, reg, new DefaultToolExecutor());
         agent.setSystemPrompt("You are a math assistant. You must use math tools!");
 
         var r1 = agent.execute("What is 123 * 456? Also, what time is it?");

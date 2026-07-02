@@ -1,7 +1,7 @@
 package de.augmentia.strandsagents.secrets.gcp;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.augmentia.strandsagents.features.secrets.SecretProvider;
+import de.augmentia.strandsagents.config.secrets.SecretProvider;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;

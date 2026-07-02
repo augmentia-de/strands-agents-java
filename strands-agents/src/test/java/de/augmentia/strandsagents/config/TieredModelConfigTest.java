@@ -2,12 +2,13 @@ package de.augmentia.strandsagents.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class TieredModelConfigTest {
 
-    private final ChatModelConfig simple = new ChatModelConfig(ModelProviderType.OPENAI, "sk-simple", null, "gpt-4o-mini", null, null, null, null, null);
-    private final ChatModelConfig advanced = new ChatModelConfig(ModelProviderType.OPENAI, "sk-adv", null, "gpt-4o", null, null, null, null, null);
+    private final ChatModelConfig simple = new ChatModelConfig(ModelProviderType.OPENAI, "sk-simple", null, "gpt-4o-mini", null, null, Map.of(), null, null);
+    private final ChatModelConfig advanced = new ChatModelConfig(ModelProviderType.OPENAI, "sk-adv", null, "gpt-4o", null, null, Map.of(), null, null);
 
     @Test
     void forTier_simple_returnsSimple() {

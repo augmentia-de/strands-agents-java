@@ -3,20 +3,15 @@ package de.augmentia.strandsagents.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import de.augmentia.strandsagents.core.MockChatModel;
-import de.augmentia.strandsagents.core.MockStreamingChatModel;
-import de.augmentia.strandsagents.core.Agent;
-import de.augmentia.strandsagents.core.StreamingAgent;
 import de.augmentia.strandsagents.model.agent.StopReason;
 import de.augmentia.strandsagents.model.event.*;
-import de.augmentia.strandsagents.features.tools.AgentTool;
-import de.augmentia.strandsagents.features.tools.ToolResult;
+import de.augmentia.strandsagents.tools.AgentTool;
+import de.augmentia.strandsagents.tools.ToolResult;
 import java.util.ArrayList;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import org.junit.jupiter.api.Test;
 
 class StreamingTest {
@@ -281,7 +276,7 @@ class StreamingTest {
                 return ToolResult.success("ok");
             }
         });
-        var agent = new StreamingAgent(new MockStreamingChatModel(), registry, new ToolExecutor());
+        var agent = new StreamingAgent(new MockStreamingChatModel(), registry, new DefaultToolExecutor());
         var result = agent.execute("Was ist 2+3?");
         assertThat(result.finalAnswer()).isNotEmpty();
     }

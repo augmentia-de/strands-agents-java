@@ -2,10 +2,8 @@ package de.augmentia.strandsagents.facade;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.augmentia.strandsagents.features.gdpr.AuditTrailHook;
-import de.augmentia.strandsagents.features.gdpr.GdprAgentPlugin;
-import de.augmentia.strandsagents.features.gdpr.PiiAnonymizerHook;
-import java.util.List;
+import de.augmentia.strandsagents.interceptor.gdpr.AuditTrailHook;
+import de.augmentia.strandsagents.interceptor.gdpr.PiiAnonymizerHook;
 import org.junit.jupiter.api.Test;
 
 class GDPRAgentBuilderTest {

@@ -93,12 +93,12 @@ public class AguiResource {
                 if (model == null) {
                     var mockModel = new de.augmentia.strandsagents.core.MockStreamingChatModel();
                     var agent = new StreamingAgent(mockModel,
-                        agentService.getFullRegistry(), new de.augmentia.strandsagents.core.ToolExecutor());
+                        agentService.getFullRegistry(), new de.augmentia.strandsagents.core.DefaultToolExecutor());
                     agent.setEventListener(translator);
                     agent.executeStreaming(prompt, translator);
                 } else {
                     var agent = new StreamingAgent(model,
-                        agentService.getFullRegistry(), new de.augmentia.strandsagents.core.ToolExecutor(),
+                        agentService.getFullRegistry(), new de.augmentia.strandsagents.core.DefaultToolExecutor(),
                         null, agentService.getSessionManager(), null);
                     agent.setEventListener(translator);
                     agent.executeStreaming(prompt, translator);

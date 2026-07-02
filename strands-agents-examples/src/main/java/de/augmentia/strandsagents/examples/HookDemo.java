@@ -1,16 +1,16 @@
 package de.augmentia.strandsagents.examples;
 
-import de.augmentia.strandsagents.core.ToolExecutor;
+import de.augmentia.strandsagents.core.DefaultToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.config.ModelFactory;
-import de.augmentia.strandsagents.features.pipeline.AgentHook;
-import de.augmentia.strandsagents.features.pipeline.HookContexts;
-import de.augmentia.strandsagents.features.pipeline.HookRegistry;
-import de.augmentia.strandsagents.features.pipeline.HookResult;
+import de.augmentia.strandsagents.interceptor.pipeline.AgentHook;
+import de.augmentia.strandsagents.interceptor.pipeline.HookContexts;
+import de.augmentia.strandsagents.interceptor.pipeline.HookRegistry;
+import de.augmentia.strandsagents.interceptor.pipeline.HookResult;
 import de.augmentia.strandsagents.model.agent.AgentResult;
-import de.augmentia.strandsagents.features.tools.CalculatorTool;
-import de.augmentia.strandsagents.features.tools.TimeTool;
+import de.augmentia.strandsagents.tools.builtin.CalculatorTool;
+import de.augmentia.strandsagents.tools.builtin.TimeTool;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import java.util.ArrayList;
@@ -51,7 +51,7 @@ public class HookDemo {
             //new MockChatModel("Mock: %s"),
                 ModelFactory.createOpenAiFromEnv(),
             tools,
-            new ToolExecutor(),
+            new DefaultToolExecutor(),
             null,   // no conversation manager
             null,   // no session manager
             null,   // no resilience

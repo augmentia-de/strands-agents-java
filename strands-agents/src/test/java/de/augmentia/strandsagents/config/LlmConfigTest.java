@@ -2,7 +2,7 @@ package de.augmentia.strandsagents.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.augmentia.strandsagents.features.secrets.SecretProvider;
+import de.augmentia.strandsagents.config.secrets.SecretProvider;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 

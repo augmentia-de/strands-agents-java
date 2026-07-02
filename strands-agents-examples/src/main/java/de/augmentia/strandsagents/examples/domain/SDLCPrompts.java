@@ -1,9 +1,7 @@
 package de.augmentia.strandsagents.examples.domain;
 
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.features.tools.*;
-import de.augmentia.strandsagents.features.tools.WebFetchTool;
-import de.augmentia.strandsagents.features.tools.WebSearchTool;
+import de.augmentia.strandsagents.tools.builtin.*;
 
 import java.nio.file.Path;
 

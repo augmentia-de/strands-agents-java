@@ -4,11 +4,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.augmentia.strandsagents.config.ModelProviderType;
 import de.augmentia.strandsagents.config.ModelTier;
-import de.augmentia.strandsagents.features.resilience.CircuitBreakerConfig;
-import de.augmentia.strandsagents.features.resilience.ResilienceConfig;
-import de.augmentia.strandsagents.features.resilience.RetryConfig;
+import de.augmentia.strandsagents.interceptor.resilience.CircuitBreakerConfig;
+import de.augmentia.strandsagents.interceptor.resilience.ResilienceConfig;
+import de.augmentia.strandsagents.interceptor.resilience.RetryConfig;
 import java.util.List;
-import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ConfigModel {
@@ -306,7 +305,7 @@ public class ConfigModel {
         var model = new ConfigModel();
         model.modelName = "gpt-4o-mini";
         model.provider = ModelProviderType.OPENAI;
-        model.maxIterations = 10;
+        model.maxIterations = 5;
         model.maxMessages = 20;
         model.maxTokens = 4000;
         model.keepLastUserMessages = 3;

@@ -1,15 +1,15 @@
 package de.augmentia.strandsagents.examples.domain;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.augmentia.strandsagents.core.AgentFactory;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.Agent;
-import de.augmentia.strandsagents.features.subagent.SubAgentTool;
+import de.augmentia.strandsagents.core.subagent.SubAgentTool;
 import de.augmentia.strandsagents.config.AgentConfig;
+import de.augmentia.strandsagents.config.AgentSettings;
 import de.augmentia.strandsagents.config.ModelFactory;
 import de.augmentia.strandsagents.model.agent.AgentResult;
 import de.augmentia.strandsagents.model.event.ToolExecutionFinishedEvent;
-import de.augmentia.strandsagents.model.event.ToolExecutionStartedEvent;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.model.chat.ChatModel;
@@ -19,7 +19,6 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Multi-Agent Evaluation Demo (Java).
@@ -54,20 +53,29 @@ public class MultiAgentEvaluationDemo {
         Method executeMethod = SubAgentTool.class.getMethod("execute", String.class);
 
         // 1. Setup Specialists
-        Agent techAgent = AgentConfig.builder()
-            .toolRegistry(ToolRegistry.builder().with(new DatabaseTools()).build())
+        Agent techAgent = AgentFactory.buildAgent(AgentSettings.builder()
             .systemPrompt("You are a Technical Support Specialist. Troubleshoot the user's issue. You MUST use 'lookup_customer' to verify the user and 'create_ticket' if the issue is a bug or crash. Provide a detailed resolution.")
-            .build().createAgent(model);
+            .build(),
+            AgentConfig.builder()
+                .toolRegistry(ToolRegistry.builder().with(new DatabaseTools()).build())
+                .build(),
+            model);
 
-        Agent billingAgent = AgentConfig.builder()
-            .toolRegistry(ToolRegistry.builder().with(new DatabaseTools()).build())
+        Agent billingAgent = AgentFactory.buildAgent(AgentSettings.builder()
             .systemPrompt("You are a Billing Specialist. Verify the customer using 'lookup_customer' and address their payment or subscription concern.")
-            .build().createAgent(model);
+            .build(),
+            AgentConfig.builder()
+                .toolRegistry(ToolRegistry.builder().with(new DatabaseTools()).build())
+                .build(),
+            model);
 
-        Agent returnsAgent = AgentConfig.builder()
-            .toolRegistry(ToolRegistry.builder().with(new DatabaseTools()).build())
+        Agent returnsAgent = AgentFactory.buildAgent(AgentSettings.builder()
             .systemPrompt("You are a Returns Specialist. Use tools to verify the order and customer. Provide clear instructions for returns or exchanges.")
-            .build().createAgent(model);
+            .build(),
+            AgentConfig.builder()
+                .toolRegistry(ToolRegistry.builder().with(new DatabaseTools()).build())
+                .build(),
+            model);
 
         // 2. Wrap Specialists as Tools
         SubAgentTool techTool = new SubAgentTool(techAgent, "technical_support", "Handle technical issues, bugs, and crashes.");
@@ -75,7 +83,7 @@ public class MultiAgentEvaluationDemo {
         SubAgentTool returnsTool = new SubAgentTool(returnsAgent, "returns_exchanges", "Handle returns, exchanges, and shipping status.");
 
         // 3. Setup Orchestrator
-        Agent orchestrator = AgentConfig.builder()
+        Agent orchestrator = AgentFactory.buildAgent(AgentSettings.builder()
             .systemPrompt("""
                 You are a customer support router. Your ONLY task is to delegate queries to the appropriate specialist.
                 
@@ -90,7 +98,8 @@ public class MultiAgentEvaluationDemo {
                 - Billing, payments, subscriptions -> billing_support
                 - Returns, exchanges, orders -> returns_exchanges
                 - Simple greetings -> answer directly""")
-            .build().createAgent(model);
+            .build(),
+            AgentConfig.builder().build(), model);
 
         orchestrator.getToolRegistry().register("technical_support", techTool, executeMethod);
         orchestrator.getToolRegistry().register("billing_support", billingTool, executeMethod);
@@ -134,7 +143,7 @@ public class MultiAgentEvaluationDemo {
             }
         }
 
-        Agent evaluator = AgentConfig.builder()
+        Agent evaluator = AgentFactory.buildAgent(AgentSettings.builder()
             .systemPrompt("""
                 You are a Multi-Agent Quality Evaluator. 
                 Your task is to score the coordination between an orchestrator and specialist agents.
@@ -148,7 +157,8 @@ public class MultiAgentEvaluationDemo {
                      - Orchestrator just promised to connect but did not trigger the tool call.
                 
                 Provide a score (0.0 to 1.0) and a brief justification.""")
-            .build().createAgent(model);
+            .build(),
+            AgentConfig.builder().build(), model);
 
         var evalResult = evaluator.execute("Evaluate this interaction report:\n" + report.toString());
         

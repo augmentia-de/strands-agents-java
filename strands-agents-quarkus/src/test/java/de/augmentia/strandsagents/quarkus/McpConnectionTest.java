@@ -1,6 +1,6 @@
 package de.augmentia.strandsagents.quarkus;
 
-import de.augmentia.strandsagents.features.skills.McpServerConfigLoader;
+import de.augmentia.strandsagents.skills.McpServerConfigLoader;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

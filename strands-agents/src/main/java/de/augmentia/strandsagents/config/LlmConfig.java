@@ -1,6 +1,6 @@
 package de.augmentia.strandsagents.config;
 
-import de.augmentia.strandsagents.features.secrets.SecretProvider;
+import de.augmentia.strandsagents.config.secrets.SecretProvider;
 import static de.augmentia.strandsagents.config.ConfigReader.*;
 
 public record LlmConfig(

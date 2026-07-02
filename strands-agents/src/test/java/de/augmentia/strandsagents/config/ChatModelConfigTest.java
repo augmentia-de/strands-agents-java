@@ -42,7 +42,7 @@ class ChatModelConfigTest {
 
         @Test
         void returnsFallbackWhenPrefixHasNoConfig() {
-            var fallback = new ChatModelConfig(ModelProviderType.OPENAI, "sk-fallback", "http://fallback", "gpt-4", 0.5, 3, null, null, null);
+            var fallback = new ChatModelConfig(ModelProviderType.OPENAI, "sk-fallback", "http://fallback", "gpt-4", 0.5, 3, Map.of(), null, null);
             var result = ChatModelConfig.fromEnvWithFallback("NONEXISTENT_", fallback);
             assertThat(result.apiKey()).isEqualTo("sk-fallback");
             assertThat(result.modelName()).isEqualTo("gpt-4");
@@ -53,7 +53,7 @@ class ChatModelConfigTest {
             var prefix = "TEST_PFX_";
             System.setProperty(prefix + "API_KEY", "sk-prefix");
             System.setProperty(prefix + "MODEL", "gpt-4o");
-            var fallback = new ChatModelConfig(ModelProviderType.OPENAI, "sk-fallback", null, "gpt-4", null, null, null, null, null);
+            var fallback = new ChatModelConfig(ModelProviderType.OPENAI, "sk-fallback", null, "gpt-4", null, null, Map.of(), null, null);
             try {
                 var result = ChatModelConfig.fromEnvWithFallback(prefix, fallback);
                 assertThat(result.apiKey()).isEqualTo("sk-prefix");
@@ -76,7 +76,7 @@ class ChatModelConfigTest {
 
         @Test
         void overwritesFallbackWithSecrets() {
-            var fallback = new ChatModelConfig(ModelProviderType.OPENAI, "sk-fallback", "http://fallback", "gpt-4", 0.5, 3, null, null, null);
+            var fallback = new ChatModelConfig(ModelProviderType.OPENAI, "sk-fallback", "http://fallback", "gpt-4", 0.5, 3, Map.of(), null, null);
             var secrets = Map.of(
                 "api_key", "sk-vault",
                 "base_url", "http://vault",
@@ -92,7 +92,7 @@ class ChatModelConfigTest {
 
         @Test
         void keepsFallbackWhenSecretMissing() {
-            var fallback = new ChatModelConfig(ModelProviderType.OPENAI, "sk-fallback", null, "gpt-4", 0.5, null, null, null, null);
+            var fallback = new ChatModelConfig(ModelProviderType.OPENAI, "sk-fallback", null, "gpt-4", 0.5, null, Map.of(), null, null);
             var result = ChatModelConfig.fromVault(Map.of(), fallback);
             assertThat(result.apiKey()).isEqualTo("sk-fallback");
             assertThat(result.modelName()).isEqualTo("gpt-4");
@@ -104,7 +104,7 @@ class ChatModelConfigTest {
 
         @Test
         void withApiKey_returnsNewCopy() {
-            var original = new ChatModelConfig(ModelProviderType.OPENAI, "sk-old", null, "gpt-4", null, null, null, null, null);
+            var original = new ChatModelConfig(ModelProviderType.OPENAI, "sk-old", null, "gpt-4", null, null, Map.of(), null, null);
             var modified = original.withApiKey("sk-new");
             assertThat(modified.apiKey()).isEqualTo("sk-new");
             assertThat(original.apiKey()).isEqualTo("sk-old");
@@ -112,7 +112,7 @@ class ChatModelConfigTest {
 
         @Test
         void withModelName_returnsNewCopy() {
-            var original = new ChatModelConfig(ModelProviderType.OPENAI, "sk-test", null, "gpt-4", null, null, null, null, null);
+            var original = new ChatModelConfig(ModelProviderType.OPENAI, "sk-test", null, "gpt-4", null, null, Map.of(), null, null);
             var modified = original.withModelName("gpt-4o");
             assertThat(modified.modelName()).isEqualTo("gpt-4o");
             assertThat(original.modelName()).isEqualTo("gpt-4");
@@ -124,7 +124,7 @@ class ChatModelConfigTest {
 
         @Test
         void convertsFields() {
-            var cfg = new ChatModelConfig(ModelProviderType.OPENAI, "sk-test", "http://test", "gpt-4", 0.5, 3, null, null, null);
+            var cfg = new ChatModelConfig(ModelProviderType.OPENAI, "sk-test", "http://test", "gpt-4", 0.5, 3, Map.of(), null, null);
             var llm = cfg.toLlmConfig();
             assertThat(llm.apiKey()).isEqualTo("sk-test");
             assertThat(llm.baseUrl()).isEqualTo("http://test");

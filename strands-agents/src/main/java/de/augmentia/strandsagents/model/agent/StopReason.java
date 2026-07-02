@@ -4,5 +4,6 @@ public enum StopReason {
     MAX_ITERATIONS,
     COMPLETED,
     INTERRUPTED,
-    ERROR
+    ERROR,
+    STUCK
 }

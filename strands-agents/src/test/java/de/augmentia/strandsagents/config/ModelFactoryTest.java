@@ -3,6 +3,7 @@ package de.augmentia.strandsagents.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.Map;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
@@ -29,7 +30,7 @@ class ModelFactoryTest {
 
         @Test
         void customProviderIsUsed() {
-            var config = new ChatModelConfig(ModelProviderType.OPENAI, null, null, "test-model", null, null, null, null, null);
+            var config = new ChatModelConfig(ModelProviderType.OPENAI, null, null, "test-model", null, null, Map.of(), null, null);
             ModelFactory.register(ModelProviderType.OPENAI, new CapturingProvider());
             var model = ModelFactory.createChatModel(config);
             assertThat(model).isNotNull();
@@ -37,7 +38,7 @@ class ModelFactoryTest {
 
         @Test
         void nullProviderType_throws() {
-            var config = new ChatModelConfig(null, null, null, null, null, null, null, null, null);
+            var config = new ChatModelConfig(null, null, null, null, null, null, Map.of(), null, null);
             assertThatThrownBy(() -> ModelFactory.createChatModel(config))
                 .isInstanceOf(NullPointerException.class);
         }
@@ -50,8 +51,8 @@ class ModelFactoryTest {
         void createChatModel_usesCorrectTier() {
             ModelFactory.register(ModelProviderType.OPENAI, new CapturingProvider("simple-model"));
             ModelFactory.register(ModelProviderType.OLLAMA, new CapturingProvider("advanced-model"));
-            var simpleCfg = new ChatModelConfig(ModelProviderType.OPENAI, null, null, "simple", null, null, null, null, null);
-            var advancedCfg = new ChatModelConfig(ModelProviderType.OLLAMA, null, null, "advanced", null, null, null, null, null);
+            var simpleCfg = new ChatModelConfig(ModelProviderType.OPENAI, null, null, "simple", null, null, Map.of(), null, null);
+            var advancedCfg = new ChatModelConfig(ModelProviderType.OLLAMA, null, null, "advanced", null, null, Map.of(), null, null);
             var tc = new TieredModelConfig(simpleCfg, advancedCfg, ModelTier.SIMPLE);
             var model = ModelFactory.createChatModel(ModelTier.ADVANCED, tc);
             assertThat(model.toString()).contains("advanced-model");
@@ -70,7 +71,7 @@ class ModelFactoryTest {
                     return null;
                 }
             });
-            var cfg = new ChatModelConfig(ModelProviderType.OPENAI, null, null, "test", null, null, null, null, null);
+            var cfg = new ChatModelConfig(ModelProviderType.OPENAI, null, null, "test", null, null, Map.of(), null, null);
             var tc = new TieredModelConfig(cfg, cfg, ModelTier.SIMPLE);
             var streaming = ModelFactory.createStreamingChatModel(ModelTier.SIMPLE, tc);
             assertThat(streaming).isInstanceOf(SyncToStreamingBridge.class);

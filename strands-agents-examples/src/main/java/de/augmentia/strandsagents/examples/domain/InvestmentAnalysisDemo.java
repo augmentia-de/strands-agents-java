@@ -2,10 +2,12 @@ package de.augmentia.strandsagents.examples.domain;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.augmentia.strandsagents.core.AgentFactory;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.features.swarm.SwarmOrchestrator;
 import de.augmentia.strandsagents.config.AgentConfig;
+import de.augmentia.strandsagents.config.AgentSettings;
 import de.augmentia.strandsagents.config.ModelFactory;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
@@ -48,31 +50,35 @@ public class InvestmentAnalysisDemo {
         ChatModel model = ModelFactory.createOpenAiFromEnv();
 
         // 1. Create specialized agents
-        Agent companyStrategist = AgentConfig.builder()
+        Agent companyStrategist = AgentFactory.buildAgent(AgentSettings.builder()
             .systemPrompt("""
                 You are a Business Strategist. Your task is to analyze the company's business model, 
                 sector position, and competitive advantages. 
                 Identify the core value proposition and market strategy.""")
-            .build()
-            .createAgent(model);
+            .build(),
+            AgentConfig.builder().build(), model);
 
-        Agent financialAnalyst = AgentConfig.builder()
-            .toolRegistry(ToolRegistry.builder().with(new FinancialTools()).build())
+        Agent financialAnalyst = AgentFactory.buildAgent(AgentSettings.builder()
             .systemPrompt("""
                 You are a Senior Financial Analyst. Your task is to assess the company's financial health.
                 Use the 'get_financial_metrics' tool to gather data. 
                 Analyze profitability, debt levels, and valuation (P/E, PEG).""")
-            .build()
-            .createAgent(model);
+            .build(),
+            AgentConfig.builder()
+                .toolRegistry(ToolRegistry.builder().with(new FinancialTools()).build())
+                .build(),
+            model);
 
-        Agent marketAnalyst = AgentConfig.builder()
-            .toolRegistry(ToolRegistry.builder().standard().include("web_search").build())
+        Agent marketAnalyst = AgentFactory.buildAgent(AgentSettings.builder()
             .systemPrompt("""
                 You are a Market Sentiment Analyst. Your task is to research recent news and market trends.
                 Use 'web_search' to find current events and public sentiment.
                 Synthesize findings into a market outlook.""")
-            .build()
-            .createAgent(model);
+            .build(),
+            AgentConfig.builder()
+                .toolRegistry(ToolRegistry.builder().standard().include("web_search").build())
+                .build(),
+            model);
 
         // 2. Create the Swarm Orchestrator
         // The orchestrator coordinates handoffs between these specialized roles.

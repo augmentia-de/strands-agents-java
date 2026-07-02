@@ -1,11 +1,11 @@
 package de.augmentia.strandsagents.core;
 
-import de.augmentia.strandsagents.features.conversation.ConversationManager;
-import de.augmentia.strandsagents.features.sessions.SessionManager;
+import de.augmentia.strandsagents.core.conversation.ConversationManager;
+import de.augmentia.strandsagents.core.sessions.SessionManager;
 import de.augmentia.strandsagents.model.agent.AgentResult;
 import de.augmentia.strandsagents.model.event.TokenEvent;
-import de.augmentia.strandsagents.features.plugin.Plugin;
-import de.augmentia.strandsagents.features.resilience.ResilienceConfig;
+import de.augmentia.strandsagents.interceptor.plugin.Plugin;
+import de.augmentia.strandsagents.interceptor.resilience.ResilienceConfig;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import java.util.List;
 import dev.langchain4j.model.chat.request.ChatRequest;

@@ -1,7 +1,9 @@
-package de.augmentia.strandsagents.features.structured;
+package de.augmentia.strandsagents.core.structured;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.augmentia.strandsagents.model.structured.StructuredOutputConfig;
+import de.augmentia.strandsagents.model.structured.StructuredOutputMode;
 import org.junit.jupiter.api.Test;
 
 class StructuredOutputConfigTest {

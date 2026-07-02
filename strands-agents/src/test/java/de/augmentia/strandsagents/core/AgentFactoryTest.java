@@ -3,12 +3,10 @@ package de.augmentia.strandsagents.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.augmentia.strandsagents.config.StrandsAgentConfig;
-import de.augmentia.strandsagents.features.conversation.ConversationManager;
-import de.augmentia.strandsagents.features.guardrails.GuardrailPlugin;
-import de.augmentia.strandsagents.features.plugin.Plugin;
-import de.augmentia.strandsagents.features.tools.ListToolsTool;
-import de.augmentia.strandsagents.model.tool.ToolExecutionResult;
-import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import de.augmentia.strandsagents.core.conversation.ConversationManager;
+import de.augmentia.strandsagents.interceptor.guardrails.GuardrailPlugin;
+import de.augmentia.strandsagents.interceptor.plugin.Plugin;
+
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -44,7 +42,7 @@ class AgentFactoryTest {
         var config = new StrandsAgentConfig(
             "skills", ".sessions", true, "logs/llm.log", List.of(),
             true, true, "config.json", "", false, true,
-            "de.augmentia.strandsagents.features.tools.CalculatorTool", "", "");
+            "de.augmentia.strandsagents.tools.builtin.CalculatorTool", "", "");
         var registry = AgentFactory.createToolRegistry(config);
         assertThat(registry.getToolNames()).contains("add");
     }

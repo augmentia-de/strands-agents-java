@@ -41,7 +41,7 @@ class StrandsAgentBuilderTest {
         props.setProperty("strands.agent.system-prompt", "Props-based prompt");
         props.setProperty("strands.agent.max-iterations", "20");
         props.setProperty("strands.agent.max-messages", "50");
-        props.setProperty("strands.agent.tools", "de.augmentia.strandsagents.features.tools.WebSearchTool");
+        props.setProperty("strands.agent.tools", "de.augmentia.strandsagents.tools.builtin.WebSearchTool");
         props.setProperty("strands.agent.skills.dir", "/opt/skills");
         props.setProperty("strands.agent.ollama.base-url", "http://ollama:11434");
 
@@ -117,7 +117,7 @@ class StrandsAgentBuilderTest {
     @Test
     void withTool_shouldAddToolNameToRegistry() {
         var agent = (DefaultStrandsAgent) StrandsAgent.builder()
-            .withTool("de.augmentia.strandsagents.features.tools.WebSearchTool")
+            .withTool("de.augmentia.strandsagents.tools.builtin.WebSearchTool")
             .build();
 
         var registry = agent.getDelegate().getToolRegistry();
@@ -154,13 +154,13 @@ class StrandsAgentBuilderTest {
     void programmaticTools_shouldBeAddedToJsonTools() {
         var json = """
             {
-                "tools": ["de.augmentia.strandsagents.features.tools.WebSearchTool"]
+                "tools": ["de.augmentia.strandsagents.tools.builtin.WebSearchTool"]
             }
             """;
 
         var agent = (DefaultStrandsAgent) StrandsAgent.builder()
             .fromJson(json)
-            .withTool("de.augmentia.strandsagents.features.tools.WebFetchTool")
+            .withTool("de.augmentia.strandsagents.tools.builtin.WebFetchTool")
             .build();
 
         var registry = agent.getDelegate().getToolRegistry();

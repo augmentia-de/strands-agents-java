@@ -6,6 +6,7 @@ import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 
 import java.util.Map;
+import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +73,7 @@ public class ModelFactory {
             config.modelName(),
             config.temperature(),
             config.maxRetries(),
-            null,
+            Map.of(),
             config.logRequests(),
             config.logResponses()
         );
@@ -92,7 +93,7 @@ public class ModelFactory {
             config.modelName(),
             config.temperature(),
             config.maxRetries(),
-            null,
+            Map.of(),
             config.logRequests(),
             config.logResponses()
         );
@@ -181,8 +182,9 @@ public class ModelFactory {
     static class OllamaProvider implements ModelProvider {
         @Override
         public ChatModel createChatModel(ChatModelConfig config) {
-            var ollamaBaseUrl = config.ollamaBaseUrl() != null && !config.ollamaBaseUrl().isBlank()
-                ? config.ollamaBaseUrl() : "http://localhost:11434";
+            var props = config.providerProperties();
+            var ollamaBaseUrl = props != null && props.containsKey("baseUrl")
+                ? props.get("baseUrl") : "http://localhost:11434";
             var modelName = config.modelName() != null && !config.modelName().isBlank()
                 ? config.modelName() : "llama3";
             return dev.langchain4j.model.ollama.OllamaChatModel.builder()
@@ -193,8 +195,9 @@ public class ModelFactory {
 
         @Override
         public StreamingChatModel createStreamingChatModel(ChatModelConfig config) {
-            var ollamaBaseUrl = config.ollamaBaseUrl() != null && !config.ollamaBaseUrl().isBlank()
-                ? config.ollamaBaseUrl() : "http://localhost:11434";
+            var props = config.providerProperties();
+            var ollamaBaseUrl = props != null && props.containsKey("baseUrl")
+                ? props.get("baseUrl") : "http://localhost:11434";
             var modelName = config.modelName() != null && !config.modelName().isBlank()
                 ? config.modelName() : "llama3";
             return dev.langchain4j.model.ollama.OllamaStreamingChatModel.builder()

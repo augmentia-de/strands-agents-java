@@ -3,10 +3,8 @@ package de.augmentia.strandsagents.core;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.augmentia.strandsagents.core.MockChatModel;
-import de.augmentia.strandsagents.core.Agent;
-import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.features.conversation.SummarizingSlidingWindowConversationManager;
+import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.core.conversation.SummarizingSlidingWindowConversationManager;
 import de.augmentia.strandsagents.model.agent.StopReason;
 import de.augmentia.strandsagents.model.message.AssistantMessage;
 import de.augmentia.strandsagents.model.message.Message;
@@ -258,7 +256,7 @@ class ConversationManagerTest {
     @Test
     void agentWithSlidingWindowLimitsHistory() {
         var manager = new SlidingWindowConversationManager(2);
-        var agent = new Agent(new MockChatModel(), new ToolRegistry(), new ToolExecutor(), manager);
+        var agent = new Agent(new MockChatModel(), new ToolRegistry(), new DefaultToolExecutor(), manager);
 
         agent.execute("Frage 1");
         agent.execute("Frage 2");
@@ -271,7 +269,7 @@ class ConversationManagerTest {
     @Test
     void agentWithSlidingWindowWindowOne() {
         var manager = new SlidingWindowConversationManager(1);
-        var agent = new Agent(new MockChatModel(), new ToolRegistry(), new ToolExecutor(), manager);
+        var agent = new Agent(new MockChatModel(), new ToolRegistry(), new DefaultToolExecutor(), manager);
 
         agent.execute("Frage 1");
         agent.execute("Frage 2");
@@ -286,7 +284,7 @@ class ConversationManagerTest {
     void agentWithHybridProducesSummary() {
         var summarizer = new MockChatModel();
         var manager = new SummarizingSlidingWindowConversationManager(summarizer, 5, 3);
-        var agent = new Agent(new MockChatModel(), new ToolRegistry(), new ToolExecutor(), manager);
+        var agent = new Agent(new MockChatModel(), new ToolRegistry(), new DefaultToolExecutor(), manager);
 
         agent.execute("Dies ist eine sehr lange erste Nachricht, die viele Token verbraucht.");
         agent.execute("Dies ist eine weitere lange Nachricht, die hoffentlich das Limit ueberschreitet.");
@@ -313,7 +311,7 @@ class ConversationManagerTest {
 
     @Test
     void agentWithNullConversationManagerWorks() {
-        var agent = new Agent(new MockChatModel(), new ToolRegistry(), new ToolExecutor(), null);
+        var agent = new Agent(new MockChatModel(), new ToolRegistry(), new DefaultToolExecutor(), null);
 
         var result = agent.execute("Test");
 

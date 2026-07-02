@@ -1,12 +1,11 @@
 package de.augmentia.strandsagents.examples.feature;
 
-import de.augmentia.strandsagents.features.secrets.CompositeSecretProvider;
-import de.augmentia.strandsagents.features.secrets.FileSecretProvider;
-import de.augmentia.strandsagents.features.secrets.SecretProvider;
+import de.augmentia.strandsagents.config.vault.CompositeSecretProvider;
+import de.augmentia.strandsagents.config.vault.FileSecretProvider;
+import de.augmentia.strandsagents.config.secrets.SecretProvider;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 
 public class SecretVaultDemo {

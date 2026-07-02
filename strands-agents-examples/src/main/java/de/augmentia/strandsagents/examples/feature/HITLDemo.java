@@ -1,15 +1,15 @@
 package de.augmentia.strandsagents.examples.feature;
 
+import de.augmentia.strandsagents.core.DefaultToolExecutor;
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.config.ModelFactory;
-import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.features.pipeline.HookRegistry;
+import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.model.agent.AgentResult;
-import de.augmentia.strandsagents.features.plugin.Plugin;
-import de.augmentia.strandsagents.features.hitl.HITLAuthority;
-import de.augmentia.strandsagents.features.hitl.HITLPlugin;
+import de.augmentia.strandsagents.interceptor.plugin.Plugin;
+import de.augmentia.strandsagents.interceptor.hitl.HITLAuthority;
+import de.augmentia.strandsagents.interceptor.hitl.HITLPlugin;
 import dev.langchain4j.model.chat.ChatModel;
 
 import java.util.List;
@@ -25,10 +25,10 @@ public class HITLDemo {
 
         ToolRegistry toolRegistry = ToolRegistry.builder()
             .standard()
-            .with("de.augmentia.strandsagents.features.tools.CalculatorTool")
+            .with("de.augmentia.strandsagents.tools.builtin.CalculatorTool")
             .build();
 
-        ToolExecutor toolExecutor = new ToolExecutor();
+        ToolExecutor toolExecutor = new DefaultToolExecutor();
         var conversationManager = new SlidingWindowConversationManager(10);
 
         var hitlPlugin = new HITLPlugin(

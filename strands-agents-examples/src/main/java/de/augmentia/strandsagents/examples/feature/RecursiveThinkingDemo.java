@@ -2,8 +2,8 @@ package de.augmentia.strandsagents.examples.feature;
 
 
 import de.augmentia.strandsagents.core.Agent;
-import de.augmentia.strandsagents.features.subagent.SubAgentExecutor;
-import de.augmentia.strandsagents.features.subagent.SubAgentResult;
+import de.augmentia.strandsagents.core.subagent.SubAgentExecutor;
+import de.augmentia.strandsagents.core.subagent.SubAgentResult;
 import de.augmentia.strandsagents.config.ModelFactory;
 
 import java.util.ArrayList;

@@ -2,9 +2,11 @@ package de.augmentia.strandsagents.examples.domain;
 
 
 import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.core.AgentFactory;
 import de.augmentia.strandsagents.config.AgentConfig;
-import de.augmentia.strandsagents.features.guardrails.GuardrailPlugin;
-import de.augmentia.strandsagents.features.guardrails.GuardrailResult;
+import de.augmentia.strandsagents.config.AgentSettings;
+import de.augmentia.strandsagents.interceptor.guardrails.GuardrailPlugin;
+import de.augmentia.strandsagents.interceptor.guardrails.GuardrailResult;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 
@@ -41,7 +43,7 @@ public class LibraryAgentDemo {
         );
 
         // 3. Create the agent using AgentConfig
-        Agent agent = AgentConfig.builder()
+        Agent agent = AgentFactory.buildAgent(AgentSettings.builder()
             .systemPrompt("You are a Senior Library Services Assistant. Your primary responsibility is to " +
                 "process book renewal requests while strictly adhering to the Standard Operating Procedure (SOP).\n\n" +
                 "**MANDATORY WORKFLOW:**\n" +
@@ -50,9 +52,10 @@ public class LibraryAgentDemo {
                 "3. **Execution:** Only attempt 'renewBook' after both identity and status have been confirmed.\n\n" +
                 "Do not bypass these steps. If a patron presents a book ID that doesn't match the status check, " +
                 "you must halt and re-verify.")
-            .plugins(List.of(steeringGuardrail))
-            .build()
-            .createAgent();
+            .build(),
+            AgentConfig.builder()
+                .plugins(List.of(steeringGuardrail))
+                .build());
 
         agent.getToolRegistry().register(tools);
 

@@ -1,17 +1,17 @@
 package de.augmentia.strandsagents.examples.domain;
 
-import de.augmentia.strandsagents.core.ToolExecutor;
+import de.augmentia.strandsagents.core.DefaultToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.StreamingAgent;
 import de.augmentia.strandsagents.config.ModelFactory;
-import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.model.agent.AgentResult;
 import de.augmentia.strandsagents.model.agent.AgentState;
 import de.augmentia.strandsagents.model.agent.AgentStatus;
 import de.augmentia.strandsagents.model.agent.StopReason;
 import de.augmentia.strandsagents.model.session.Session;
-import de.augmentia.strandsagents.features.sessions.FileSessionManager;
-import de.augmentia.strandsagents.features.sessions.SessionManager;
+import de.augmentia.strandsagents.core.sessions.FileSessionManager;
+import de.augmentia.strandsagents.core.sessions.SessionManager;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import org.slf4j.Logger;
@@ -54,7 +54,7 @@ public class SDLCWorkflowDemo {
 
         // Initialize agent with an empty registry; tools will be set dynamically per phase
         ToolRegistry registry = new ToolRegistry();
-        this.agent = new StreamingAgent(streamingModel, registry, new ToolExecutor(), new SlidingWindowConversationManager(8192), sessionManager);
+        this.agent = new StreamingAgent(streamingModel, registry, new DefaultToolExecutor(), new SlidingWindowConversationManager(8192), sessionManager);
         logger.info("StreamingAgent initialized for session: {}", sessionId);
 
         this.agent.addEventListener(event -> {

@@ -6,8 +6,8 @@
     "maxMessages": 25,
     "provider": "OPENAI",
     "tools": [
-        "de.augmentia.strandsagents.features.tools.WebSearchTool",
-        "de.augmentia.strandsagents.features.tools.WebFetchTool"
+        "de.augmentia.strandsagents.tools.WebSearchTool",
+        "de.augmentia.strandsagents.tools.WebFetchTool"
     ],
     "resilience": {
         "retry": {

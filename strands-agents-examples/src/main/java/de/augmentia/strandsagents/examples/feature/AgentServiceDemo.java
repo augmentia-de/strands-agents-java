@@ -1,11 +1,9 @@
 package de.augmentia.strandsagents.examples.feature;
 
-import de.augmentia.strandsagents.core.MockChatModel;
-import de.augmentia.strandsagents.core.Agent;
-import de.augmentia.strandsagents.features.service.AgentService;
-import de.augmentia.strandsagents.features.hitl.checkpoint.CheckpointService;
-import de.augmentia.strandsagents.features.hitl.checkpoint.SSEChannel;
-import de.augmentia.strandsagents.features.sessions.SessionManager;
+import de.augmentia.strandsagents.core.service.AgentService;
+import de.augmentia.strandsagents.interceptor.hitl.checkpoint.CheckpointService;
+import de.augmentia.strandsagents.interceptor.hitl.checkpoint.SSEChannel;
+import de.augmentia.strandsagents.core.sessions.SessionManager;
 import de.augmentia.strandsagents.model.api.*;
 import de.augmentia.strandsagents.model.agent.StopReason;
 

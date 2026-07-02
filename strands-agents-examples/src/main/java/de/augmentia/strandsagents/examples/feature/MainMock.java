@@ -1,12 +1,14 @@
 package de.augmentia.strandsagents.examples.feature;
 
 
-import de.augmentia.strandsagents.core.ToolExecutor;
+import de.augmentia.strandsagents.core.AgentFactory;
+import de.augmentia.strandsagents.core.DefaultToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.Agent;
-import de.augmentia.strandsagents.features.subagent.SubAgentTool;
+import de.augmentia.strandsagents.core.subagent.SubAgentTool;
 import de.augmentia.strandsagents.features.swarm.SwarmOrchestrator;
 import de.augmentia.strandsagents.config.AgentConfig;
+import de.augmentia.strandsagents.config.AgentSettings;
 import de.augmentia.strandsagents.model.event.*;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
@@ -34,10 +36,10 @@ public class MainMock {
         System.out.println("─── 1. Basis: Events + Tools + Sessions ───");
 
         var registry = ToolRegistry.builder()
-            .with("de.augmentia.strandsagents.features.tools.CalculatorTool")
+            .with("de.augmentia.strandsagents.tools.builtin.CalculatorTool")
             .build();
         var model = new DemoMockModel();
-        var agent = new Agent(model, registry, new ToolExecutor());
+        var agent = new Agent(model, registry, new DefaultToolExecutor());
         agent.setEventListener(event -> {
             switch (event) {
                 case AgentStartedEvent e -> System.out.println("  [EVENT] Started");
@@ -80,7 +82,7 @@ public class MainMock {
         System.out.println("  Registrierte Tools: " + registry.getToolNames());
 
         var parentModel = new DemoMockModel();
-        var parentAgent = new Agent(parentModel, registry, new ToolExecutor());
+        var parentAgent = new Agent(parentModel, registry, new DefaultToolExecutor());
         var result = parentAgent.execute("Research the weather");
         System.out.println("  Parent-Agent: " + result.finalAnswer());
         System.out.println();
@@ -117,25 +119,27 @@ public class MainMock {
     static void demoAgentConfig() {
         System.out.println("─── 4. Config: AgentConfig + ToolRegistry.Builder ───");
 
-        var config = AgentConfig.builder()
+        var settings = AgentSettings.builder()
             .name("research-agent")
             .modelName("openai/gpt-4o")
             .systemPrompt("You are a research agent.")
+            .maxIterations(15)
+            .build();
+        var infra = AgentConfig.builder()
             .toolRegistry(ToolRegistry.builder()
                 .standard()
                 .include("bash", "read", "ls")
                 .build())
-            .maxIterations(15)
             .build();
 
-        System.out.println("  Name: " + config.name());
-        System.out.println("  Model: " + config.modelName());
-        System.out.println("  SystemPrompt: " + config.systemPrompt());
-        System.out.println("  Tools: " + config.toolRegistry().getToolNames());
-        System.out.println("  MaxIterations: " + config.maxIterations());
+        System.out.println("  Name: " + settings.name());
+        System.out.println("  Model: " + settings.modelName());
+        System.out.println("  SystemPrompt: " + settings.systemPrompt());
+        System.out.println("  Tools: " + infra.toolRegistry().getToolNames());
+        System.out.println("  MaxIterations: " + settings.maxIterations());
 
-        var agent = config.createAgent(new DemoMockModel());
-        System.out.println("  Agent created via config.createAgent(model)");
+        var agent = AgentFactory.buildAgent(settings, infra, new DemoMockModel());
+        System.out.println("  Agent created via AgentFactory.buildAgent(settings, infra, model)");
 
         var result = agent.execute("Hallo");
         System.out.println("  Agent: " + result.finalAnswer());

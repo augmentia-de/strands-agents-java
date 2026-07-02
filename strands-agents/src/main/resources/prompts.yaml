@@ -150,6 +150,7 @@ prompts:
   # ============================================================
   agent.llm_error: "LLM error: %s"
   agent.max_iterations: "Maximum iterations reached"
+  agent.stuck: "Stuck-state detected — repeated identical tool calls"
   agent.hook_cancelled: "Hook cancelled: %s"
 
   # ============================================================

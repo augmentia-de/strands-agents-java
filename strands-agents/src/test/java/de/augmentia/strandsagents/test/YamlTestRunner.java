@@ -4,23 +4,23 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.core.MockChatModel;
-import de.augmentia.strandsagents.core.ToolExecutor;
+import de.augmentia.strandsagents.core.DefaultToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.features.guardrails.BlockAction;
-import de.augmentia.strandsagents.features.guardrails.GuardrailPlugin;
-import de.augmentia.strandsagents.features.plugin.Plugin;
-import de.augmentia.strandsagents.features.resilience.CircuitBreakerConfig;
-import de.augmentia.strandsagents.features.resilience.ResilienceConfig;
-import de.augmentia.strandsagents.features.resilience.RetryConfig;
-import de.augmentia.strandsagents.features.structured.StructuredOutputConfig;
-import de.augmentia.strandsagents.features.tools.CalculatorTool;
-import de.augmentia.strandsagents.features.tools.TimeTool;
-import de.augmentia.strandsagents.features.tools.WebSearchTool;
+import de.augmentia.strandsagents.core.conversation.ConversationManager;
+import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.interceptor.guardrails.BlockAction;
+import de.augmentia.strandsagents.interceptor.guardrails.GuardrailPlugin;
+import de.augmentia.strandsagents.interceptor.plugin.Plugin;
+import de.augmentia.strandsagents.interceptor.resilience.CircuitBreakerConfig;
+import de.augmentia.strandsagents.interceptor.resilience.ResilienceConfig;
+import de.augmentia.strandsagents.interceptor.resilience.RetryConfig;
+import de.augmentia.strandsagents.model.structured.StructuredOutputConfig;
+import de.augmentia.strandsagents.tools.builtin.CalculatorTool;
+import de.augmentia.strandsagents.tools.builtin.TimeTool;
+import de.augmentia.strandsagents.tools.builtin.WebSearchTool;
 import de.augmentia.strandsagents.model.agent.StopReason;
-import de.augmentia.strandsagents.test.TestConfig.*;
 import dev.langchain4j.model.chat.ChatModel;
-import dev.langchain4j.store.memory.chat.ChatMemoryStore;
+
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -63,7 +63,7 @@ public class YamlTestRunner {
             var plugins = createPlugins(config);
             var resilienceConfig = createResilienceConfig(config);
 
-            var agent = new Agent(model, toolRegistry, new ToolExecutor(),
+            var agent = new Agent(model, toolRegistry, new DefaultToolExecutor(),
                 conversationManager, null, null, resilienceConfig, plugins);
             if (config.systemPrompt() != null && !config.systemPrompt().isBlank()) {
                 agent.setSystemPrompt(config.systemPrompt());
@@ -186,7 +186,7 @@ public class YamlTestRunner {
         return registry;
     }
 
-    private static de.augmentia.strandsagents.features.conversation.ConversationManager createConversationManager(TestConfig config) {
+    private static ConversationManager createConversationManager(TestConfig config) {
         var cc = config.conversation();
         if (cc == null || cc.type() == null) return null;
         if ("sliding".equalsIgnoreCase(cc.type())) {

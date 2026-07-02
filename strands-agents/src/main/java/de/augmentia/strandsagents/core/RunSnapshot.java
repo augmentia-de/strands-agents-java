@@ -1,8 +1,9 @@
 package de.augmentia.strandsagents.core;
 
-import de.augmentia.strandsagents.features.pipeline.HookRegistry;
-import de.augmentia.strandsagents.features.skills.Skill;
-import de.augmentia.strandsagents.features.structured.StructuredOutputConfig;
+
+import de.augmentia.strandsagents.interceptor.pipeline.HookRegistry;
+import de.augmentia.strandsagents.skills.Skill;
+import de.augmentia.strandsagents.model.structured.StructuredOutputConfig;
 import java.util.List;
 
 /**

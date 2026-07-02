@@ -1,15 +1,13 @@
 package de.augmentia.strandsagents.examples.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.augmentia.strandsagents.features.pipeline.AgentHook;
-import de.augmentia.strandsagents.features.pipeline.HookContexts;
-import de.augmentia.strandsagents.features.pipeline.HookResult;
+import de.augmentia.strandsagents.interceptor.pipeline.AgentHook;
+import de.augmentia.strandsagents.interceptor.pipeline.HookContexts;
+import de.augmentia.strandsagents.interceptor.pipeline.HookResult;
 import de.augmentia.strandsagents.model.message.SystemMessage;
-import dev.langchain4j.agent.tool.ToolSpecification;
+
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 

@@ -4,15 +4,17 @@ import java.lang.reflect.Method;
 import java.util.Map;
 
 import de.augmentia.strandsagents.core.*;
-import de.augmentia.strandsagents.features.subagent.SubAgentTool;
-import de.augmentia.strandsagents.features.swarm.SwarmOrchestrator;
+import de.augmentia.strandsagents.core.subagent.SubAgentTool;
+
 import de.augmentia.strandsagents.config.AgentConfig;
+import de.augmentia.strandsagents.config.AgentSettings;
 import de.augmentia.strandsagents.config.ModelFactory;
+import de.augmentia.strandsagents.features.swarm.SwarmOrchestrator;
 import de.augmentia.strandsagents.model.event.ToolExecutionFinishedEvent;
 import de.augmentia.strandsagents.model.event.ToolExecutionStartedEvent;
 
 import dev.langchain4j.model.chat.ChatModel;
-import de.augmentia.strandsagents.features.tools.CalculatorTool;
+import de.augmentia.strandsagents.tools.builtin.CalculatorTool;
 
 public class SwarmDemo {
 
@@ -40,23 +42,27 @@ public class SwarmDemo {
     void demoOrchestrator(ChatModel model) {
         System.out.println("── Pattern A: Orchestrator-based ────");
 
-        var researchAgent = AgentConfig.builder()
-            .toolRegistry(ToolRegistry.builder().standard().include("web_search", "web_fetch").build())
+        var researchAgent = AgentFactory.buildAgent(AgentSettings.builder()
             .systemPrompt("""
                 You are a market research analyst. Research the given topic thoroughly.
                 Use web_search and web_fetch to gather current data.
                 Always conclude with a clear summary of your findings.""")
-            .build()
-            .createAgent(model);
+            .build(),
+            AgentConfig.builder()
+                .toolRegistry(ToolRegistry.builder().standard().include("web_search", "web_fetch").build())
+                .build(),
+            model);
 
-        var financeAgent = AgentConfig.builder()
-            .toolRegistry(ToolRegistry.builder().with(new CalculatorTool()).build())
+        var financeAgent = AgentFactory.buildAgent(AgentSettings.builder()
             .systemPrompt("""
                 You are a senior financial analyst. Analyze data and produce
                 financial projections, ROI estimates, and risk assessments.
                 Use the calculator tool for precise computations.""")
-            .build()
-            .createAgent(model);
+            .build(),
+            AgentConfig.builder()
+                .toolRegistry(ToolRegistry.builder().with(new CalculatorTool()).build())
+                .build(),
+            model);
 
         var orchestrator = new SwarmOrchestrator(
             Map.of("research", researchAgent, "finance", financeAgent),
@@ -95,31 +101,35 @@ public class SwarmDemo {
         }
 
         // Sub-agent: financial analyst with CalculatorTool
-        var financeAgent = AgentConfig.builder()
-            .toolRegistry(ToolRegistry.builder().with(new CalculatorTool()).build())
+        var financeAgent = AgentFactory.buildAgent(AgentSettings.builder()
             .systemPrompt("""
                 You are a Senior Financial Analyst.
                 Your expertise covers quantitative modeling, ROI projections,
                 and risk assessment. Use the calculator for precise numbers.""")
-            .build()
-            .createAgent(model);
+            .build(),
+            AgentConfig.builder()
+                .toolRegistry(ToolRegistry.builder().with(new CalculatorTool()).build())
+                .build(),
+            model);
 
         var financeTool = new SubAgentTool(financeAgent, "finance_expert",
             "Delegate complex financial calculations or ROI analysis.");
 
         // Parent agent: researcher with web tools + finance_expert as tool
-        var researcher = AgentConfig.builder()
-            .toolRegistry(ToolRegistry.builder()
-                .standard().include("web_search", "web_fetch")
-                .build())
+        var researcher = AgentFactory.buildAgent(AgentSettings.builder()
             .systemPrompt("""
                 You are an expert Market Researcher.
                 Research topics thoroughly using web_search and web_fetch.
                 If you encounter financial data, ROI calculations, or complex
                 modeling, delegate to the 'finance_expert' tool.
                 Always produce a final consolidated report.""")
-            .build()
-            .createAgent(model);
+            .build(),
+            AgentConfig.builder()
+                .toolRegistry(ToolRegistry.builder()
+                    .standard().include("web_search", "web_fetch")
+                    .build())
+                .build(),
+            model);
 
         researcher.getToolRegistry().register("finance_expert", financeTool, executeMethod);
 

@@ -1,10 +1,13 @@
 package de.augmentia.strandsagents.facade;
 
-import de.augmentia.strandsagents.features.gdpr.AuditTrailHook;
-import de.augmentia.strandsagents.features.gdpr.GdprAgentPlugin;
-import de.augmentia.strandsagents.features.gdpr.PiiAnonymizerHook;
-import de.augmentia.strandsagents.features.plugin.Plugin;
-import de.augmentia.strandsagents.features.sessions.SessionManager;
+
+import de.augmentia.strandsagents.interceptor.gdpr.AuditTrailHook;
+import de.augmentia.strandsagents.interceptor.gdpr.GdprAgentPlugin;
+import de.augmentia.strandsagents.interceptor.gdpr.PiiAnonymizerHook;
+import de.augmentia.strandsagents.interceptor.plugin.Plugin;
+import de.augmentia.strandsagents.core.sessions.SessionManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -108,6 +111,7 @@ public class GDPRAgentBuilder {
     }
 
     public static class FileAuditStore implements AuditTrailHook.AuditStore {
+        private static final Logger log = LoggerFactory.getLogger(FileAuditStore.class);
         private final Path dir;
         public FileAuditStore(Path dir) { this.dir = dir; }
         @Override
@@ -139,16 +143,21 @@ public class GDPRAgentBuilder {
                         .filter(f -> f.toString().endsWith(".json"))
                         .map(f -> {
                             try { return mapper.readValue(f.toFile(), AuditTrailHook.AuditEntry.class); }
-                            catch (Exception e) { return null; }
+                            catch (Exception e) { 
+                                log.warn("Failed to read audit entry: " + f, e);
+                                return null; 
+                            }
                         })
                         .filter(Objects::nonNull)
                         .sorted(Comparator.comparing(AuditTrailHook.AuditEntry::timestamp))
                         .toList();
                 }
             } catch (Exception e) {
+                log.error("Failed to list audit entries", e);
                 return List.of();
             }
         }
+
         @Override
         public boolean verifyChain() {
             var entries = findAll();

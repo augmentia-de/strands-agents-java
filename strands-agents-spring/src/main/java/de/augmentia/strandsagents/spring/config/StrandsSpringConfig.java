@@ -1,5 +1,6 @@
 package de.augmentia.strandsagents.spring.config;
 
+import de.augmentia.strandsagents.core.DefaultToolExecutor;
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.config.LlmConfig;
@@ -35,7 +36,7 @@ public class StrandsSpringConfig {
 
     @Bean
     public ToolExecutor toolExecutor() {
-        return new ToolExecutor();
+        return new DefaultToolExecutor();
     }
 
     @Bean

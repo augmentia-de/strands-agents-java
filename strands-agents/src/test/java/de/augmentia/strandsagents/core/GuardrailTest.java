@@ -3,13 +3,11 @@ package de.augmentia.strandsagents.core;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.augmentia.strandsagents.core.MockChatModel;
-import de.augmentia.strandsagents.core.Agent;
+import de.augmentia.strandsagents.interceptor.guardrails.*;
 import de.augmentia.strandsagents.model.agent.StopReason;
 
 import java.util.List;
 
-import de.augmentia.strandsagents.features.guardrails.*;
 import org.junit.jupiter.api.Test;
 
 class GuardrailTest {
@@ -52,7 +50,7 @@ class GuardrailTest {
         var plugin = new GuardrailPlugin(List.of(blockingGuard), List.of(), BlockAction.THROW, "");
 
         var model = new MockChatModel();
-        var agent = new Agent(model, new ToolRegistry(), new ToolExecutor(), null, null, null,
+        var agent = new Agent(model, new ToolRegistry(), new DefaultToolExecutor(), null, null, null,
             List.of(plugin));
 
         assertThatThrownBy(() -> agent.execute("test"))
@@ -67,7 +65,7 @@ class GuardrailTest {
             "Anfrage abgelehnt.");
 
         var model = new MockChatModel();
-        var agent = new Agent(model, new ToolRegistry(), new ToolExecutor(), null, null, null,
+        var agent = new Agent(model, new ToolRegistry(), new DefaultToolExecutor(), null, null, null,
             List.of(plugin));
 
         var result = agent.execute("test");
@@ -83,7 +81,7 @@ class GuardrailTest {
             "fallback");
 
         var model = new MockChatModel();
-        var agent = new Agent(model, new ToolRegistry(), new ToolExecutor(), null, null, null,
+        var agent = new Agent(model, new ToolRegistry(), new DefaultToolExecutor(), null, null, null,
             List.of(plugin));
 
         var result = agent.execute("test");
@@ -98,7 +96,7 @@ class GuardrailTest {
         var plugin = new GuardrailPlugin(List.of(), List.of(sanitizingGuard), BlockAction.THROW, "");
 
         var model = new MockChatModel();
-        var agent = new Agent(model, new ToolRegistry(), new ToolExecutor(), null, null, null,
+        var agent = new Agent(model, new ToolRegistry(), new DefaultToolExecutor(), null, null, null,
             List.of(plugin));
 
         assertThatThrownBy(() -> agent.execute("test"))
@@ -114,7 +112,7 @@ class GuardrailTest {
             "standard fallback");
 
         var model = new MockChatModel();
-        var agent = new Agent(model, new ToolRegistry(), new ToolExecutor(), null, null, null,
+        var agent = new Agent(model, new ToolRegistry(), new DefaultToolExecutor(), null, null, null,
             List.of(plugin));
 
         var result = agent.execute("test");

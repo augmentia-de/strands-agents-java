@@ -1,6 +1,12 @@
 package de.augmentia.strandsagents.quarkus.service;
 
-import de.augmentia.strandsagents.features.tools.*;
+import de.augmentia.strandsagents.skills.CapabilitySearchTool;
+import de.augmentia.strandsagents.skills.McpIngestTool;
+import de.augmentia.strandsagents.skills.McpListTool;
+import de.augmentia.strandsagents.skills.SkillSearchTool;
+import de.augmentia.strandsagents.tools.ListToolsTool;
+import de.augmentia.strandsagents.tools.builtin.*;
+import de.augmentia.strandsagents.tools.mcp.McpClientFactory;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection(targets = {
@@ -87,21 +93,21 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
     GrepTool.Params.class,
     FindTool.class,
     FindTool.Params.class,
-    de.augmentia.strandsagents.features.tools.ListToolsTool.class,
-    de.augmentia.strandsagents.features.tools.ListToolsTool.Params.class,
+    ListToolsTool.class,
+    ListToolsTool.Params.class,
     WebFetchTool.class,
     WebFetchTool.Params.class,
     WebSearchTool.class,
     WebSearchTool.Params.class,
-    de.augmentia.strandsagents.features.mcp.McpClientFactory.class,
-    de.augmentia.strandsagents.features.skills.McpListTool.class,
-    de.augmentia.strandsagents.features.skills.McpListTool.Params.class,
-    de.augmentia.strandsagents.features.skills.McpIngestTool.class,
-    de.augmentia.strandsagents.features.skills.McpIngestTool.Params.class,
-    de.augmentia.strandsagents.features.skills.CapabilitySearchTool.class,
-    de.augmentia.strandsagents.features.skills.CapabilitySearchTool.Params.class,
-    de.augmentia.strandsagents.features.skills.SkillSearchTool.class,
-    de.augmentia.strandsagents.features.skills.SkillSearchTool.Params.class,
+    McpClientFactory.class,
+    McpListTool.class,
+    McpListTool.Params.class,
+    McpIngestTool.class,
+    McpIngestTool.Params.class,
+    CapabilitySearchTool.class,
+    CapabilitySearchTool.Params.class,
+    SkillSearchTool.class,
+    SkillSearchTool.Params.class,
     de.augmentia.strandsagents.model.message.Message.class,
     de.augmentia.strandsagents.model.message.MessageTypeIdResolver.class,
     de.augmentia.strandsagents.model.message.UserMessage.class,

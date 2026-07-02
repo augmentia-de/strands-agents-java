@@ -2,9 +2,13 @@ package de.augmentia.strandsagents.core;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.augmentia.strandsagents.features.security.CapabilityToken;
-import de.augmentia.strandsagents.features.tools.*;
-import de.augmentia.strandsagents.features.tools.ToolCapability;
+import de.augmentia.strandsagents.tools.*;
+import de.augmentia.strandsagents.tools.AgentTool;
+import de.augmentia.strandsagents.tools.TextContent;
+import de.augmentia.strandsagents.tools.ToolCapability;
+import de.augmentia.strandsagents.interceptor.security.CapabilityToken;
+import de.augmentia.strandsagents.tools.ToolResult;
+import de.augmentia.strandsagents.tools.builtin.*;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.agent.tool.ToolSpecifications;
@@ -23,13 +27,36 @@ public class ToolRegistry {
         .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final Map<String, ToolMethod> tools = new LinkedHashMap<>();
+    private List<ToolDescriptionValidator> validators = ToolDescriptionValidator.defaults();
+    private boolean strictValidation = false;
 
     public ToolRegistry() {}
+
+    public void setValidators(List<ToolDescriptionValidator> validators) {
+        this.validators = validators != null ? validators : List.of();
+    }
+
+    public void setStrictValidation(boolean strict) {
+        this.strictValidation = strict;
+    }
+
+    private void validate(ToolSpecification spec) {
+        if (validators == null) return;
+        for (var v : validators) {
+            v.validate(spec).ifPresent(warning -> {
+                if (strictValidation) {
+                    throw new IllegalArgumentException(warning);
+                }
+                log.warn(warning);
+            });
+        }
+    }
 
     public void register(Object toolInstance) {
         for (Method method : toolInstance.getClass().getMethods()) {
             if (method.isAnnotationPresent(Tool.class)) {
                 var spec = ToolSpecifications.toolSpecificationFrom(method);
+                validate(spec);
                 var cap = method.isAnnotationPresent(ToolCapability.class)
                     ? method.getAnnotation(ToolCapability.class).value()
                     : null;
@@ -40,6 +67,7 @@ public class ToolRegistry {
 
     public void register(String name, Object toolInstance, Method method) {
         var spec = ToolSpecifications.toolSpecificationFrom(method);
+        validate(spec);
         var cap = method.isAnnotationPresent(ToolCapability.class)
             ? method.getAnnotation(ToolCapability.class).value()
             : null;
@@ -47,11 +75,13 @@ public class ToolRegistry {
     }
 
     public void register(String name, ToolSpecification spec, ToolMethod toolMethod) {
+        validate(spec);
         tools.put(name, toolMethod);
     }
 
     public void register(AgentTool<?> agentTool) {
         var spec = toToolSpecification(agentTool);
+        validate(spec);
         tools.put(agentTool.name(), new AgentToolMethod(agentTool, spec));
     }
 
@@ -83,7 +113,7 @@ public class ToolRegistry {
         return builder.build();
     }
 
-    private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name, String type, String desc) {
+private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name, String type, String desc) {
         switch (type) {
             case "int", "integer" -> {
                 if (desc != null) b.addIntegerProperty(name, desc);
@@ -114,6 +144,12 @@ public class ToolRegistry {
             throw new IllegalArgumentException("Unknown tool: " + name);
         }
         return tm;
+    }
+
+    private volatile AtomicBoolean sharedAbortFlag = new AtomicBoolean(false);
+
+    void setAbortFlag(AtomicBoolean flag) {
+        this.sharedAbortFlag = flag;
     }
 
     public List<ToolSpecification> getSpecifications() {
@@ -163,13 +199,13 @@ public class ToolRegistry {
 
         String execute(String jsonArguments) throws Exception;
 
-        default de.augmentia.strandsagents.features.security.CapabilityToken requiredCapability() {
+        default CapabilityToken requiredCapability() {
             return null;
         }
     }
 
     record JavaToolMethod(Object instance, Method method, ToolSpecification spec,
-                          de.augmentia.strandsagents.features.security.CapabilityToken requiredCapability)
+                          CapabilityToken requiredCapability)
             implements ToolMethod {
 
         JavaToolMethod(Object instance, Method method, ToolSpecification spec) {
@@ -210,7 +246,20 @@ public class ToolRegistry {
         }
     }
 
-    record AgentToolMethod(AgentTool<?> agentTool, ToolSpecification spec) implements ToolMethod {
+    static final class AgentToolMethod implements ToolMethod {
+        private final AgentTool<?> agentTool;
+        private final ToolSpecification spec;
+        private final AtomicBoolean abortFlag;
+
+        AgentToolMethod(AgentTool<?> agentTool, ToolSpecification spec) {
+            this(agentTool, spec, null);
+        }
+
+        AgentToolMethod(AgentTool<?> agentTool, ToolSpecification spec, AtomicBoolean abortFlag) {
+            this.agentTool = agentTool;
+            this.spec = spec;
+            this.abortFlag = abortFlag;
+        }
 
         @Override
         public ToolSpecification spec() {
@@ -234,8 +283,15 @@ public class ToolRegistry {
                     "Failed to parse arguments for tool '" + agentTool.name() + "': " + e.getMessage(), e);
             }
 
-            AgentTool raw = agentTool;
-            var result = raw.execute(null, params, new AtomicBoolean(false), null);
+            var flag = abortFlag != null ? abortFlag : new AtomicBoolean(false);
+            ToolResult result;
+            try {
+                result = ((AgentTool) agentTool).execute(null, params, flag, null);
+            } catch (InterruptedException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
             var sb = new StringBuilder();
             for (var block : result.content()) {
                 if (block instanceof TextContent t) {
@@ -243,6 +299,9 @@ public class ToolRegistry {
                 } else {
                     sb.append(block.toString());
                 }
+            }
+            if (abortFlag != null && abortFlag.get()) {
+                throw new InterruptedException("Tool execution aborted");
             }
             return sb.toString();
         }

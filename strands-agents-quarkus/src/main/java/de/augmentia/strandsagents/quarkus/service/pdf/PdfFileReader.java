@@ -1,9 +1,8 @@
 package de.augmentia.strandsagents.quarkus.service.pdf;
 
-import de.augmentia.strandsagents.features.tools.FileReader;
-import de.augmentia.strandsagents.features.tools.ReadTool;
-import de.augmentia.strandsagents.features.tools.TextContent;
-import de.augmentia.strandsagents.features.tools.ToolResult;
+import de.augmentia.strandsagents.tools.FileReader;
+import de.augmentia.strandsagents.tools.builtin.ReadTool;
+import de.augmentia.strandsagents.tools.ToolResult;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

@@ -2,11 +2,13 @@ package de.augmentia.strandsagents.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.model.agent.StopReason;
 
-import de.augmentia.strandsagents.features.structured.StructuredOutputConfig;
-import de.augmentia.strandsagents.features.sessions.FileSessionManager;
+import de.augmentia.strandsagents.model.structured.StructuredOutputConfig;
+import de.augmentia.strandsagents.core.sessions.FileSessionManager;
+import de.augmentia.strandsagents.tools.AgentTool;
+import de.augmentia.strandsagents.tools.ToolResult;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
@@ -19,9 +21,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
-import de.augmentia.strandsagents.features.pipeline.AgentHook;
-import de.augmentia.strandsagents.features.pipeline.HookContexts;
-import de.augmentia.strandsagents.features.pipeline.HookResult;
+import de.augmentia.strandsagents.interceptor.pipeline.AgentHook;
+import de.augmentia.strandsagents.interceptor.pipeline.HookContexts;
+import de.augmentia.strandsagents.interceptor.pipeline.HookResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -133,7 +135,7 @@ class AgentTest {
     void slidingWindowPrunesOldMessages() {
         var manager = new SlidingWindowConversationManager(2);
         var agent = new Agent(new MockChatModel("R: %s"),
-            new ToolRegistry(), new ToolExecutor(), manager);
+            new ToolRegistry(), new DefaultToolExecutor(), manager);
 
         agent.execute("Frage 1");
         agent.execute("Frage 2");
@@ -149,7 +151,7 @@ class AgentTest {
     void slidingWindowWithSessionPreservesRecentOnly() {
         var manager = new SlidingWindowConversationManager(1);
         var agent = new Agent(new MockChatModel("R: %s"),
-            new ToolRegistry(), new ToolExecutor(), manager);
+            new ToolRegistry(), new DefaultToolExecutor(), manager);
 
         agent.execute("first");
 
@@ -167,7 +169,7 @@ class AgentTest {
         var sessionManager = new FileSessionManager(tempDir);
         var session = sessionManager.createSession("agent", Map.of());
         var agent = new Agent(new MockChatModel("R: %s"),
-            new ToolRegistry(), new ToolExecutor(), null, sessionManager);
+            new ToolRegistry(), new DefaultToolExecutor(), null, sessionManager);
 
         var result = agent.execute(session.sessionId(), "Hallo");
 
@@ -184,7 +186,7 @@ class AgentTest {
         var sessionManager = new FileSessionManager(tempDir);
         var session = sessionManager.createSession("agent", Map.of());
         var agent = new Agent(new MockChatModel("R: %s"),
-            new ToolRegistry(), new ToolExecutor(), null, sessionManager);
+            new ToolRegistry(), new DefaultToolExecutor(), null, sessionManager);
 
         agent.execute(session.sessionId(), "Erste");
         agent.execute(session.sessionId(), "Zweite");
@@ -302,7 +304,7 @@ class AgentTest {
     void buildRequestIncludesTools() {
         var model = new RecordingChatModel();
         var registry = new ToolRegistry();
-        registry.register(new de.augmentia.strandsagents.features.tools.AgentTool<Object>() {
+        registry.register(new AgentTool<Object>() {
             @Override public String name() { return "my-tool"; }
             @Override public String description() { return "A tool"; }
             @Override public Class<Object> parameterType() { return Object.class; }
@@ -310,13 +312,13 @@ class AgentTest {
                 return com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
             }
             @Override
-            public de.augmentia.strandsagents.features.tools.ToolResult execute(
+            public ToolResult execute(
                     String id, Object p, java.util.concurrent.atomic.AtomicBoolean a,
-                    java.util.function.Consumer<de.augmentia.strandsagents.features.tools.ToolResult> u) {
-                return de.augmentia.strandsagents.features.tools.ToolResult.success("ok");
+                    java.util.function.Consumer<ToolResult> u) {
+                return ToolResult.success("ok");
             }
         });
-        var agent = new Agent(model, registry, new ToolExecutor());
+        var agent = new Agent(model, registry, new DefaultToolExecutor());
 
         agent.execute("use tool");
 
@@ -331,7 +333,7 @@ class AgentTest {
     void toolChangeDetectedWhenToolAddedBetweenTurns() {
         var model = new RecordingChatModel();
         var registry = new ToolRegistry();
-        var tool = new de.augmentia.strandsagents.features.tools.AgentTool<Object>() {
+        var tool = new AgentTool<Object>() {
             @Override public String name() { return "tool-a"; }
             @Override public String description() { return "Tool A"; }
             @Override public Class<Object> parameterType() { return Object.class; }
@@ -339,14 +341,14 @@ class AgentTest {
                 return com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
             }
             @Override
-            public de.augmentia.strandsagents.features.tools.ToolResult execute(
+            public ToolResult execute(
                     String id, Object p, java.util.concurrent.atomic.AtomicBoolean a,
-                    java.util.function.Consumer<de.augmentia.strandsagents.features.tools.ToolResult> u) {
-                return de.augmentia.strandsagents.features.tools.ToolResult.success("ok");
+                    java.util.function.Consumer<ToolResult> u) {
+                return ToolResult.success("ok");
             }
         };
         registry.register(tool);
-        var agent = new Agent(model, registry, new ToolExecutor());
+        var agent = new Agent(model, registry, new DefaultToolExecutor());
 
         // First turn with tool-a only
         agent.execute("first turn");
@@ -358,7 +360,7 @@ class AgentTest {
         assertThat(noticesAfterFirst).as("no tool change notice on first turn").isZero();
 
         // Add a second tool mid-session
-        var toolB = new de.augmentia.strandsagents.features.tools.AgentTool<Object>() {
+        var toolB = new AgentTool<Object>() {
             @Override public String name() { return "tool-b"; }
             @Override public String description() { return "Tool B"; }
             @Override public Class<Object> parameterType() { return Object.class; }
@@ -366,10 +368,10 @@ class AgentTest {
                 return com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
             }
             @Override
-            public de.augmentia.strandsagents.features.tools.ToolResult execute(
+            public ToolResult execute(
                     String id, Object p, java.util.concurrent.atomic.AtomicBoolean a,
-                    java.util.function.Consumer<de.augmentia.strandsagents.features.tools.ToolResult> u) {
-                return de.augmentia.strandsagents.features.tools.ToolResult.success("ok");
+                    java.util.function.Consumer<ToolResult> u) {
+                return ToolResult.success("ok");
             }
         };
         agent.addTool(toolB);
@@ -390,7 +392,7 @@ class AgentTest {
     void toolChangeDetectedWhenToolRemovedBetweenTurns() {
         var model = new RecordingChatModel();
         var registry = new ToolRegistry();
-        var tool = new de.augmentia.strandsagents.features.tools.AgentTool<Object>() {
+        var tool = new AgentTool<Object>() {
             @Override public String name() { return "tool-a"; }
             @Override public String description() { return "Tool A"; }
             @Override public Class<Object> parameterType() { return Object.class; }
@@ -398,14 +400,14 @@ class AgentTest {
                 return com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
             }
             @Override
-            public de.augmentia.strandsagents.features.tools.ToolResult execute(
+            public ToolResult execute(
                     String id, Object p, java.util.concurrent.atomic.AtomicBoolean a,
-                    java.util.function.Consumer<de.augmentia.strandsagents.features.tools.ToolResult> u) {
-                return de.augmentia.strandsagents.features.tools.ToolResult.success("ok");
+                    java.util.function.Consumer<ToolResult> u) {
+                return ToolResult.success("ok");
             }
         };
         registry.register(tool);
-        var agent = new Agent(model, registry, new ToolExecutor());
+        var agent = new Agent(model, registry, new DefaultToolExecutor());
 
         agent.execute("first turn");
 

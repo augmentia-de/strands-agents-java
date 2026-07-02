@@ -1,7 +1,7 @@
 package de.augmentia.strandsagents.secrets.aws;
 
-import de.augmentia.strandsagents.features.secrets.SecretProvider;
-import de.augmentia.strandsagents.features.secrets.SecretProviderFactory;
+import de.augmentia.strandsagents.config.secrets.SecretProvider;
+import de.augmentia.strandsagents.config.secrets.SecretProviderFactory;
 import java.util.Map;
 
 public class AwsSecretProviderFactory implements SecretProviderFactory {

@@ -3,8 +3,8 @@ package de.augmentia.strandsagents.core;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.augmentia.strandsagents.features.security.CapabilityToken;
-import de.augmentia.strandsagents.features.tools.ToolCapability;
+import de.augmentia.strandsagents.interceptor.security.CapabilityToken;
+import de.augmentia.strandsagents.tools.ToolCapability;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import java.util.Set;
@@ -19,7 +19,7 @@ class ToolExecutorCapabilityTest {
     @BeforeEach
     void setUp() {
         registry = new ToolRegistry();
-        executor = new ToolExecutor();
+        executor = new DefaultToolExecutor();
     }
 
     static class SecureTool {

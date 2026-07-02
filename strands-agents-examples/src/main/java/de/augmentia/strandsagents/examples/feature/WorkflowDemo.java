@@ -5,9 +5,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import de.augmentia.strandsagents.core.AgentFactory;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.config.AgentConfig;
+import de.augmentia.strandsagents.config.AgentSettings;
 import de.augmentia.strandsagents.config.ModelFactory;
 import de.augmentia.strandsagents.model.agent.AgentResult;
 
@@ -55,12 +57,14 @@ public class WorkflowDemo {
         // ---------------------------------------------------------------
         System.out.println("[Step 1/4] Research (web_search) ────");
 
-        var researchAgent = AgentConfig.builder()
+        var researchAgent = AgentFactory.buildAgent(AgentSettings.builder()
             .structuredOutputModel(ResearchData.class)
-            .toolRegistry(ToolRegistry.builder().standard().include("web_search", "web_fetch").build())
             .logLlmCalls(Path.of("logs/llm-calls.log"))
-            .build()
-            .createAgent(model);
+            .build(),
+            AgentConfig.builder()
+                .toolRegistry(ToolRegistry.builder().standard().include("web_search", "web_fetch").build())
+                .build(),
+            model);
 
         var r1 = exec(researchAgent,
             "Use the web_search tool to find current information about the topic '" + TOPIC + "'.\n" +
@@ -81,10 +85,10 @@ public class WorkflowDemo {
         // ---------------------------------------------------------------
         System.out.println("[Step 2/4] Draft ────────────────────");
 
-        var draftAgent = AgentConfig.builder()
+        var draftAgent = AgentFactory.buildAgent(AgentSettings.builder()
             .structuredOutputModel(ArticleDraft.class)
-            .build()
-            .createAgent(model);
+            .build(),
+            AgentConfig.builder().build(), model);
 
         var r2 = exec(draftAgent,
             "Write an article draft based on this research data:\n" +
@@ -103,10 +107,10 @@ public class WorkflowDemo {
         // ---------------------------------------------------------------
         System.out.println("[Step 3/4] Review ───────────────────");
 
-        var reviewAgent = AgentConfig.builder()
+        var reviewAgent = AgentFactory.buildAgent(AgentSettings.builder()
             .structuredOutputModel(ReviewFeedback.class)
-            .build()
-            .createAgent(model);
+            .build(),
+            AgentConfig.builder().build(), model);
 
         var r3 = exec(reviewAgent,
             "Review the following article draft:\n" +
@@ -128,11 +132,13 @@ public class WorkflowDemo {
         // ---------------------------------------------------------------
         System.out.println("[Step 4/4] Publish (write tool) ────");
 
-        var publishAgent = AgentConfig.builder()
+        var publishAgent = AgentFactory.buildAgent(AgentSettings.builder()
             .structuredOutputModel(PublishedArticle.class)
-            .toolRegistry(ToolRegistry.builder().standard().include("write").build())
-            .build()
-            .createAgent(model);
+            .build(),
+            AgentConfig.builder()
+                .toolRegistry(ToolRegistry.builder().standard().include("write").build())
+                .build(),
+            model);
 
         var prevDraft  = (ArticleDraft)  state.get("draft");
         var prevReview = (ReviewFeedback) state.get("review");

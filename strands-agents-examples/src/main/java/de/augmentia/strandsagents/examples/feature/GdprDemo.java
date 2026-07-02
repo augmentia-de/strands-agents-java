@@ -3,19 +3,21 @@ package de.augmentia.strandsagents.examples.feature;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.core.MockChatModel;
 import de.augmentia.strandsagents.facade.GDPRAgentBuilder;
-import de.augmentia.strandsagents.facade.StrandsAgent;
-import de.augmentia.strandsagents.features.gdpr.*;
-import de.augmentia.strandsagents.features.gdpr.PiiAnonymizerHook.BlockAction;
-import de.augmentia.strandsagents.features.gdpr.PiiAnonymizerHook.MaskType;
-import de.augmentia.strandsagents.features.pipeline.HookRegistry;
-import de.augmentia.strandsagents.features.plugin.Plugin;
-import de.augmentia.strandsagents.features.sessions.SessionManager;
+import de.augmentia.strandsagents.interceptor.gdpr.*;
+import de.augmentia.strandsagents.interceptor.gdpr.GdprAgentPlugin;
+import de.augmentia.strandsagents.interceptor.gdpr.PiiAnonymizerHook;
+import de.augmentia.strandsagents.interceptor.gdpr.PiiAnonymizerHook.BlockAction;
+import de.augmentia.strandsagents.interceptor.gdpr.PiiAnonymizerHook.MaskType;
+import de.augmentia.strandsagents.interceptor.pipeline.HookRegistry;
+import de.augmentia.strandsagents.core.sessions.SessionManager;
 import de.augmentia.strandsagents.model.message.UserMessage;
-import de.augmentia.strandsagents.features.pipeline.HookContexts;
-import de.augmentia.strandsagents.features.pipeline.HookResult;
+import de.augmentia.strandsagents.interceptor.pipeline.HookContexts;
+import de.augmentia.strandsagents.interceptor.pipeline.HookResult;
+import de.augmentia.strandsagents.tools.feature.GdprDeleteTool;
+import de.augmentia.strandsagents.tools.feature.GdprExportTool;
+
 import java.time.Instant;
 import java.util.*;
-import java.nio.file.Path;
 
 /**
  * Demonstrates all GDPR compliance integration variants.
@@ -134,8 +136,8 @@ public class GdprDemo {
         System.out.println("--- Variante 4: GDPR Export (Art. 20 DSGVO) ---");
 
         var sm = createSessionManager();
-        var tool = new de.augmentia.strandsagents.features.gdpr.tools.GdprExportTool(sm);
-        var params = new de.augmentia.strandsagents.features.gdpr.tools.GdprExportTool.Params("s1");
+        var tool = new GdprExportTool(sm);
+        var params = new GdprExportTool.Params("s1");
 
         try {
             var result = tool.execute("call-1", params, new java.util.concurrent.atomic.AtomicBoolean(false), null);
@@ -150,8 +152,8 @@ public class GdprDemo {
         System.out.println("--- Variante 5: GDPR Delete (Art. 17 DSGVO) ---");
 
         var sm = createSessionManager();
-        var tool = new de.augmentia.strandsagents.features.gdpr.tools.GdprDeleteTool(sm);
-        var params = new de.augmentia.strandsagents.features.gdpr.tools.GdprDeleteTool.Params("s1", false);
+        var tool = new GdprDeleteTool(sm);
+        var params = new GdprDeleteTool.Params("s1", false);
 
         try {
             var result = tool.execute("call-2", params, new java.util.concurrent.atomic.AtomicBoolean(false), null);

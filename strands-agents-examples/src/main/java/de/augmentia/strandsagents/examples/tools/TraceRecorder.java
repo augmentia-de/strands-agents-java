@@ -2,9 +2,9 @@ package de.augmentia.strandsagents.examples.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.augmentia.strandsagents.core.AgentEventListener;
-import de.augmentia.strandsagents.features.pipeline.AgentHook;
-import de.augmentia.strandsagents.features.pipeline.HookContexts;
-import de.augmentia.strandsagents.features.pipeline.HookResult;
+import de.augmentia.strandsagents.interceptor.pipeline.AgentHook;
+import de.augmentia.strandsagents.interceptor.pipeline.HookContexts;
+import de.augmentia.strandsagents.interceptor.pipeline.HookResult;
 import de.augmentia.strandsagents.model.event.AfterInvocationEvent;
 import de.augmentia.strandsagents.model.event.AgentEvent;
 import de.augmentia.strandsagents.model.event.AgentFinishedEvent;

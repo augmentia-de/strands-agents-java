@@ -2,12 +2,12 @@ package de.augmentia.strandsagents.examples;
 
 import de.augmentia.strandsagents.config.LlmConfig;
 import de.augmentia.strandsagents.core.Agent;
-import de.augmentia.strandsagents.core.ToolExecutor;
+import de.augmentia.strandsagents.core.DefaultToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.features.pipeline.HookRegistry;
-import de.augmentia.strandsagents.features.skills.*;
-import de.augmentia.strandsagents.features.tools.ToolActivator;
-import de.augmentia.strandsagents.examples.feature.CachingDemo;
+import de.augmentia.strandsagents.interceptor.pipeline.HookRegistry;
+import de.augmentia.strandsagents.skills.*;
+import de.augmentia.strandsagents.tools.ToolActivator;
+import de.augmentia.strandsagents.examples.hooks.CacheLoggingHook;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
 
@@ -50,7 +50,7 @@ public class SkillDemo {
         // ---- Hooks ----
         var skillActivationHook = new SkillActivationHook(skills);
         var hooks = new HookRegistry();
-        hooks.register(new CachingDemo.CacheLoggingHook());
+        hooks.register(new CacheLoggingHook());
         hooks.register(skillActivationHook);
 
         // ---- Capability registry ----
@@ -75,7 +75,7 @@ public class SkillDemo {
         // ---- Tool registry ----
         var toolRegistry = new ToolRegistry();
         Path ws = Path.of(".").toAbsolutePath();
-        toolRegistry.register(new CapabilitySearchTool(capRegistry, model, new ToolExecutor(), embeddingService));
+        toolRegistry.register(new CapabilitySearchTool(capRegistry, model, new DefaultToolExecutor(), embeddingService));
         toolRegistry.register(new ToolActivator(toolRegistry, ws));
 
         // ---- Skills plugin (injects skill instructions into system prompt) ----

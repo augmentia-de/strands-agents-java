@@ -1,12 +1,12 @@
 package de.augmentia.strandsagents.core;
 
-import de.augmentia.strandsagents.features.routing.LlmRouter;
+import de.augmentia.strandsagents.core.routing.LlmRouter;
 import de.augmentia.strandsagents.config.ModelTier;
-import de.augmentia.strandsagents.features.conversation.ConversationManager;
-import de.augmentia.strandsagents.features.plugin.Plugin;
+import de.augmentia.strandsagents.core.conversation.ConversationManager;
+import de.augmentia.strandsagents.interceptor.plugin.Plugin;
 import de.augmentia.strandsagents.prompt.PromptRegistry;
-import de.augmentia.strandsagents.features.resilience.ResilienceConfig;
-import de.augmentia.strandsagents.features.sessions.SessionManager;
+import de.augmentia.strandsagents.interceptor.resilience.ResilienceConfig;
+import de.augmentia.strandsagents.core.sessions.SessionManager;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;

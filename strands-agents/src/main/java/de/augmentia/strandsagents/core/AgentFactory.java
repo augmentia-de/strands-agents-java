@@ -1,20 +1,29 @@
 package de.augmentia.strandsagents.core;
 
+import de.augmentia.strandsagents.config.AgentConfig;
+import de.augmentia.strandsagents.config.AgentSettings;
+import de.augmentia.strandsagents.config.ModelFactory;
 import de.augmentia.strandsagents.config.StrandsAgentConfig;
-import de.augmentia.strandsagents.features.conversation.ConversationManager;
-import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.features.plugin.Plugin;
-import de.augmentia.strandsagents.features.guardrails.GuardrailPlugin;
-import de.augmentia.strandsagents.features.hitl.HITLPlugin;
-import de.augmentia.strandsagents.features.hitl.checkpoint.CheckpointService;
-import de.augmentia.strandsagents.features.hitl.checkpoint.ConsoleChannel;
-import de.augmentia.strandsagents.features.hitl.checkpoint.EmailChannel;
-import de.augmentia.strandsagents.features.hitl.checkpoint.SSEChannel;
-import de.augmentia.strandsagents.features.tools.ListToolsTool;
-import de.augmentia.strandsagents.features.tools.HttpTool;
-import de.augmentia.strandsagents.features.sessions.FileSessionManager;
-import de.augmentia.strandsagents.features.sessions.SessionManager;
-import de.augmentia.strandsagents.features.skills.Skill;
+import de.augmentia.strandsagents.core.conversation.ConversationManager;
+import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.interceptor.hitl.checkpoint.CheckpointService;
+import de.augmentia.strandsagents.interceptor.hitl.checkpoint.ConsoleChannel;
+import de.augmentia.strandsagents.interceptor.hitl.checkpoint.EmailChannel;
+import de.augmentia.strandsagents.interceptor.hitl.checkpoint.SSEChannel;
+import de.augmentia.strandsagents.interceptor.plugin.Plugin;
+import de.augmentia.strandsagents.interceptor.guardrails.GuardrailPlugin;
+import de.augmentia.strandsagents.interceptor.hitl.HITLPlugin;
+import de.augmentia.strandsagents.skills.Skill;
+import de.augmentia.strandsagents.skills.AgentSkillsPlugin;
+import de.augmentia.strandsagents.core.sessions.FileSessionManager;
+import de.augmentia.strandsagents.core.sessions.SessionManager;
+import de.augmentia.strandsagents.core.routing.LlmRouter;
+import de.augmentia.strandsagents.config.TieredModelConfig;
+import de.augmentia.strandsagents.config.ModelTier;
+import de.augmentia.strandsagents.interceptor.telemetry.FileLlmLogger;
+import de.augmentia.strandsagents.interceptor.telemetry.LoggingChatModel;
+import de.augmentia.strandsagents.tools.ListToolsTool;
+import de.augmentia.strandsagents.tools.builtin.HttpTool;
 import dev.langchain4j.model.chat.ChatModel;
 
 import java.nio.file.Files;
@@ -76,11 +85,10 @@ public class AgentFactory {
     }
 
     public static List<Plugin> buildPlugins(List<Skill> skills, List<String> initialSkills,
-                                             boolean skillSearchEnabled) {
+                                           boolean skillSearchEnabled) {
         var plugins = new ArrayList<Plugin>();
         if (skills != null && !skills.isEmpty()) {
-            var skillsPlugin = new de.augmentia.strandsagents.features.skills.AgentSkillsPlugin(
-                skills, initialSkills != null ? initialSkills : List.of());
+            var skillsPlugin = new AgentSkillsPlugin(skills, initialSkills != null ? initialSkills : List.of());
             skillsPlugin.setSkillSearchEnabled(skillSearchEnabled);
             plugins.add(skillsPlugin);
         }
@@ -99,14 +107,82 @@ public class AgentFactory {
     }
 
     public static Agent createAgent(ChatModel model, ToolRegistry tools,
-                                     SessionManager sessionManager,
-                                     CheckpointService cpService,
-                                     List<Plugin> plugins) {
-        var agent = new Agent(model, tools, new ToolExecutor(),
+                                    SessionManager sessionManager,
+                                    CheckpointService cpService,
+                                    List<Plugin> plugins) {
+        var agent = new Agent(model, tools, new DefaultToolExecutor(),
             null, sessionManager, null, plugins);
         if (cpService != null) {
             agent.setCheckpointService(cpService);
             wireCheckpointService(agent, cpService);
+        }
+        return agent;
+    }
+
+    public static Agent buildAgent(AgentSettings settings, AgentConfig infra) {
+        return buildAgent(settings, infra, ModelFactory.createOpenAiFromEnv());
+    }
+
+    public static Agent buildAgent(AgentSettings settings, AgentConfig infra, ChatModel model) {
+        var effectiveRegistry = infra.toolRegistry() != null ? infra.toolRegistry() : new ToolRegistry();
+        var effectivePlugins = infra.plugins() != null ? infra.plugins() : List.<Plugin>of();
+
+        ChatModel effectiveModel = model;
+        FileLlmLogger logger = null;
+        if (settings.llmLogPath() != null) {
+            logger = new FileLlmLogger(settings.llmLogPath());
+            effectiveModel = new LoggingChatModel(model, logger);
+        }
+
+        var agent = new Agent(effectiveModel, effectiveRegistry, new DefaultToolExecutor(),
+            infra.conversationManager(), infra.sessionManager(), infra.chatMemoryStore(), settings.resilienceConfig(), effectivePlugins);
+        if (logger != null) {
+            agent.setLlmLogger(logger);
+        }
+        if (settings.systemPrompt() != null && !settings.systemPrompt().isBlank()) {
+            agent.setSystemPrompt(settings.systemPrompt());
+        }
+        if (settings.structuredOutputConfig() != null) {
+            agent.setStructuredOutputConfig(settings.structuredOutputConfig());
+        }
+        return agent;
+    }
+
+    public static Agent buildTieredAgent(AgentSettings settings, AgentConfig infra, Boolean useAdvancedModel) {
+        var effectiveRegistry = infra.toolRegistry() != null ? infra.toolRegistry() : new ToolRegistry();
+        var effectivePlugins = infra.plugins() != null ? infra.plugins() : List.<Plugin>of();
+
+        var tc = settings.tieredConfig() != null ? settings.tieredConfig() : TieredModelConfig.fromEnv();
+        var simpleModel = ModelFactory.createChatModel(ModelTier.SIMPLE, tc);
+        var advancedModel = ModelFactory.createChatModel(ModelTier.ADVANCED, tc);
+        var defaultTier = settings.modelTier() != null ? settings.modelTier() : tc.defaultTier();
+
+        FileLlmLogger logger = null;
+        ChatModel effectiveSimple = simpleModel;
+        if (settings.llmLogPath() != null) {
+            logger = new FileLlmLogger(settings.llmLogPath());
+            effectiveSimple = new LoggingChatModel(simpleModel, logger);
+        }
+
+        Agent agent;
+        if (defaultTier == ModelTier.ROUTING) {
+            var router = new LlmRouter(simpleModel);
+            agent = new RoutingAgent(effectiveSimple, advancedModel, router, effectiveRegistry, new DefaultToolExecutor(),
+                infra.conversationManager(), infra.sessionManager(), infra.chatMemoryStore(), settings.resilienceConfig(), effectivePlugins);
+        } else {
+            agent = new Agent(effectiveSimple, effectiveRegistry, new DefaultToolExecutor(),
+                infra.conversationManager(), infra.sessionManager(), infra.chatMemoryStore(), settings.resilienceConfig(), effectivePlugins);
+            agent.setAdvancedModel(advancedModel);
+            agent.setModelTier(defaultTier);
+        }
+        if (settings.systemPrompt() != null && !settings.systemPrompt().isBlank()) {
+            agent.setSystemPrompt(settings.systemPrompt());
+        }
+        if (settings.structuredOutputConfig() != null) {
+            agent.setStructuredOutputConfig(settings.structuredOutputConfig());
+        }
+        if (logger != null) {
+            agent.setLlmLogger(logger);
         }
         return agent;
     }

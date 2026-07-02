@@ -2,10 +2,10 @@ package de.augmentia.strandsagents.examples.domain;
 
 
 import de.augmentia.strandsagents.core.Agent;
-import de.augmentia.strandsagents.features.subagent.SubAgentTool;
+import de.augmentia.strandsagents.core.subagent.SubAgentTool;
 import de.augmentia.strandsagents.config.ModelFactory;
-import de.augmentia.strandsagents.features.tools.BashTool;
-import de.augmentia.strandsagents.features.tools.WriteTool;
+import de.augmentia.strandsagents.tools.builtin.BashTool;
+import de.augmentia.strandsagents.tools.builtin.WriteTool;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 

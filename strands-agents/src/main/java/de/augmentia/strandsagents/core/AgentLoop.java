@@ -1,16 +1,16 @@
 package de.augmentia.strandsagents.core;
 
-import de.augmentia.strandsagents.features.context.AgentContext;
-import de.augmentia.strandsagents.features.internal.ChatMessageConverter;
-import de.augmentia.strandsagents.features.pipeline.HookContexts;
-import de.augmentia.strandsagents.features.pipeline.HookResult;
-import de.augmentia.strandsagents.features.plugin.Plugin;
-import de.augmentia.strandsagents.features.guardrails.GuardrailException;
-import de.augmentia.strandsagents.features.guardrails.GuardrailResult;
-import de.augmentia.strandsagents.features.hitl.checkpoint.Checkpoint;
-import de.augmentia.strandsagents.features.resilience.Retry;
-import de.augmentia.strandsagents.features.resilience.RetryConfig;
-import de.augmentia.strandsagents.features.resilience.TokenRecovery;
+import de.augmentia.strandsagents.core.context.AgentContext;
+import de.augmentia.strandsagents.core.internal.ChatMessageConverter;
+import de.augmentia.strandsagents.interceptor.pipeline.HookContexts;
+import de.augmentia.strandsagents.interceptor.pipeline.HookResult;
+import de.augmentia.strandsagents.interceptor.plugin.Plugin;
+import de.augmentia.strandsagents.interceptor.guardrails.GuardrailException;
+import de.augmentia.strandsagents.interceptor.guardrails.GuardrailResult;
+import de.augmentia.strandsagents.interceptor.hitl.checkpoint.Checkpoint;
+import de.augmentia.strandsagents.interceptor.resilience.Retry;
+import de.augmentia.strandsagents.interceptor.resilience.RetryConfig;
+import de.augmentia.strandsagents.interceptor.resilience.TokenRecovery;
 import de.augmentia.strandsagents.model.agent.AgentPhase;
 import de.augmentia.strandsagents.model.agent.AgentResult;
 import de.augmentia.strandsagents.model.agent.ExecutionMetrics;
@@ -40,7 +40,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.time.Duration;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -72,6 +72,7 @@ final class AgentLoop {
     private boolean structuredForceAttempted;
     private boolean structuredForceActive;
     private String structuredOutputResult;
+    private final StuckDetector stuckDetector = new StuckDetector();
 
     AgentLoop(Agent agent, String sid, String prompt, Map<String, Object> contextVariables) {
         this.agent = agent;
@@ -79,6 +80,7 @@ final class AgentLoop {
         this.sid = sid;
         this.prompt = prompt;
         this.contextVariables = contextVariables;
+        agent.abortFlag.set(false);
     }
 
     AgentResult execute() {
@@ -113,7 +115,10 @@ final class AgentLoop {
 
             for (int iteration = 0; iteration < Agent.MAX_TOOL_ITERATIONS; iteration++) {
                 checkPaused();
-                if (agent.cancelled) throw new RuntimeException("Agent execution cancelled by user");
+                if (agent.cancelled || agent.abortFlag.get()) {
+                    agent.cancelled = true;
+                    throw new RuntimeException("Agent execution cancelled by user");
+                }
 
                 log.debug("Iteration {}/{} — chatMemory messages={}",
                     iteration + 1, Agent.MAX_TOOL_ITERATIONS, agent.chatMemory.messages().size());
@@ -147,6 +152,11 @@ final class AgentLoop {
 
                 toolCallCount += aiMessage.toolExecutionRequests().size();
                 executeTools(aiMessage);
+
+                if (stuckDetector.isStuck(aiMessage.toolExecutionRequests())) {
+                    log.warn("Stuck-state detected — terminating after {} iterations", iteration + 1);
+                    return handleStuck();
+                }
             }
 
             return handleMaxIterations();
@@ -503,6 +513,11 @@ final class AgentLoop {
 
     private void executeTools(AiMessage aiMessage) {
         for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
+            if (agent.cancelled || agent.abortFlag.get()) {
+                agent.cancelled = true;
+                throw new RuntimeException("Agent execution cancelled by user");
+            }
+
             var args = parseArgs(req.arguments());
 
             var beforeTc = run.hookRegistry().triggerBeforeToolCall(
@@ -518,6 +533,9 @@ final class AgentLoop {
 
             agent.fire(new ToolExecutionStartedEvent(sid, Instant.now(),
                 new ToolCall(req.id(), req.name(), req.arguments())));
+
+            // Link agent's abort flag to toolRegistry for tool execution
+            run.toolRegistry().setAbortFlag(agent.abortFlag);
 
             String prevSessionId = AgentContext.SESSION_ID.get();
             AgentContext.SESSION_ID.set(sid);
@@ -562,6 +580,10 @@ final class AgentLoop {
                 }
                 agent.fire(new ToolExecutionFinishedEvent(sid, Instant.now(), finalToolResult));
             } catch (Exception e) {
+                if (agent.abortFlag.get()) {
+                    log.debug("Tool execution aborted by user");
+                    throw new RuntimeException("Agent execution cancelled by user");
+                }
                 Throwable cause = e;
                 while ((cause instanceof java.util.concurrent.ExecutionException ||
                         cause instanceof java.lang.reflect.InvocationTargetException) &&
@@ -654,6 +676,26 @@ final class AgentLoop {
             ChatMessageConverter.toDomainMessages(agent.chatMemory.messages()),
             new ExecutionMetrics(durationMs(), totalInputTokens, totalOutputTokens, toolCallCount),
             StopReason.MAX_ITERATIONS
+        );
+        var afterAgent = run.hookRegistry().triggerAfterAgent(
+            new HookContexts.AfterAgentContext(sid, result), result.finalAnswer());
+        var finalAnswer = afterAgent instanceof HookResult.Modify<?>(Object value)
+            ? (String) value : result.finalAnswer();
+        var modifiedResult = new AgentResult(sid, finalAnswer, result.generatedMessages(),
+            result.metrics(), result.stopReason(), result.structuredOutput());
+        agent.fire(new AgentFinishedEvent(sid, Instant.now(), modifiedResult.finalAnswer()));
+        return modifiedResult;
+    }
+
+    private AgentResult handleStuck() {
+        log.debug("Stuck-state detected — returning result");
+        agent.phase = AgentPhase.FAILED;
+        var result = new AgentResult(
+            sid,
+            PromptRegistry.getOrDefault("agent.stuck", "Stuck-state detected — repeated identical tool calls"),
+            ChatMessageConverter.toDomainMessages(agent.chatMemory.messages()),
+            new ExecutionMetrics(durationMs(), totalInputTokens, totalOutputTokens, toolCallCount),
+            StopReason.STUCK
         );
         var afterAgent = run.hookRegistry().triggerAfterAgent(
             new HookContexts.AfterAgentContext(sid, result), result.finalAnswer());

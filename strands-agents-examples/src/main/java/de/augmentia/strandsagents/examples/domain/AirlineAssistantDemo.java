@@ -3,11 +3,11 @@ package de.augmentia.strandsagents.examples.domain;
 import de.augmentia.strandsagents.core.*;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.config.ModelFactory;
-import de.augmentia.strandsagents.features.conversation.ConversationManager;
-import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.core.conversation.ConversationManager;
+import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.model.agent.AgentResult;
-import de.augmentia.strandsagents.features.sessions.FileSessionManager;
-import de.augmentia.strandsagents.features.sessions.SessionManager;
+import de.augmentia.strandsagents.core.sessions.FileSessionManager;
+import de.augmentia.strandsagents.core.sessions.SessionManager;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.model.chat.ChatModel;
 
@@ -28,7 +28,7 @@ public class AirlineAssistantDemo {
         toolRegistry.register(airlineService); // Register the service as a tool provider
 
         // 3. ToolExecutor: The engine that runs the tools
-        ToolExecutor toolExecutor = new ToolExecutor();
+        ToolExecutor toolExecutor = new DefaultToolExecutor();
 
         // 4. ConversationManager: Handles chat history (e.g., sliding window of 10 messages)
         ConversationManager conversationManager = new SlidingWindowConversationManager(10);

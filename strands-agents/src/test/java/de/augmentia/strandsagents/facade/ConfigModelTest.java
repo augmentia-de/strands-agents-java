@@ -5,8 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.augmentia.strandsagents.config.ModelProviderType;
 import de.augmentia.strandsagents.config.ModelTier;
-import de.augmentia.strandsagents.features.resilience.ResilienceConfig;
-import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ConfigModelTest {
@@ -19,7 +17,7 @@ class ConfigModelTest {
         var model = ConfigModel.defaults();
         assertThat(model.getModelName()).isEqualTo("gpt-4o-mini");
         assertThat(model.getProvider()).isEqualTo(ModelProviderType.OPENAI);
-        assertThat(model.getMaxIterations()).isEqualTo(10);
+        assertThat(model.getMaxIterations()).isEqualTo(5);
         assertThat(model.getMaxMessages()).isEqualTo(20);
         assertThat(model.getTemperature()).isEqualTo(0.7);
     }
@@ -37,7 +35,7 @@ class ConfigModelTest {
                 "provider": "OPENAI",
                 "maxIterations": 15,
                 "maxMessages": 30,
-                "tools": ["de.augmentia.strandsagents.features.tools.WebSearchTool"],
+                "tools": ["de.augmentia.strandsagents.tools.builtin.WebSearchTool"],
                 "skillsDir": "/custom/skills",
                 "initialSkills": ["skill1", "skill2"],
                 "ollamaBaseUrl": "http://localhost:11434"
@@ -54,7 +52,7 @@ class ConfigModelTest {
         assertThat(model.getProvider()).isEqualTo(ModelProviderType.OPENAI);
         assertThat(model.getMaxIterations()).isEqualTo(15);
         assertThat(model.getMaxMessages()).isEqualTo(30);
-        assertThat(model.getTools()).containsExactly("de.augmentia.strandsagents.features.tools.WebSearchTool");
+        assertThat(model.getTools()).containsExactly("de.augmentia.strandsagents.tools.builtin.WebSearchTool");
         assertThat(model.getSkillsDir()).isEqualTo("/custom/skills");
         assertThat(model.getInitialSkills()).containsExactly("skill1", "skill2");
         assertThat(model.getOllamaBaseUrl()).isEqualTo("http://localhost:11434");

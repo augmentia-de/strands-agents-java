@@ -3,26 +3,26 @@ package de.augmentia.strandsagents.examples;
 import de.augmentia.strandsagents.core.*;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.config.ModelFactory;
-import de.augmentia.strandsagents.features.conversation.ConversationManager;
-import de.augmentia.strandsagents.features.pipeline.AgentHook;
-import de.augmentia.strandsagents.features.pipeline.HookContexts;
-import de.augmentia.strandsagents.features.pipeline.HookRegistry;
-import de.augmentia.strandsagents.features.pipeline.HookResult;
-import de.augmentia.strandsagents.features.hitl.checkpoint.CheckpointService;
-import de.augmentia.strandsagents.features.hitl.checkpoint.ConsoleChannel;
-import de.augmentia.strandsagents.features.sessions.SessionManager;
-import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.core.conversation.ConversationManager;
+import de.augmentia.strandsagents.interceptor.pipeline.AgentHook;
+import de.augmentia.strandsagents.interceptor.pipeline.HookContexts;
+import de.augmentia.strandsagents.interceptor.pipeline.HookRegistry;
+import de.augmentia.strandsagents.interceptor.pipeline.HookResult;
+import de.augmentia.strandsagents.interceptor.hitl.checkpoint.CheckpointService;
+import de.augmentia.strandsagents.interceptor.hitl.checkpoint.ConsoleChannel;
+import de.augmentia.strandsagents.core.sessions.SessionManager;
+import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.model.agent.AgentResult;
-import de.augmentia.strandsagents.features.plugin.Plugin;
-import de.augmentia.strandsagents.features.guardrails.GuardrailPlugin;
-import de.augmentia.strandsagents.features.guardrails.GuardrailResult;
-import de.augmentia.strandsagents.features.resilience.CircuitBreakerConfig;
-import de.augmentia.strandsagents.features.resilience.ResilienceConfig;
-import de.augmentia.strandsagents.features.resilience.RetryConfig;
-import de.augmentia.strandsagents.features.tools.BashTool;
-import de.augmentia.strandsagents.features.tools.HumanInTheLoopTool;
-import de.augmentia.strandsagents.features.tools.ReadTool;
-import de.augmentia.strandsagents.features.sessions.FileSessionManager;
+import de.augmentia.strandsagents.interceptor.plugin.Plugin;
+import de.augmentia.strandsagents.interceptor.guardrails.GuardrailPlugin;
+import de.augmentia.strandsagents.interceptor.guardrails.GuardrailResult;
+import de.augmentia.strandsagents.interceptor.resilience.CircuitBreakerConfig;
+import de.augmentia.strandsagents.interceptor.resilience.ResilienceConfig;
+import de.augmentia.strandsagents.interceptor.resilience.RetryConfig;
+import de.augmentia.strandsagents.tools.builtin.BashTool;
+import de.augmentia.strandsagents.tools.HumanInTheLoopTool;
+import de.augmentia.strandsagents.tools.builtin.ReadTool;
+import de.augmentia.strandsagents.core.sessions.FileSessionManager;
 import dev.langchain4j.model.chat.ChatModel;
 
 import java.nio.file.Path;
@@ -58,7 +58,7 @@ public class AgentDemo {
         toolRegistry.register(new HumanInTheLoopTool(cpService)); // Allows asking the human for help
 
         // 3. ToolExecutor: The engine that runs the tools
-        ToolExecutor toolExecutor = new ToolExecutor();
+        ToolExecutor toolExecutor = new DefaultToolExecutor();
 
         // 4. ConversationManager: Handles chat history (e.g., sliding window of 10 messages)
         ConversationManager conversationManager = new SlidingWindowConversationManager(10);

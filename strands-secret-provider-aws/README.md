@@ -64,7 +64,7 @@ The provider returns `null` on any failure (network error, missing parameter, in
 
 ## SPI registration
 
-Registered via Java ServiceLoader — file `META-INF/services/de.augmentia.strandsagents.features.secrets.SecretProviderFactory`:
+Registered via Java ServiceLoader — file `META-INF/services/de.augmentia.strandsagents.config.secrets.SecretProviderFactory`:
 
 ```
 de.augmentia.strandsagents.secrets.aws.AwsSecretProviderFactory

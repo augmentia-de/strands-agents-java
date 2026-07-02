@@ -7,14 +7,12 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import de.augmentia.strandsagents.core.MockChatModel;
-import de.augmentia.strandsagents.core.Agent;
-import de.augmentia.strandsagents.features.context.AgentContext;
-import de.augmentia.strandsagents.features.sessions.InMemorySessionManager;
-import de.augmentia.strandsagents.features.subagent.SubAgentExecutor;
-import de.augmentia.strandsagents.features.subagent.SubAgentTool;
+import de.augmentia.strandsagents.core.context.AgentContext;
+import de.augmentia.strandsagents.core.sessions.InMemorySessionManager;
+import de.augmentia.strandsagents.core.subagent.SubAgentExecutor;
+import de.augmentia.strandsagents.core.subagent.SubAgentTool;
 
-import de.augmentia.strandsagents.features.routing.LlmRouter;
+import de.augmentia.strandsagents.core.routing.LlmRouter;
 import de.augmentia.strandsagents.features.swarm.SwarmOrchestrator;
 import org.junit.jupiter.api.Test;
 
@@ -252,10 +250,10 @@ class EnhancedMultiAgentTest {
     @Test
     void subAgentToolSharesSessionWhenSessionIdIsSet() {
         var sessionManager = new InMemorySessionManager();
-        var subAgent = new Agent(new MockChatModel("Sub: %s"), new ToolRegistry(), new ToolExecutor(), null, sessionManager);
+        var subAgent = new Agent(new MockChatModel("Sub: %s"), new ToolRegistry(), new DefaultToolExecutor(), null, sessionManager);
         var tool = new SubAgentTool(subAgent, "helper");
 
-        var parentAgent = new Agent(new MockChatModel(), new ToolRegistry(), new ToolExecutor(), null, sessionManager);
+        var parentAgent = new Agent(new MockChatModel(), new ToolRegistry(), new DefaultToolExecutor(), null, sessionManager);
         var session = sessionManager.createSession("test", Map.of());
         var sid = session.sessionId();
 
@@ -284,8 +282,8 @@ class EnhancedMultiAgentTest {
     @Test
     void swarmOrchestratorSharesSessionWithWorkers() {
         var sessionManager = new InMemorySessionManager();
-        var weatherAgent = new Agent(new MockChatModel("Wetter: %s"), new ToolRegistry(), new ToolExecutor(), null, sessionManager);
-        var defaultAgent = new Agent(new MockChatModel("Default: %s"), new ToolRegistry(), new ToolExecutor(), null, sessionManager);
+        var weatherAgent = new Agent(new MockChatModel("Wetter: %s"), new ToolRegistry(), new DefaultToolExecutor(), null, sessionManager);
+        var defaultAgent = new Agent(new MockChatModel("Default: %s"), new ToolRegistry(), new DefaultToolExecutor(), null, sessionManager);
 
         var orchestrator = new SwarmOrchestrator(
             Map.of("wetter", weatherAgent), defaultAgent, sessionManager);
@@ -315,7 +313,7 @@ class EnhancedMultiAgentTest {
         var registry = new ToolRegistry();
         registry.register(agentTool);
 
-        var mainAgent = new Agent(new MockChatModel(), registry, new ToolExecutor());
+        var mainAgent = new Agent(new MockChatModel(), registry, new DefaultToolExecutor());
         var result = mainAgent.execute("Hilf mir bitte");
 
         assertThat(result.finalAnswer()).isNotEmpty();

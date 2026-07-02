@@ -2,8 +2,8 @@ package de.augmentia.strandsagents.quarkus.service;
 
 import de.augmentia.strandsagents.core.*;
 import de.augmentia.strandsagents.core.MockChatModel;
-import de.augmentia.strandsagents.features.conversation.SummarizingSlidingWindowConversationManager;
-import de.augmentia.strandsagents.features.routing.LlmRouter;
+import de.augmentia.strandsagents.core.conversation.SummarizingSlidingWindowConversationManager;
+import de.augmentia.strandsagents.core.routing.LlmRouter;
 import de.augmentia.strandsagents.prompt.PromptRegistry;
 import de.augmentia.strandsagents.core.MockStreamingChatModel;
 import de.augmentia.strandsagents.core.Agent;
@@ -15,24 +15,24 @@ import de.augmentia.strandsagents.config.ModelProviderType;
 import de.augmentia.strandsagents.config.ModelTier;
 import de.augmentia.strandsagents.config.TieredModelConfig;
 import de.augmentia.strandsagents.core.RoutingAgent;
-import de.augmentia.strandsagents.features.telemetry.FileLlmLogger;
-import de.augmentia.strandsagents.features.telemetry.LoggingChatModel;
+import de.augmentia.strandsagents.interceptor.telemetry.FileLlmLogger;
+import de.augmentia.strandsagents.interceptor.telemetry.LoggingChatModel;
 import de.augmentia.strandsagents.model.event.AgentStateChangedEvent;
-import de.augmentia.strandsagents.features.plugin.Plugin;
-import de.augmentia.strandsagents.features.hitl.HITLPlugin;
-import de.augmentia.strandsagents.features.hitl.checkpoint.CheckpointService;
-import de.augmentia.strandsagents.features.hitl.checkpoint.SSEChannel;
-import de.augmentia.strandsagents.features.skills.*;
+import de.augmentia.strandsagents.interceptor.plugin.Plugin;
+import de.augmentia.strandsagents.interceptor.hitl.HITLPlugin;
+import de.augmentia.strandsagents.interceptor.hitl.checkpoint.CheckpointService;
+import de.augmentia.strandsagents.interceptor.hitl.checkpoint.SSEChannel;
+import de.augmentia.strandsagents.skills.*;
 import dev.langchain4j.mcp.client.McpClient;
 import de.augmentia.strandsagents.config.StrandsAgentConfig;
-import de.augmentia.strandsagents.features.mcp.McpConnector;
+import de.augmentia.strandsagents.tools.mcp.McpConnector;
 import de.augmentia.strandsagents.model.api.AgentInitRequest;
 import de.augmentia.strandsagents.model.api.ChatRequest;
 import de.augmentia.strandsagents.model.api.ChatResponse;
 import de.augmentia.strandsagents.model.api.McpServerSelection;
 import de.augmentia.strandsagents.model.api.SkillInfo;
 import de.augmentia.strandsagents.model.api.ToolInfo;
-import de.augmentia.strandsagents.features.sessions.FileSessionManager;
+import de.augmentia.strandsagents.core.sessions.FileSessionManager;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import jakarta.annotation.PostConstruct;
@@ -48,27 +48,27 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import de.augmentia.strandsagents.features.guardrails.GuardrailPlugin;
-import de.augmentia.strandsagents.features.hitl.checkpoint.ConsoleChannel;
+import de.augmentia.strandsagents.interceptor.guardrails.GuardrailPlugin;
+import de.augmentia.strandsagents.interceptor.hitl.checkpoint.ConsoleChannel;
 import de.augmentia.strandsagents.model.event.ToolExecutionStartedEvent;
 import de.augmentia.strandsagents.model.event.ToolExecutionFinishedEvent;
-import de.augmentia.strandsagents.features.guardrails.GuardrailResult;
-import de.augmentia.strandsagents.features.resilience.CircuitBreakerConfig;
-import de.augmentia.strandsagents.features.resilience.ResilienceConfig;
-import de.augmentia.strandsagents.features.resilience.RetryConfig;
-import de.augmentia.strandsagents.features.tools.BashTool;
-import de.augmentia.strandsagents.features.tools.HumanInTheLoopTool;
-import de.augmentia.strandsagents.features.tools.FileReaderFactory;
-import de.augmentia.strandsagents.features.tools.ReadTool;
+import de.augmentia.strandsagents.interceptor.guardrails.GuardrailResult;
+import de.augmentia.strandsagents.interceptor.resilience.CircuitBreakerConfig;
+import de.augmentia.strandsagents.interceptor.resilience.ResilienceConfig;
+import de.augmentia.strandsagents.interceptor.resilience.RetryConfig;
+import de.augmentia.strandsagents.tools.builtin.BashTool;
+import de.augmentia.strandsagents.tools.HumanInTheLoopTool;
+import de.augmentia.strandsagents.tools.FileReaderFactory;
+import de.augmentia.strandsagents.tools.builtin.ReadTool;
 import de.augmentia.strandsagents.quarkus.service.pdf.PdfFileReader;
-import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.features.conversation.ConversationManager;
-import de.augmentia.strandsagents.features.sessions.SessionManager;
+import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.core.conversation.ConversationManager;
+import de.augmentia.strandsagents.core.sessions.SessionManager;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ApplicationScoped
-public class AgentService implements de.augmentia.strandsagents.features.service.AgentService {
+public class AgentService implements de.augmentia.strandsagents.core.service.AgentService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentService.class);
     private static final String TOOLS_PLACEHOLDER = "{{tools}}";
@@ -94,6 +94,7 @@ public class AgentService implements de.augmentia.strandsagents.features.service
 
     private final ConcurrentHashMap<String, InitializedSession> initializedAgents = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, StreamingAgent> activeStreams = new ConcurrentHashMap<>();
+    private final List<FileLlmLogger> loggers = new ArrayList<>();
 
     private record InitializedSession(
         Agent agent,
@@ -158,6 +159,12 @@ public class AgentService implements de.augmentia.strandsagents.features.service
             session.close();
         }
         initializedAgents.clear();
+        for (var logger : loggers) {
+            try { logger.close(); } catch (Exception e) {
+                log.debug("Error closing LLM logger: {}", e.getMessage());
+            }
+        }
+        loggers.clear();
     }
 
     public synchronized void ensureInitialized() {
@@ -282,7 +289,7 @@ public class AgentService implements de.augmentia.strandsagents.features.service
                             ModelProviderType.fromString(req.simpleProvider),
                             simpleBase.apiKey(), simpleBase.baseUrl(),
                             req.simpleModel != null ? req.simpleModel : simpleBase.modelName(),
-                            simpleBase.temperature(), simpleBase.maxRetries(), simpleBase.ollamaBaseUrl(),
+                            simpleBase.temperature(), simpleBase.maxRetries(), simpleBase.providerProperties(),
                             simpleBase.logRequests(), simpleBase.logResponses())
                         : simpleBase,
                     req.advancedProvider != null
@@ -290,7 +297,7 @@ public class AgentService implements de.augmentia.strandsagents.features.service
                             ModelProviderType.fromString(req.advancedProvider),
                             advancedBase.apiKey(), advancedBase.baseUrl(),
                             req.advancedModel != null ? req.advancedModel : advancedBase.modelName(),
-                            advancedBase.temperature(), advancedBase.maxRetries(), advancedBase.ollamaBaseUrl(),
+                            advancedBase.temperature(), advancedBase.maxRetries(), advancedBase.providerProperties(),
                             advancedBase.logRequests(), advancedBase.logResponses())
                         : advancedBase,
                     effectiveTier
@@ -311,11 +318,11 @@ public class AgentService implements de.augmentia.strandsagents.features.service
 
             if (effectiveTier == ModelTier.ROUTING) {
                 var router = new LlmRouter(wrappedSimple);
-                agent = new RoutingAgent(wrappedSimple, wrappedAdvanced, router, selectedTools, new ToolExecutor(),
+                agent = new RoutingAgent(wrappedSimple, wrappedAdvanced, router, selectedTools, new DefaultToolExecutor(),
                     conversationManager, sessionManager, null, resilienceConfig, plugins);
                 ((RoutingAgent) agent).resolveRoutingTier(systemPrompt);
             } else {
-                agent = new Agent(wrappedSimple, selectedTools, new ToolExecutor(),
+                agent = new Agent(wrappedSimple, selectedTools, new DefaultToolExecutor(),
                     conversationManager, sessionManager, null, plugins);
                 agent.setAdvancedModel(wrappedAdvanced);
                 agent.setModelTier(effectiveTier);
@@ -327,10 +334,10 @@ public class AgentService implements de.augmentia.strandsagents.features.service
             );
             SummarizingSlidingWindowConversationManager conversationManager = new SummarizingSlidingWindowConversationManager(
                     ModelFactory.createOpenAiFromEnv(), 15384, 3);
-            agent = new StreamingAgent(streamingModel, selectedTools, new ToolExecutor(),
+            agent = new StreamingAgent(streamingModel, selectedTools, new DefaultToolExecutor(),
                     conversationManager, sessionManager, resilienceConfig, plugins);
         } else {
-            agent = new Agent(modelToUse, selectedTools, new ToolExecutor(),
+            agent = new Agent(modelToUse, selectedTools, new DefaultToolExecutor(),
                 null, sessionManager, null, plugins);
         }
         agent.setSystemPrompt(systemPrompt);
@@ -448,11 +455,11 @@ public class AgentService implements de.augmentia.strandsagents.features.service
         } else {
             if (streamingModelToUse != null) {
                 agent = new StreamingAgent(streamingModelToUse,
-                    activeTools, new ToolExecutor(), null, sessionManager, null, plugins);
+                    activeTools, new DefaultToolExecutor(), null, sessionManager, null, plugins);
             } else {
                 agent = new StreamingAgent(
                     new MockStreamingChatModel(),
-                    activeTools, new ToolExecutor());
+                    activeTools, new DefaultToolExecutor());
             }
         }
 
@@ -559,7 +566,7 @@ public class AgentService implements de.augmentia.strandsagents.features.service
         toolRegistry.register(new HumanInTheLoopTool(cpService));
 
         // 4. ToolExecutor
-        ToolExecutor toolExecutor = new ToolExecutor();
+        ToolExecutor toolExecutor = new DefaultToolExecutor();
 
         // 5. ConversationManager
         ConversationManager conversationManager = new SlidingWindowConversationManager(10);
@@ -898,9 +905,8 @@ public class AgentService implements de.augmentia.strandsagents.features.service
         try {
             Files.createDirectories(logDir);
             var logger = new FileLlmLogger(Path.of(config.llmLogPath()));
-            var wrapped = new LoggingChatModel(m, logger);
-            Runtime.getRuntime().addShutdownHook(new Thread(logger::close));
-            return wrapped;
+            loggers.add(logger);
+            return new LoggingChatModel(m, logger);
         } catch (Exception e) {
             log.warn("LLM logging not available: {}", e.getMessage());
             return m;

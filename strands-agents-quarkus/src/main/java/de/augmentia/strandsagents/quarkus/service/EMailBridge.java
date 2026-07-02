@@ -1,6 +1,6 @@
 package de.augmentia.strandsagents.quarkus.service;
 
-import de.augmentia.strandsagents.features.hitl.checkpoint.EmailChannel;
+import de.augmentia.strandsagents.interceptor.hitl.checkpoint.EmailChannel;
 import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.reactive.ReactiveMailer;
 import io.quarkus.runtime.StartupEvent;

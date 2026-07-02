@@ -2,10 +2,13 @@ package de.augmentia.strandsagents.examples;
 
 import java.time.Instant;
 
+import de.augmentia.strandsagents.core.AgentFactory;
+import de.augmentia.strandsagents.core.DefaultToolExecutor;
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.StreamingAgent;
 import de.augmentia.strandsagents.config.AgentConfig;
+import de.augmentia.strandsagents.config.AgentSettings;
 import de.augmentia.strandsagents.config.ModelFactory;
 import de.augmentia.strandsagents.model.agent.AgentResult;
 
@@ -113,7 +116,7 @@ public class StructuredOutputDemo {
         System.out.println("=== STATIC Mode: Nested Records ===");
 
         var agent = new StreamingAgent(ModelFactory.createOpenAiStreamingFromEnv(null),
-                null, new ToolExecutor(), null, null, null);
+                null, new DefaultToolExecutor(), null, null, null);
         agent.setStructuredOutputModel(Customer.class);
         agent.setToolRegistry(new ToolRegistry());
 
@@ -144,10 +147,10 @@ public class StructuredOutputDemo {
     static void demoDynamicSchema() {
         System.out.println("=== DYNAMIC Mode: JSON Schema (gleiche Struktur) ===");
 
-        var agent = AgentConfig.builder()
+        var settings = AgentSettings.builder()
             .structuredOutputSchema(CUSTOMER_SCHEMA)
-            .build()
-            .createAgent(ModelFactory.createOpenAiFromEnv());
+            .build();
+        var agent = AgentFactory.buildAgent(settings, AgentConfig.builder().build(), ModelFactory.createOpenAiFromEnv());
 
         var result = agent.execute(
             "Extrahiere den Kunden: Erika Musterfrau, 32, erika@test.de, " +
@@ -177,10 +180,10 @@ public class StructuredOutputDemo {
     static void demoShoppingCart() {
         System.out.println("=== DYNAMIC Mode: Shopping Cart mit Array ===");
 
-        var agent = AgentConfig.builder()
+        var settings = AgentSettings.builder()
             .structuredOutputSchema(SHOPPING_CART_SCHEMA)
-            .build()
-            .createAgent(ModelFactory.createOpenAiFromEnv());
+            .build();
+        var agent = AgentFactory.buildAgent(settings, AgentConfig.builder().build(), ModelFactory.createOpenAiFromEnv());
 
         var result = agent.execute(
             "Erstelle einen Warenkorb: Kunde ist Max Mustermann (max@test.de). " +

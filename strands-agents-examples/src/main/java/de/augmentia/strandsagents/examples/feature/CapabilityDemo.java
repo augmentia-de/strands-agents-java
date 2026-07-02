@@ -2,21 +2,21 @@ package de.augmentia.strandsagents.examples.feature;
 
 import de.augmentia.strandsagents.config.LlmConfig;
 import de.augmentia.strandsagents.core.Agent;
-import de.augmentia.strandsagents.core.ToolExecutor;
+import de.augmentia.strandsagents.core.DefaultToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.features.pipeline.HookRegistry;
-import de.augmentia.strandsagents.features.skills.AgentSkillsPlugin;
-import de.augmentia.strandsagents.features.skills.CapabilityEmbeddingService;
-import de.augmentia.strandsagents.features.skills.CapabilityRegistry;
-import de.augmentia.strandsagents.features.skills.CapabilitySearchTool;
-import de.augmentia.strandsagents.features.skills.SkillActivationHook;
-import de.augmentia.strandsagents.features.skills.SkillParser;
-import de.augmentia.strandsagents.features.tools.ToolActivator;
+
+import de.augmentia.strandsagents.interceptor.pipeline.HookRegistry;
+import de.augmentia.strandsagents.skills.AgentSkillsPlugin;
+import de.augmentia.strandsagents.skills.CapabilityEmbeddingService;
+import de.augmentia.strandsagents.skills.CapabilityRegistry;
+import de.augmentia.strandsagents.skills.CapabilitySearchTool;
+import de.augmentia.strandsagents.skills.SkillActivationHook;
+import de.augmentia.strandsagents.skills.SkillParser;
+import de.augmentia.strandsagents.tools.ToolActivator;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.util.List;
 import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class CapabilityDemo {
@@ -78,7 +78,7 @@ public class CapabilityDemo {
         // ---- Tool registry ----
         var toolRegistry = new ToolRegistry();
         Path ws = Path.of(".").toAbsolutePath();
-        toolRegistry.register(new CapabilitySearchTool(capRegistry, model, new ToolExecutor(), embeddingService));
+        toolRegistry.register(new CapabilitySearchTool(capRegistry, model, new DefaultToolExecutor(), embeddingService));
         toolRegistry.register(new ToolActivator(toolRegistry, ws));
 
         // ---- Agent with minimal prompt (no skill name hints) ----

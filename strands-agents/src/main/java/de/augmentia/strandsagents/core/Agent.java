@@ -1,48 +1,32 @@
 package de.augmentia.strandsagents.core;
 
-import de.augmentia.strandsagents.config.AgentConfig;
-import de.augmentia.strandsagents.config.LlmConfig;
-import de.augmentia.strandsagents.config.ModelFactory;
 import de.augmentia.strandsagents.config.ModelTier;
-import de.augmentia.strandsagents.features.context.AgentContext;
-import de.augmentia.strandsagents.features.conversation.ConversationManager;
-import de.augmentia.strandsagents.features.sessions.SessionManager;
-import de.augmentia.strandsagents.features.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.features.internal.ChatMessageConverter;
-import de.augmentia.strandsagents.prompt.PromptRegistry;
+import de.augmentia.strandsagents.core.conversation.ConversationManager;
+import de.augmentia.strandsagents.core.sessions.SessionManager;
+import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
+import de.augmentia.strandsagents.core.internal.ChatMessageConverter;
+import de.augmentia.strandsagents.interceptor.pipeline.AgentHook;
+import de.augmentia.strandsagents.interceptor.pipeline.HookRegistry;
+import de.augmentia.strandsagents.interceptor.resilience.CircuitBreaker;
+import de.augmentia.strandsagents.interceptor.resilience.ResilienceConfig;
+import de.augmentia.strandsagents.interceptor.resilience.RetryConfig;
+
 import de.augmentia.strandsagents.model.agent.*;
 import de.augmentia.strandsagents.model.event.*;
 import de.augmentia.strandsagents.model.session.Session;
-import de.augmentia.strandsagents.model.tool.ToolCall;
-import de.augmentia.strandsagents.model.tool.ToolExecutionResult;
-import de.augmentia.strandsagents.features.pipeline.HookContexts;
-import de.augmentia.strandsagents.features.pipeline.HookRegistry;
-import de.augmentia.strandsagents.features.pipeline.HookResult;
-import de.augmentia.strandsagents.features.plugin.Plugin;
-import de.augmentia.strandsagents.features.plugin.PluginRegistry;
-import de.augmentia.strandsagents.features.guardrails.GuardrailException;
-import de.augmentia.strandsagents.features.guardrails.GuardrailResult;
-import de.augmentia.strandsagents.features.hitl.checkpoint.Checkpoint;
-import de.augmentia.strandsagents.features.hitl.checkpoint.CheckpointService;
-import de.augmentia.strandsagents.features.resilience.*;
-import de.augmentia.strandsagents.features.structured.StructuredOutputConfig;
-import dev.langchain4j.agent.tool.ToolExecutionRequest;
-import dev.langchain4j.agent.tool.ToolSpecification;
-import dev.langchain4j.data.message.AiMessage;
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.data.message.ToolExecutionResultMessage;
+
+import de.augmentia.strandsagents.interceptor.plugin.Plugin;
+import de.augmentia.strandsagents.interceptor.plugin.PluginRegistry;
+import de.augmentia.strandsagents.interceptor.hitl.checkpoint.CheckpointService;
+import de.augmentia.strandsagents.model.structured.StructuredOutputConfig;
+import de.augmentia.strandsagents.interceptor.telemetry.FileLlmLogger;
+import de.augmentia.strandsagents.tools.AgentTool;
 import dev.langchain4j.memory.ChatMemory;
 
 
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
-import dev.langchain4j.model.chat.request.ResponseFormat;
-import dev.langchain4j.model.chat.request.ResponseFormatType;
-import dev.langchain4j.model.chat.request.json.JsonRawSchema;
-import dev.langchain4j.model.chat.request.json.JsonSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,6 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.Flow;
@@ -59,8 +44,6 @@ import java.util.concurrent.SubmissionPublisher;
 import java.util.UUID;
 
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -72,7 +55,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * and state management.
  * </p>
  */
-public class Agent {
+public class Agent implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(Agent.class);
     private static final int LOG_MAX = 2000;
@@ -86,7 +69,7 @@ public class Agent {
         .configure(JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true)
         .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-    static int MAX_TOOL_ITERATIONS = 10;
+    static int MAX_TOOL_ITERATIONS = 5;
     static final int MAX_HOOK_RETRIES = 3;
     static final int DEFAULT_MAX_MESSAGES = 75;
     static final ExecutorService VIRTUAL_EXECUTOR =
@@ -111,15 +94,19 @@ public class Agent {
     private String systemPrompt = "";
     private List<Plugin> plugins = new ArrayList<>();
     CheckpointService checkpointService;
-    volatile AgentPhase phase = AgentPhase.IDLE;
-    final ReentrantLock pauseLock = new ReentrantLock();
-    final Condition pauseCondition = pauseLock.newCondition();
-    private StructuredOutputConfig structuredOutputConfig;
-    private HookRegistry hookRegistry;
-    private final ChatMemoryStore chatMemoryStore;
     volatile String lastThinking;
     volatile boolean cancelled = false;
     volatile Thread executionThread;
+    AtomicBoolean abortFlag = new AtomicBoolean(false);
+    private FileLlmLogger llmLogger;
+    private final List<AutoCloseable> resources = new ArrayList<>();
+    private volatile boolean shutdown = false;
+    ChatMemoryStore chatMemoryStore;
+    HookRegistry hookRegistry;
+    StructuredOutputConfig structuredOutputConfig;
+    AgentPhase phase = AgentPhase.IDLE;
+    ReentrantLock pauseLock = new ReentrantLock();
+    Condition pauseCondition = pauseLock.newCondition();
 
     /**
      * Mutable runtime configuration snapshot source.
@@ -145,7 +132,7 @@ public class Agent {
      * @param model the chat model to use for orchestration
      */
     public Agent(ChatModel model) {
-        this(model, new ToolRegistry(), new ToolExecutor(), null, null);
+        this(model, new ToolRegistry(), new DefaultToolExecutor(), null, null);
     }
 
     /**
@@ -278,23 +265,7 @@ public class Agent {
         initPlugins(plugins);
     }
 
-    public Agent(AgentConfig config) {
-        this(config.modelName() != null
-            ? ModelFactory.createOpenAi(LlmConfig.fromEnv(config.modelName()))
-            : ModelFactory.createOpenAiFromEnv(),
-            config.toolRegistry() != null ? config.toolRegistry() : new ToolRegistry(),
-            new ToolExecutor(),
-            config.conversationManager(),
-            config.sessionManager(),
-            config.chatMemoryStore(),
-            config.resilienceConfig() != null ? config.resilienceConfig() : ResilienceConfig.DEFAULT,
-            config.plugins());
-        if (config.systemPrompt() != null && !config.systemPrompt().isBlank()) {
-            setSystemPrompt(config.systemPrompt());
-        }
-    }
-
-    /**
+    /*
      * Copies the Agent's current field values into {@link #runConfig}.
      * Called once at the end of the main constructor so that the mutable
      * config reflects the initial component setup. Subsequent mutations go
@@ -552,7 +523,7 @@ public class Agent {
         reg.register(toolInstance);
     }
 
-    public void addTool(de.augmentia.strandsagents.features.tools.AgentTool<?> tool) {
+    public void addTool(AgentTool<?> tool) {
         var reg = runConfig.getToolRegistry() != null ? runConfig.getToolRegistry() : toolRegistry;
         reg.register(tool);
     }
@@ -571,7 +542,7 @@ public class Agent {
         runConfig.setHookRegistry(this.hookRegistry);
     }
 
-    public void addHook(de.augmentia.strandsagents.features.pipeline.AgentHook hook) {
+    public void addHook(AgentHook hook) {
         var reg = runConfig.getHookRegistry() != null ? runConfig.getHookRegistry() : hookRegistry;
         reg.register(hook);
     }
@@ -622,11 +593,48 @@ public class Agent {
 
     public void cancel() {
         cancelled = true;
+        abortFlag.set(true);
         reject("Cancelled by user");
         var t = executionThread;
         if (t != null) {
             t.interrupt();
         }
+        if (toolRegistry != null) {
+            toolRegistry.setAbortFlag(abortFlag);
+        }
+    }
+
+    public AtomicBoolean getAbortFlag() {
+        return abortFlag;
+    }
+
+    public void setLlmLogger(FileLlmLogger logger) {
+        this.llmLogger = logger;
+        if (logger != null) {
+            resources.add(logger);
+        }
+    }
+
+    public void shutdown() {
+        if (shutdown) return;
+        shutdown = true;
+        cancel();
+        for (var resource : resources) {
+            try {
+                resource.close();
+            } catch (Exception e) {
+                log.debug("Error closing resource: {}", e.getMessage());
+            }
+        }
+    }
+
+    @Override
+    public void close() {
+        shutdown();
+    }
+
+    public boolean isShutdown() {
+        return shutdown;
     }
 
     public ChatModel getCurrentModel() {
@@ -668,15 +676,15 @@ public class Agent {
     public static class Builder {
         private ChatModel model;
         private ToolRegistry toolRegistry = new ToolRegistry();
-        private ToolExecutor toolExecutor = new ToolExecutor();
+        private ToolExecutor toolExecutor = new DefaultToolExecutor();
         private ConversationManager conversationManager;
         private SessionManager sessionManager;
-        private ChatMemoryStore chatMemoryStore;
+        ChatMemoryStore chatMemoryStore;
         private ResilienceConfig resilienceConfig;
-        private HookRegistry hookRegistry;
+        HookRegistry hookRegistry;
         private List<Plugin> plugins;
         private String systemPrompt;
-        private StructuredOutputConfig structuredOutputConfig;
+        StructuredOutputConfig structuredOutputConfig;
         private CheckpointService checkpointService;
         private AgentEventListener eventListener;
 

@@ -77,7 +77,7 @@ class StopReasonTest {
     void enumHasExpectedValues() {
         assertThat(StopReason.values()).containsExactly(
             StopReason.MAX_ITERATIONS, StopReason.COMPLETED,
-            StopReason.INTERRUPTED, StopReason.ERROR);
+            StopReason.INTERRUPTED, StopReason.ERROR, StopReason.STUCK);
     }
 }
 

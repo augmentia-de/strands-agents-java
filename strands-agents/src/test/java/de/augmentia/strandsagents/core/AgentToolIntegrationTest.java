@@ -3,10 +3,8 @@ package de.augmentia.strandsagents.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import de.augmentia.strandsagents.core.MockChatModel;
-import de.augmentia.strandsagents.core.Agent;
-import de.augmentia.strandsagents.features.tools.AgentTool;
-import de.augmentia.strandsagents.features.tools.ToolResult;
+import de.augmentia.strandsagents.tools.AgentTool;
+import de.augmentia.strandsagents.tools.ToolResult;
 import de.augmentia.strandsagents.model.agent.StopReason;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
@@ -31,7 +29,7 @@ class AgentToolIntegrationTest {
     void agentShouldUseMockTool() {
         var registry = new ToolRegistry();
         registry.register(simpleTool("add"));
-        var executor = new ToolExecutor();
+        var executor = new DefaultToolExecutor();
         var model = new MockChatModel();
         var agent = new Agent(model, registry, executor);
 

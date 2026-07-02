@@ -1,18 +1,16 @@
 package de.augmentia.strandsagents.examples;
 
 import de.augmentia.strandsagents.core.MockChatModel;
-import de.augmentia.strandsagents.core.ToolExecutor;
+import de.augmentia.strandsagents.core.DefaultToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.features.context.AgentContext;
-import de.augmentia.strandsagents.features.planning.CoTPlanner;
-import de.augmentia.strandsagents.features.planning.PlanningAgent;
-import de.augmentia.strandsagents.features.routing.LlmRouter;
-import de.augmentia.strandsagents.features.secrets.FileSecretProvider;
-import dev.langchain4j.model.chat.ChatModel;
+import de.augmentia.strandsagents.core.context.AgentContext;
+import de.augmentia.strandsagents.core.planning.CoTPlanner;
+import de.augmentia.strandsagents.core.planning.PlanningAgent;
+import de.augmentia.strandsagents.core.routing.LlmRouter;
+import de.augmentia.strandsagents.config.vault.FileSecretProvider;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -48,7 +46,7 @@ public class SmartPlannerDemo {
             .standard()
             .build();
         var planner = new CoTPlanner(mockModel, 2, toolRegistry);
-        var planningAgent = new PlanningAgent(mockModel, toolRegistry, new ToolExecutor(), planner);
+        var planningAgent = new PlanningAgent(mockModel, toolRegistry, new DefaultToolExecutor(), planner);
         var planResult = planningAgent.executePlanned("Greet the user politely");
         System.out.println("  [Planning] result=" + planResult.finalAnswer());
         System.out.println("  [Planning] stopReason=" + planResult.stopReason());

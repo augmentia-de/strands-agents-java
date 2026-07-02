@@ -1,10 +1,9 @@
 package de.augmentia.strandsagents.features.swarm;
 
 import de.augmentia.strandsagents.core.Agent;
-import de.augmentia.strandsagents.features.routing.LlmRouter;
-import de.augmentia.strandsagents.features.sessions.SessionManager;
+import de.augmentia.strandsagents.core.routing.LlmRouter;
+import de.augmentia.strandsagents.core.sessions.SessionManager;
 import de.augmentia.strandsagents.model.agent.AgentResult;
-import de.augmentia.strandsagents.model.session.Session;
 
 import java.util.List;
 import java.util.Map;

@@ -5,18 +5,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import de.augmentia.strandsagents.config.*;
 import de.augmentia.strandsagents.core.Agent;
-import de.augmentia.strandsagents.core.ToolExecutor;
+import de.augmentia.strandsagents.core.DefaultToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
-import de.augmentia.strandsagents.features.conversation.ConversationManager;
-import de.augmentia.strandsagents.features.conversation.SummarizingSlidingWindowConversationManager;
-import de.augmentia.strandsagents.features.plugin.Plugin;
-import de.augmentia.strandsagents.features.sessions.SessionManager;
-import de.augmentia.strandsagents.features.structured.StructuredOutputConfig;
-import de.augmentia.strandsagents.features.structured.StructuredOutputMode;
+import de.augmentia.strandsagents.core.conversation.ConversationManager;
+import de.augmentia.strandsagents.core.conversation.SummarizingSlidingWindowConversationManager;
+import de.augmentia.strandsagents.interceptor.plugin.Plugin;
+import de.augmentia.strandsagents.core.sessions.SessionManager;
+import de.augmentia.strandsagents.model.structured.StructuredOutputConfig;
+import de.augmentia.strandsagents.tools.AgentTool;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import java.util.*;
-import java.util.function.Consumer;
 
 public class StrandsAgentBuilder {
 
@@ -208,7 +207,7 @@ public class StrandsAgentBuilder {
         var resilienceConfig = merged.toResilienceConfig();
         var structuredOutputConfig = buildStructuredOutputConfig(merged);
 
-        var agent = new Agent(chatModel, toolRegistry, new ToolExecutor(),
+        var agent = new Agent(chatModel, toolRegistry, new DefaultToolExecutor(),
             convManager, sessionManager, chatMemoryStore, resilienceConfig, plugins);
         if (merged.getSystemPrompt() != null && !merged.getSystemPrompt().isBlank()) {
             agent.setSystemPrompt(merged.getSystemPrompt());
@@ -295,6 +294,10 @@ public class StrandsAgentBuilder {
     }
 
     private static ChatModelConfig toChatModelConfig(ConfigModel cfg) {
+        var props = new HashMap<String, String>();
+        if (cfg.getOllamaBaseUrl() != null) {
+            props.put("baseUrl", cfg.getOllamaBaseUrl());
+        }
         return new ChatModelConfig(
             cfg.getProvider() != null ? cfg.getProvider() : ModelProviderType.OPENAI,
             cfg.getApiKey(),
@@ -302,7 +305,7 @@ public class StrandsAgentBuilder {
             cfg.getModelName() != null ? cfg.getModelName() : "gpt-4o-mini",
             cfg.getTemperature(),
             cfg.getMaxRetries(),
-            cfg.getOllamaBaseUrl(),
+            Map.copyOf(props),
             cfg.getLogRequests(),
             cfg.getLogResponses()
         );
@@ -316,7 +319,7 @@ public class StrandsAgentBuilder {
             }
         }
         for (var instance : programmaticToolInstances) {
-            if (instance instanceof de.augmentia.strandsagents.features.tools.AgentTool<?> at) {
+            if (instance instanceof AgentTool<?> at) {
                 builder.with(at);
             } else {
                 builder.with(instance);
@@ -330,7 +333,7 @@ public class StrandsAgentBuilder {
         try {
             var clazz = Class.forName(className);
             var instance = clazz.getDeclaredConstructor().newInstance();
-            if (instance instanceof de.augmentia.strandsagents.features.tools.AgentTool<?> at) {
+            if (instance instanceof AgentTool<?> at) {
                 builder.with(at);
             } else {
                 builder.with(instance);

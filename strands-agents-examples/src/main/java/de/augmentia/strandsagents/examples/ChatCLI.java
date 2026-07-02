@@ -4,25 +4,19 @@ import de.augmentia.strandsagents.config.LlmConfig;
 import de.augmentia.strandsagents.core.*;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.config.AgentConfig;
-import de.augmentia.strandsagents.config.ModelFactory;
-import de.augmentia.strandsagents.features.conversation.SummarizingSlidingWindowConversationManager;
+import de.augmentia.strandsagents.config.AgentSettings;
+import de.augmentia.strandsagents.core.conversation.SummarizingSlidingWindowConversationManager;
 import de.augmentia.strandsagents.examples.hooks.CacheLoggingHook;
-import de.augmentia.strandsagents.features.pipeline.HookRegistry;
+import de.augmentia.strandsagents.interceptor.pipeline.HookRegistry;
 import de.augmentia.strandsagents.model.agent.AgentResult;
 import de.augmentia.strandsagents.model.event.*;
-import de.augmentia.strandsagents.features.plugin.Plugin;
-import de.augmentia.strandsagents.features.tools.McpToolMethod;
-import de.augmentia.strandsagents.features.sessions.FileChatMemoryStore;
-import de.augmentia.strandsagents.features.sessions.FileSessionManager;
-import de.augmentia.strandsagents.features.skills.AgentSkillsPlugin;
-import de.augmentia.strandsagents.features.skills.Skill;
-import de.augmentia.strandsagents.features.skills.SkillParser;
-import de.augmentia.strandsagents.model.message.Message;
-import de.augmentia.strandsagents.model.message.SystemMessage;
-import de.augmentia.strandsagents.model.message.UserMessage;
-import de.augmentia.strandsagents.model.message.AssistantMessage;
-import de.augmentia.strandsagents.model.message.ToolMessage;
-import dev.langchain4j.data.message.ChatMessage;
+import de.augmentia.strandsagents.interceptor.plugin.Plugin;
+import de.augmentia.strandsagents.tools.McpToolMethod;
+import de.augmentia.strandsagents.core.sessions.FileChatMemoryStore;
+import de.augmentia.strandsagents.core.sessions.FileSessionManager;
+import de.augmentia.strandsagents.skills.AgentSkillsPlugin;
+import de.augmentia.strandsagents.skills.Skill;
+import de.augmentia.strandsagents.skills.SkillParser;
 import dev.langchain4j.mcp.client.DefaultMcpClient;
 import dev.langchain4j.mcp.client.McpClient;
 import dev.langchain4j.mcp.client.transport.http.StreamableHttpMcpTransport;
@@ -88,7 +82,7 @@ public class ChatCLI {
         var registry = ToolRegistry.builder()
                 .workspace(Path.of(".").toAbsolutePath())
             .standard()
-            .with("de.augmentia.strandsagents.features.tools.CalculatorTool")
+            .with("de.augmentia.strandsagents.tools.builtin.CalculatorTool")
             .build();
 
         var mcpCommand = System.getenv("MCP_SERVER_COMMAND");
@@ -121,16 +115,17 @@ public class ChatCLI {
         var hookRegistry = new HookRegistry();
         hookRegistry.register(new CacheLoggingHook());
 
-        var agent = AgentConfig.builder()
-            .toolRegistry(registry)
-            .conversationManager(conversationManager)
-            .sessionManager(sessionManager)
-            .chatMemoryStore(chatMemoryStore)
-            .plugins(plugins)
+        var agent = AgentFactory.buildAgent(AgentSettings.builder()
             .logLlmCalls(Path.of("logs/llm-calls.log"))
-            .build()
-
-            .createAgent(model);
+            .build(),
+            AgentConfig.builder()
+                .toolRegistry(registry)
+                .conversationManager(conversationManager)
+                .sessionManager(sessionManager)
+                .chatMemoryStore(chatMemoryStore)
+                .plugins(plugins)
+                .build(),
+            model);
         agent.setHookRegistry(hookRegistry);
 
         var actualSessionId = sessionId != null ? sessionId : UUID.randomUUID().toString();

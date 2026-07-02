@@ -1,12 +1,12 @@
 package de.augmentia.strandsagents.examples.feature;
 
-import de.augmentia.strandsagents.features.gate.Gate;
-import de.augmentia.strandsagents.features.gate.GateEvaluator;
-import de.augmentia.strandsagents.features.gate.GateType;
-import de.augmentia.strandsagents.features.workflow.StepStatus;
-import de.augmentia.strandsagents.features.workflow.WorkCoordinator;
-import de.augmentia.strandsagents.features.workflow.WorkflowDefinition;
-import de.augmentia.strandsagents.features.workflow.WorkflowStep;
+import de.augmentia.strandsagents.interceptor.gate.Gate;
+import de.augmentia.strandsagents.interceptor.gate.GateEvaluator;
+import de.augmentia.strandsagents.interceptor.gate.GateType;
+import de.augmentia.strandsagents.core.workflow.StepStatus;
+import de.augmentia.strandsagents.core.workflow.WorkCoordinator;
+import de.augmentia.strandsagents.core.workflow.WorkflowDefinition;
+import de.augmentia.strandsagents.core.workflow.WorkflowStep;
 
 import java.lang.reflect.Method;
 import java.util.List;
