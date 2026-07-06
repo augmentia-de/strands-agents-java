@@ -145,6 +145,7 @@ public class AgentFactory {
         if (settings.structuredOutputConfig() != null) {
             agent.setStructuredOutputConfig(settings.structuredOutputConfig());
         }
+        agent.setMaxToolIterations(settings.maxToolIterations());
         return agent;
     }
 
@@ -181,6 +182,7 @@ public class AgentFactory {
         if (settings.structuredOutputConfig() != null) {
             agent.setStructuredOutputConfig(settings.structuredOutputConfig());
         }
+        agent.setMaxToolIterations(settings.maxToolIterations());
         if (logger != null) {
             agent.setLlmLogger(logger);
         }

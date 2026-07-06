@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.augmentia.strandsagents.model.agent.AgentResult;
 import de.augmentia.strandsagents.model.agent.ExecutionMetrics;
 import de.augmentia.strandsagents.model.agent.StopReason;
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import java.util.ArrayList;
 import java.util.List;
@@ -352,7 +353,7 @@ class HookRegistryTest {
     void triggerBeforeToolCallCancel() {
         var registry = new HookRegistry();
         registry.register(new CancelHook("cancel-tc"));
-        var ctx = new HookContexts.BeforeToolCallContext("s1", "bash", Map.of());
+        var ctx = new HookContexts.BeforeToolCallContext("s1", BaseToolNames.BASH, Map.of());
         assertThat(registry.triggerBeforeToolCall(ctx))
             .isInstanceOf(HookResult.Cancel.class);
     }
@@ -363,7 +364,7 @@ class HookRegistryTest {
     void triggerAfterToolCallModify() {
         var registry = new HookRegistry();
         registry.register(new ModifyAfterToolCallHook("modifier", "censored"));
-        var ctx = new HookContexts.AfterToolCallContext("s1", "bash", "secret data", false);
+        var ctx = new HookContexts.AfterToolCallContext("s1", BaseToolNames.BASH, "secret data", false);
         var result = registry.triggerAfterToolCall(ctx, "secret data");
         assertThat(((HookResult.Modify<?>) result).value()).isEqualTo("censored");
     }

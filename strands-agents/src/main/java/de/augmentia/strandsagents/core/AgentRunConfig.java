@@ -1,6 +1,7 @@
 package de.augmentia.strandsagents.core;
 
 
+import de.augmentia.strandsagents.config.AgentSettings;
 import de.augmentia.strandsagents.interceptor.pipeline.HookRegistry;
 import de.augmentia.strandsagents.skills.Skill;
 import de.augmentia.strandsagents.model.structured.StructuredOutputConfig;
@@ -27,6 +28,7 @@ public class AgentRunConfig {
     private volatile HookRegistry hookRegistry;
     private volatile AgentEventListener eventListener;
     private volatile StructuredOutputConfig structuredOutputConfig;
+    private volatile int maxToolIterations = AgentSettings.DEFAULT_MAX_TOOL_ITERATIONS;
     private final List<Skill> dynamicSkills = new ArrayList<>();
 
     public AgentRunConfig() {
@@ -72,6 +74,14 @@ public class AgentRunConfig {
         this.structuredOutputConfig = structuredOutputConfig;
     }
 
+    public int getMaxToolIterations() {
+        return maxToolIterations;
+    }
+
+    public void setMaxToolIterations(int maxToolIterations) {
+        this.maxToolIterations = maxToolIterations;
+    }
+
     public synchronized List<Skill> getDynamicSkills() {
         return List.copyOf(dynamicSkills);
     }
@@ -103,6 +113,7 @@ public class AgentRunConfig {
             hookRegistry,
             eventListener,
             structuredOutputConfig,
+            maxToolIterations,
             getDynamicSkills()
         );
     }

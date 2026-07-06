@@ -1,52 +1,29 @@
 package de.augmentia.strandsagents.tools.builtin;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.io.IOException;
+import de.augmentia.strandsagents.tools.AgentTool;
+import de.augmentia.strandsagents.tools.ToolResult;
+import de.augmentia.strandsagents.tools.security.FileSandboxGuard;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-
-import de.augmentia.strandsagents.core.internal.WorkspacePaths;
-import de.augmentia.strandsagents.tools.AgentTool;
-import de.augmentia.strandsagents.tools.TextContent;
-import de.augmentia.strandsagents.tools.ToolResult;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.stream.Stream;
 
 public class FindTool implements AgentTool<FindTool.Params> {
-    private static final Logger log = LoggerFactory.getLogger(FindTool.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final int MAX_OUTPUT_BYTES = 50_000;
 
-    private static final Set<String> SKIP_DIRS = Set.of(
-        ".git", "node_modules", "target", ".venv", ".idea",
-        "__pycache__", ".mvn", ".gradle", "build", "dist",
-        ".next", ".vscode", ".sessions", "data", ".sass-cache",
-        "coverage", ".nyc_output", ".cache", "tmp", "temp",
-        "vendor", "bower_components", ".tox", " eggs", ".eggs",
-        "site-packages", ".terraform", "Pods", ".serverless"
-    );
+    private static final ObjectMapper SCHEMA_MAPPER = new ObjectMapper();
+    private final FileSandboxGuard sandboxGuard;
 
-    private static final Set<String> SKIP_FILES = Set.of(
-        ".DS_Store", "Thumbs.db", "desktop.ini"
-    );
-
-    private final WorkspacePaths workspacePaths;
-
-    public FindTool(Path cwd) {
-        try {
-            this.workspacePaths = new WorkspacePaths(cwd);
-        } catch (java.io.IOException e) {
-            throw new IllegalArgumentException("Invalid workspace path: " + cwd, e);
-        }
+    public FindTool(Path workDir) {
+        this.sandboxGuard = new FileSandboxGuard(workDir.toString());
     }
 
     @Override
     public String name() {
-        return "find";
+        return BaseToolNames.GLOB_FILES;
     }
 
     @Override
@@ -88,98 +65,46 @@ public class FindTool implements AgentTool<FindTool.Params> {
     }
 
     @Override
-    public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
-        log.debug("Tool: find START pattern={} path={}", params.pattern(), params.path());
-        if (abortFlag.get()) {
-            log.debug("Tool: find ABORTED");
-            throw new RuntimeException("Operation aborted");
+    public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) throws Exception {
+        if (params.pattern() == null || params.pattern().isBlank()) {
+            return ToolResult.error("Glob pattern is required.");
         }
 
-        var searchPath = resolveSearchPath(params);
-        var matcher = FileSystems.getDefault().getPathMatcher("glob:" + params.pattern());
-        var maxResults = params.maxResults() != null ? params.maxResults() : 100;
-        var results = new ArrayList<String>();
+        Path rootDir = sandboxGuard.getWorkspaceRoot();
+        String cleanPattern = params.pattern().replace("\\", "/");
+        PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + cleanPattern);
 
-        try {
-            Files.walkFileTree(searchPath, new SimpleFileVisitor<Path>() {
-                @Override
-                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                    if (abortFlag.get() || results.size() >= maxResults) {
-                        return FileVisitResult.TERMINATE;
-                    }
-                    if (dir.equals(searchPath)) return FileVisitResult.CONTINUE;
-                    var fileName = dir.getFileName().toString();
-                    if (SKIP_DIRS.contains(fileName) || fileName.startsWith(".")) {
-                        return FileVisitResult.SKIP_SUBTREE;
-                    }
-                    return FileVisitResult.CONTINUE;
+        List<String> matchedFiles = new ArrayList<>();
+
+        try (Stream<Path> walk = Files.walk(rootDir)) {
+            List<Path> allPaths = walk.toList();
+
+            for (Path path : allPaths) {
+                if (abortFlag != null && abortFlag.get()) {
+                    return ToolResult.error("Glob operation aborted.");
                 }
 
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                    if (abortFlag.get() || results.size() >= maxResults) {
-                        return FileVisitResult.TERMINATE;
+                Path relativePath = rootDir.relativize(path);
+
+                if (matcher.matches(relativePath)) {
+                    try {
+                        sandboxGuard.validateAndResolve(path.toString());
+                        matchedFiles.add(relativePath.toString().replace("\\", "/"));
+                    } catch (Exception e) {
+                        // Ignoriere unbefugte Pfade
                     }
-                    var fileName = file.getFileName().toString();
-                    if (SKIP_FILES.contains(fileName)) {
-                        return FileVisitResult.CONTINUE;
-                    }
-                    var relPath = searchPath.relativize(file);
-                    if (matcher.matches(relPath) || matcher.matches(file.getFileName())) {
-                        results.add(relPath.toString());
-                    }
-                    return FileVisitResult.CONTINUE;
                 }
-
-                @Override
-                public FileVisitResult visitFileFailed(Path file, IOException exc) {
-                    if (exc instanceof AccessDeniedException) {
-                        log.warn("Skipping unreadable: {}", file);
-                        return FileVisitResult.SKIP_SUBTREE;
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-        } catch (IOException e) {
-            throw new RuntimeException("Search failed: " + e.getMessage());
-        }
-
-        Collections.sort(results);
-
-        var root = MAPPER.createObjectNode();
-        root.put("pattern", params.pattern());
-        var arr = root.putArray("results");
-        for (var r : results) {
-            arr.add(r);
-        }
-        root.put("totalResults", results.size());
-        boolean truncated = results.size() >= maxResults;
-        root.put("truncated", truncated);
-
-        log.debug("Tool: find DONE results={}", results.size());
-        return new ToolResult(
-            List.of(new TextContent(root.toString())),
-            new FindDetails(results.size(), params.pattern()));
-    }
-
-    private Path resolveSearchPath(Params params) {
-        if (params.path() == null) return workspacePaths.workspace();
-        try {
-            var resolved = workspacePaths.resolve(params.path());
-            if (Files.exists(resolved)) return resolved;
-            var wsName = workspacePaths.workspace().getFileName().toString();
-            if (params.path().equals(wsName)) {
-                log.debug("path '{}' resolved to non-existent '{}', using workspace root", params.path(), resolved);
-                return workspacePaths.workspace();
             }
-            log.debug("path '{}' resolved to non-existent '{}', searching anyway", params.path(), resolved);
-            return resolved;
-        } catch (RuntimeException e) {
-            log.warn("path '{}' resolution failed: {}, using workspace root", params.path(), e.getMessage());
-            return workspacePaths.workspace();
+        } catch (Exception e) {
+            return ToolResult.error("Error during file system traversal: " + e.getMessage());
         }
+
+        if (matchedFiles.isEmpty()) {
+            return ToolResult.success("No files matched the pattern: " + params.pattern());
+        }
+
+        return ToolResult.success("Found matching files:\n" + String.join("\n", matchedFiles));
     }
 
-    public record Params(String pattern, String path, Integer maxResults) {}
-    public record FindDetails(int fileCount, String pattern) {}
+    public record Params(String pattern) {}
 }

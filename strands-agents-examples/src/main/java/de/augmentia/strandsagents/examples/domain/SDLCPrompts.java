@@ -80,7 +80,7 @@ public class SDLCPrompts {
         CommandTool commandTool = new CommandTool(workDir);
         ReadTool readTool = new ReadTool(workDir);
         WriteTool writeTool = new WriteTool(workDir);
-        EditTool editTool = new EditTool(workDir);
+        MultiEditTool editTool = new MultiEditTool(workDir);
         GrepTool grepTool = new GrepTool(workDir);
         FindTool findTool = new FindTool(workDir);
         LsTool lsTool = new LsTool(workDir);

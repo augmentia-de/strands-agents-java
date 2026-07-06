@@ -30,7 +30,7 @@ public class CommandTool implements AgentTool<CommandTool.Params> {
 
     @Override
     public String name() {
-        return "execute_command";
+        return BaseToolNames.EXECUTE_COMMAND;
     }
 
     @Override

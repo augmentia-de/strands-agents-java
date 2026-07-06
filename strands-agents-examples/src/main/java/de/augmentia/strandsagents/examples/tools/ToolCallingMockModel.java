@@ -23,8 +23,8 @@ import java.util.stream.Collectors;
 
     public class ToolCallingMockModel implements ChatModel {
 
-    // Must match Agent.MAX_TOOL_ITERATIONS. Set via reflection from OrchestratorDemo.
-    static int MAX_AGENT_LOOP = 10;
+    // Per-agent maxToolIterations, default 12 in AgentSettings.
+    static int MAX_AGENT_LOOP = 12;
     private static final ObjectMapper JSON = new ObjectMapper();
     private boolean structuredMode;
     private static final Pattern EDIT_KEYWORDS =

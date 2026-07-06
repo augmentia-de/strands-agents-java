@@ -1,48 +1,47 @@
 package de.augmentia.strandsagents.tools.builtin;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-
-import java.io.*;
-import java.nio.file.*;
+import de.augmentia.strandsagents.tools.*;
+import de.augmentia.strandsagents.tools.security.FileSandboxGuard;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-import de.augmentia.strandsagents.core.internal.WorkspacePaths;
-import de.augmentia.strandsagents.tools.AgentTool;
-import de.augmentia.strandsagents.tools.FileReaderFactory;
-import de.augmentia.strandsagents.tools.ToolResult;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 
 public class ReadTool implements AgentTool<ReadTool.Params> {
-    private static final Logger log = LoggerFactory.getLogger(ReadTool.class);
+
     private static final ObjectMapper SCHEMA_MAPPER = new ObjectMapper();
-    private final WorkspacePaths workspacePaths;
+    private final FileSandboxGuard sandboxGuard;
     private final FileReaderFactory readerFactory;
 
-    public ReadTool(Path cwd) {
-        this(cwd, FileReaderFactory.withDefaults());
+    // Konstruktor-basierte Konfiguration
+    public ReadTool(Path workDir) {
+        this.sandboxGuard = new FileSandboxGuard(workDir.toString());
+        this.readerFactory = FileReaderFactory.withDefaults();
     }
 
     public ReadTool(Path cwd, FileReaderFactory readerFactory) {
         try {
-            this.workspacePaths = new WorkspacePaths(cwd);
+            this.sandboxGuard = new FileSandboxGuard(cwd.toString());
             this.readerFactory = readerFactory;
-        } catch (java.io.IOException e) {
+        } catch (Exception e) {
             throw new IllegalArgumentException("Invalid workspace path: " + cwd, e);
         }
     }
 
+
     @Override
     public String name() {
-        return "read";
+        return BaseToolNames.READ_FILES;
     }
 
     @Override
     public String description() {
-        return "Read the contents of a file. Supported formats: text files, images (.jpg/.png/.gif/.webp), PDFs (.pdf). "
-            + "Use offset/limit for large files.";
+        return "Reads the contents of one or multiple files or directories securely inside the sandbox.";
     }
 
     @Override
@@ -77,47 +76,35 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
     }
 
     @Override
-    public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
-        log.debug("Tool: read START path={}", params.path());
-        if (abortFlag.get()) {
-            throw new RuntimeException("Operation aborted");
+    public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) throws Exception {
+        if (params.filePaths() == null || params.filePaths().isEmpty()) {
+            return ToolResult.error("No file paths provided.");
         }
 
-        var path = workspacePaths.resolve(params.path());
-        if (!Files.isReadable(path)) {
-            throw new RuntimeException("File not readable: " + params.path());
-        }
+        List<ContentBlock> allBlocks = new ArrayList<>();
+        for (String pathStr : params.filePaths()) {
+            if (abortFlag != null && abortFlag.get()) {
+                return ToolResult.error("Operation aborted.");
+            }
 
-        if (Files.isDirectory(path)) {
-            try (var files = Files.list(path)) {
-                var listing = files
-                    .map(p -> p.getFileName().toString() + (Files.isDirectory(p) ? "/" : ""))
-                    .sorted()
-                    .toList();
-                var sb = new StringBuilder();
-                sb.append("Directory: ").append(params.path()).append("\n");
-                for (var f : listing) {
-                    sb.append("  ").append(f).append("\n");
+            try {
+                // ABSICHERUNG
+                Path securePath = sandboxGuard.validateAndResolve(pathStr);
+
+                FileReader reader = readerFactory.findReader(securePath);
+                if (reader == null) {
+                    allBlocks.add(new TextContent("Unsupported file type or directory format for: " + pathStr));
+                    continue;
                 }
-                return ToolResult.success(sb.toString());
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to list directory: " + params.path(), e);
-            }
-        }
 
-        try {
-            var reader = readerFactory.findReader(path);
-            if (reader == null) {
-                return ToolResult.error("Unsupported file type: " + params.path()
-                    + " — use a plain text file (.txt, .json, .md, etc.),"
-                    + " an image (.jpg, .png, .gif, .webp),"
-                    + " or a PDF (.pdf).");
+                ToolResult fileResult = reader.read(securePath, params);
+                allBlocks.addAll(fileResult.content());
+            } catch (Exception e) {
+                allBlocks.add(new TextContent("Security or I/O Error reading " + pathStr + ": " + e.getMessage()));
             }
-            return reader.read(path, params);
-        } catch (IOException e) {
-            throw new RuntimeException(e.getMessage(), e);
         }
+        return new ToolResult(allBlocks, null);
     }
 
-    public record Params(String path, Integer offset, Integer limit, Integer line_start, Integer line_end) {}
+    public record Params(List<String> filePaths, Integer offset, Integer limit, Integer line_start, Integer line_end) {}
 }

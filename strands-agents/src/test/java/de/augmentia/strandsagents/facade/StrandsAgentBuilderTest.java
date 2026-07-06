@@ -3,8 +3,8 @@ package de.augmentia.strandsagents.facade;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.augmentia.strandsagents.config.ModelProviderType;
-import java.util.List;
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
+
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
 
@@ -121,7 +121,7 @@ class StrandsAgentBuilderTest {
             .build();
 
         var registry = agent.getDelegate().getToolRegistry();
-        assertThat(registry.getToolNames()).contains("web_search");
+        assertThat(registry.getToolNames()).contains(BaseToolNames.WEB_SEARCH);
     }
 
     @Test
@@ -164,7 +164,7 @@ class StrandsAgentBuilderTest {
             .build();
 
         var registry = agent.getDelegate().getToolRegistry();
-        assertThat(registry.getToolNames()).contains("web_search", "web_fetch");
+        assertThat(registry.getToolNames()).contains(BaseToolNames.WEB_SEARCH, BaseToolNames.WEB_FETCH);
     }
 
     @Test

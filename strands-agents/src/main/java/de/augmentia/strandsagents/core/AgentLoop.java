@@ -113,7 +113,7 @@ final class AgentLoop {
             agent.chatMemory.add(UserMessage.from(prompt));
 
 
-            for (int iteration = 0; iteration < Agent.MAX_TOOL_ITERATIONS; iteration++) {
+            for (int iteration = 0; iteration < run.maxToolIterations(); iteration++) {
                 checkPaused();
                 if (agent.cancelled || agent.abortFlag.get()) {
                     agent.cancelled = true;
@@ -121,7 +121,7 @@ final class AgentLoop {
                 }
 
                 log.debug("Iteration {}/{} — chatMemory messages={}",
-                    iteration + 1, Agent.MAX_TOOL_ITERATIONS, agent.chatMemory.messages().size());
+                    iteration + 1, run.maxToolIterations(), agent.chatMemory.messages().size());
 
                 var domainMessages = pruneConversation();
 
@@ -668,7 +668,7 @@ final class AgentLoop {
     }
 
     private AgentResult handleMaxIterations() {
-        log.debug("Max iterations ({}) reached — returning result", Agent.MAX_TOOL_ITERATIONS);
+        log.debug("Max iterations ({}) reached — returning result", run.maxToolIterations());
         agent.phase = AgentPhase.FAILED;
         var result = new AgentResult(
             sid,

@@ -10,15 +10,14 @@ import java.util.List;
 import java.util.Map;
 
 import de.augmentia.strandsagents.interceptor.pipeline.HookContexts;
-import de.augmentia.strandsagents.skills.AgentSkillsPlugin;
-import de.augmentia.strandsagents.skills.Skill;
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import org.junit.jupiter.api.Test;
 
 class AgentSkillsPluginTest {
 
     private static final Skill TEST_SKILL = new Skill("test-skill",
         "A test skill", "Do the test thing", null,
-        List.of("bash", "calc"), Map.of("author", "me"), "MIT", "java21", null);
+        List.of(BaseToolNames.BASH, "calc"), Map.of("author", "me"), "MIT", "java21", null);
 
     private static final Skill WEATHER_SKILL = new Skill("weather",
         "Weather lookup", "Check the weather", null,

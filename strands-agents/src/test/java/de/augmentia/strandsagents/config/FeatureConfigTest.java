@@ -2,6 +2,7 @@ package de.augmentia.strandsagents.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -17,8 +18,8 @@ class FeatureConfigTest {
     @Test
     void isEnabled_disabledFeature_returnsFalse() {
         var fc = new FeatureConfig(Map.of(
-            "bash", new FeatureConfig.FeatureToggle(false, "Bash")));
-        assertThat(fc.isEnabled("bash")).isFalse();
+            BaseToolNames.BASH, new FeatureConfig.FeatureToggle(false, "Bash")));
+        assertThat(fc.isEnabled(BaseToolNames.BASH)).isFalse();
     }
 
     @Test
@@ -36,10 +37,10 @@ class FeatureConfigTest {
     @Test
     void withOverride_enablesDisabledFeature() {
         var fc = new FeatureConfig(Map.of(
-            "bash", new FeatureConfig.FeatureToggle(false, "Bash")));
-        var overridden = fc.withOverride("bash", true);
-        assertThat(overridden.isEnabled("bash")).isTrue();
-        assertThat(fc.isEnabled("bash")).isFalse();
+            BaseToolNames.BASH, new FeatureConfig.FeatureToggle(false, "Bash")));
+        var overridden = fc.withOverride(BaseToolNames.BASH, true);
+        assertThat(overridden.isEnabled(BaseToolNames.BASH)).isTrue();
+        assertThat(fc.isEnabled(BaseToolNames.BASH)).isFalse();
     }
 
     @Test
@@ -62,7 +63,7 @@ class FeatureConfigTest {
         var fc = FeatureConfig.load();
         assertThat(fc).isNotNull();
         assertThat(fc.isEnabled("llm_logging")).isTrue();
-        assertThat(fc.isEnabled("bash")).isFalse();
+        assertThat(fc.isEnabled(BaseToolNames.BASH)).isFalse();
         assertThat(fc.isEnabled("skill_search")).isFalse();
         assertThat(fc.isEnabled("mcp_ingest")).isFalse();
         assertThat(fc.isEnabled("hitl")).isFalse();
@@ -91,7 +92,7 @@ class FeatureConfigTest {
     @Test
     void strandConfig_fromYaml_resolvesFeatures() {
         var fc = new FeatureConfig(Map.of(
-            "bash", new FeatureConfig.FeatureToggle(true, ""),
+            BaseToolNames.BASH, new FeatureConfig.FeatureToggle(true, ""),
             "llm_logging", new FeatureConfig.FeatureToggle(false, ""),
             "skill_search", new FeatureConfig.FeatureToggle(true, "")));
         var cfg = StrandsAgentConfig.fromYaml(fc);

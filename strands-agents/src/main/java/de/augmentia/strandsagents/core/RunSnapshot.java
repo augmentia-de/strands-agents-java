@@ -21,6 +21,7 @@ public record RunSnapshot(
     HookRegistry hookRegistry,
     AgentEventListener eventListener,
     StructuredOutputConfig structuredOutputConfig,
+    int maxToolIterations,
     List<Skill> dynamicSkills
 ) {
 }

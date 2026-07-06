@@ -1,41 +1,32 @@
 package de.augmentia.strandsagents.tools.builtin;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.io.IOException;
-import java.nio.file.*;
-import java.util.List;
+import de.augmentia.strandsagents.tools.AgentTool;
+import de.augmentia.strandsagents.tools.ToolResult;
+import de.augmentia.strandsagents.tools.security.FileSandboxGuard;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-import de.augmentia.strandsagents.core.internal.WorkspacePaths;
-import de.augmentia.strandsagents.tools.AgentTool;
-import de.augmentia.strandsagents.tools.TextContent;
-import de.augmentia.strandsagents.tools.ToolResult;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 public class WriteTool implements AgentTool<WriteTool.Params> {
-    private static final Logger log = LoggerFactory.getLogger(WriteTool.class);
-    private static final ObjectMapper SCHEMA_MAPPER = new ObjectMapper();
-    private final WorkspacePaths workspacePaths;
 
-    public WriteTool(Path cwd) {
-        try {
-            this.workspacePaths = new WorkspacePaths(cwd);
-        } catch (java.io.IOException e) {
-            throw new IllegalArgumentException("Invalid workspace path: " + cwd, e);
-        }
+    private static final ObjectMapper SCHEMA_MAPPER = new ObjectMapper();
+    private final FileSandboxGuard sandboxGuard;
+
+    public WriteTool(Path workDir) {
+        this.sandboxGuard = new FileSandboxGuard(workDir.toString());
     }
 
     @Override
     public String name() {
-        return "write";
+        return BaseToolNames.WRITE_FILE;
     }
 
     @Override
     public String description() {
-        return "Write content to a file. Creates parent directories automatically.";
+        return "Writes or overwrites a single file with the specified content securely inside the sandbox.";
     }
 
     @Override
@@ -65,28 +56,28 @@ public class WriteTool implements AgentTool<WriteTool.Params> {
     }
 
     @Override
-    public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
-        log.debug("Tool: write START path={}", params.path());
-        if (abortFlag.get()) {
-            log.debug("Tool: write ABORTED");
-            throw new RuntimeException("Operation aborted");
+    public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) throws Exception {
+        if (params.filePath() == null || params.filePath().isBlank()) {
+            return ToolResult.error("filePath is required.");
         }
-        var path = workspacePaths.resolve(params.path());
+        if (params.content() == null) {
+            return ToolResult.error("content is required.");
+        }
+
         try {
-            var parent = path.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
+            Path securePath = sandboxGuard.validateAndResolve(params.filePath());
+
+            if (securePath.getParent() != null) {
+                Files.createDirectories(securePath.getParent());
             }
-            Files.writeString(path, params.content());
-            log.debug("Tool: write DONE bytes={}", params.content().length());
-            return new ToolResult(
-                List.of(new TextContent("Successfully wrote " + params.content().length() + " bytes to " + params.path())),
-                null);
-        } catch (IOException e) {
-            log.debug("Tool: write ERROR: {}", e.getMessage());
-            throw new RuntimeException(e.getMessage(), e);
+
+            Files.writeString(securePath, params.content());
+            return ToolResult.success("Successfully wrote file to: " + securePath.getFileName());
+
+        } catch (Exception e) {
+            return ToolResult.error("Failed to write file due to security or I/O error: " + e.getMessage());
         }
     }
 
-    public record Params(String path, String content) {}
+    public record Params(String filePath, String content) {}
 }

@@ -2,9 +2,9 @@ package de.augmentia.strandsagents.core.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.augmentia.strandsagents.core.internal.ChatMessageConverter;
 import de.augmentia.strandsagents.model.message.*;
 import de.augmentia.strandsagents.model.tool.ToolCall;
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 
 import java.time.Instant;
 import java.util.List;
@@ -52,26 +52,26 @@ class ChatMessageConverterTest {
 
     @Test
     void convertsAssistantMessageWithToolCalls() {
-        var toolCall = new ToolCall("tc-1", "bash", "{\"cmd\": \"ls\"}");
+        var toolCall = new ToolCall("tc-1", BaseToolNames.BASH, "{\"cmd\": \"ls\"}");
         var domain = new AssistantMessage("id-1", Instant.now(), null, Map.of(), List.of(toolCall));
         var lc4j = ChatMessageConverter.toLangChain4j(domain);
         assertThat(lc4j).isInstanceOf(dev.langchain4j.data.message.AiMessage.class);
         var aiMsg = (dev.langchain4j.data.message.AiMessage) lc4j;
         assertThat(aiMsg.hasToolExecutionRequests()).isTrue();
         assertThat(aiMsg.toolExecutionRequests()).hasSize(1);
-        assertThat(aiMsg.toolExecutionRequests().get(0).name()).isEqualTo("bash");
+        assertThat(aiMsg.toolExecutionRequests().get(0).name()).isEqualTo(BaseToolNames.BASH);
         assertThat(aiMsg.toolExecutionRequests().get(0).arguments()).isEqualTo("{\"cmd\": \"ls\"}");
 
         var back = ChatMessageConverter.toDomainMessage(lc4j);
         assertThat(back).isInstanceOf(AssistantMessage.class);
         var am = (AssistantMessage) back;
         assertThat(am.toolCalls()).hasSize(1);
-        assertThat(am.toolCalls().get(0).toolName()).isEqualTo("bash");
+        assertThat(am.toolCalls().get(0).toolName()).isEqualTo(BaseToolNames.BASH);
     }
 
     @Test
     void convertsToolMessageBidirectionally() {
-        var domain = new ToolMessage("id-1", Instant.now(), "result", Map.of(), "tc-1", "bash");
+        var domain = new ToolMessage("id-1", Instant.now(), "result", Map.of(), "tc-1", BaseToolNames.BASH);
         var lc4j = ChatMessageConverter.toLangChain4j(domain);
         assertThat(lc4j).isInstanceOf(dev.langchain4j.data.message.ToolExecutionResultMessage.class);
 
@@ -79,7 +79,7 @@ class ChatMessageConverterTest {
         assertThat(back).isInstanceOf(ToolMessage.class);
         var tm = (ToolMessage) back;
         assertThat(tm.content()).isEqualTo("result");
-        assertThat(tm.toolName()).isEqualTo("bash");
+        assertThat(tm.toolName()).isEqualTo(BaseToolNames.BASH);
         assertThat(tm.toolCallId()).isEqualTo("tc-1");
     }
 

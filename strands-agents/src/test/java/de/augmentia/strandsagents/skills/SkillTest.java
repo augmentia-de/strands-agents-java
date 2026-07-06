@@ -7,7 +7,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-import de.augmentia.strandsagents.skills.Skill;
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import org.junit.jupiter.api.Test;
 
 class SkillTest {
@@ -23,11 +23,11 @@ class SkillTest {
     @Test
     void createSkillWithAllFields() {
         var path = Path.of("/tmp/skills/my-skill");
-        var allowed = List.of("bash", "calc");
+        var allowed = List.of(BaseToolNames.BASH, "calc");
         var meta = Map.<String, Object>of("author", "me");
         var skill = new Skill("full", "Full skill", "Instructions", path, allowed, meta, "MIT", "java21", null);
         assertThat(skill.path()).isEqualTo(path);
-        assertThat(skill.allowedTools()).containsExactly("bash", "calc");
+        assertThat(skill.allowedTools()).containsExactly(BaseToolNames.BASH, "calc");
         assertThat(skill.metadata()).containsEntry("author", "me");
         assertThat(skill.license()).isEqualTo("MIT");
         assertThat(skill.compatibility()).isEqualTo("java21");

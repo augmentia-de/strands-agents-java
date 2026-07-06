@@ -76,6 +76,7 @@ public class StrandsAgentBuilder {
         if (props.containsKey("strands.agent.provider")) parsed.setProvider(ModelProviderType.valueOf(props.getProperty("strands.agent.provider").toUpperCase()));
         if (props.containsKey("strands.agent.system-prompt")) parsed.setSystemPrompt(props.getProperty("strands.agent.system-prompt"));
         if (props.containsKey("strands.agent.max-iterations")) parsed.setMaxIterations(Integer.parseInt(props.getProperty("strands.agent.max-iterations")));
+        if (props.containsKey("strands.agent.max-tool-iterations")) parsed.setMaxToolIterations(Integer.parseInt(props.getProperty("strands.agent.max-tool-iterations")));
         if (props.containsKey("strands.agent.max-messages")) parsed.setMaxMessages(Integer.parseInt(props.getProperty("strands.agent.max-messages")));
         if (props.containsKey("strands.agent.skills.dir")) parsed.setSkillsDir(props.getProperty("strands.agent.skills.dir"));
         if (props.containsKey("strands.agent.ollama.base-url")) parsed.setOllamaBaseUrl(props.getProperty("strands.agent.ollama.base-url"));
@@ -160,6 +161,11 @@ public class StrandsAgentBuilder {
         return this;
     }
 
+    public StrandsAgentBuilder withMaxToolIterations(int maxToolIterations) {
+        programmaticOverrides.setMaxToolIterations(maxToolIterations);
+        return this;
+    }
+
     public StrandsAgentBuilder withMaxMessages(int maxMessages) {
         programmaticOverrides.setMaxMessages(maxMessages);
         return this;
@@ -212,6 +218,9 @@ public class StrandsAgentBuilder {
         if (merged.getSystemPrompt() != null && !merged.getSystemPrompt().isBlank()) {
             agent.setSystemPrompt(merged.getSystemPrompt());
         }
+        if (merged.getMaxToolIterations() != null) {
+            agent.setMaxToolIterations(merged.getMaxToolIterations());
+        }
         if (structuredOutputConfig != null) {
             agent.setStructuredOutputConfig(structuredOutputConfig);
         }
@@ -245,6 +254,7 @@ public class StrandsAgentBuilder {
         if (source.getMaxRetries() != null) target.setMaxRetries(source.getMaxRetries());
         if (source.getProvider() != null) target.setProvider(source.getProvider());
         if (source.getMaxIterations() != null) target.setMaxIterations(source.getMaxIterations());
+        if (source.getMaxToolIterations() != null) target.setMaxToolIterations(source.getMaxToolIterations());
         if (source.getMaxMessages() != null) target.setMaxMessages(source.getMaxMessages());
         if (source.getMaxTokens() != null) target.setMaxTokens(source.getMaxTokens());
         if (source.getKeepLastUserMessages() != null) target.setKeepLastUserMessages(source.getKeepLastUserMessages());

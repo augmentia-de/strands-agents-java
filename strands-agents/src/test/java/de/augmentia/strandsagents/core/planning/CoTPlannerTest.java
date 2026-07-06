@@ -5,8 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Map;
 
-import de.augmentia.strandsagents.core.planning.CoTPlanner;
-import de.augmentia.strandsagents.core.planning.Step;
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -62,7 +61,7 @@ class CoTPlannerTest {
             """;
         var steps = callParseSteps(json);
         assertThat(steps).hasSize(2);
-        assertThat(steps.get(0).toolName()).isEqualTo("web_search");
+        assertThat(steps.get(0).toolName()).isEqualTo(BaseToolNames.WEB_SEARCH);
         assertThat(steps.get(1).toolName()).isEqualTo("calc");
         assertThat(steps.get(1).dependsOn()).containsExactly("s1");
     }
@@ -120,7 +119,7 @@ class CoTPlannerTest {
 
     @Test
     void formatToolNames_returnsJoined() {
-        var names = List.of("calc", "web_search", "file_read");
+        var names = List.of("calc", BaseToolNames.WEB_SEARCH, "file_read");
         assertThat(callFormatToolNames(names)).isEqualTo("calc, web_search, file_read");
     }
 

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.augmentia.strandsagents.core.AgentFactory;
 import de.augmentia.strandsagents.core.ToolRegistry;
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.features.swarm.SwarmOrchestrator;
 import de.augmentia.strandsagents.config.AgentConfig;
@@ -76,7 +77,7 @@ public class InvestmentAnalysisDemo {
                 Synthesize findings into a market outlook.""")
             .build(),
             AgentConfig.builder()
-                .toolRegistry(ToolRegistry.builder().standard().include("web_search").build())
+                .toolRegistry(ToolRegistry.builder().standard().include(BaseToolNames.WEB_SEARCH).build())
                 .build(),
             model);
 

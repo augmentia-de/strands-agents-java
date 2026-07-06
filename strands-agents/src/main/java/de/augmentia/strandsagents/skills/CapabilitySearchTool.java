@@ -8,6 +8,7 @@ import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.tools.AgentTool;
 import de.augmentia.strandsagents.tools.TextContent;
 import de.augmentia.strandsagents.tools.ToolResult;
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import dev.langchain4j.model.chat.ChatModel;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,7 +47,7 @@ public class CapabilitySearchTool implements AgentTool<CapabilitySearchTool.Para
     public record Params(String task) {}
 
     @Override
-    public String name() { return "capability_search"; }
+    public String name() { return BaseToolNames.CAPABILITY_SEARCH; }
 
     @Override
     public String description() {

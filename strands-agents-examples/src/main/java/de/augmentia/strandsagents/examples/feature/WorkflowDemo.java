@@ -7,6 +7,7 @@ import java.util.Map;
 
 import de.augmentia.strandsagents.core.AgentFactory;
 import de.augmentia.strandsagents.core.ToolRegistry;
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.config.AgentConfig;
 import de.augmentia.strandsagents.config.AgentSettings;
@@ -62,7 +63,7 @@ public class WorkflowDemo {
             .logLlmCalls(Path.of("logs/llm-calls.log"))
             .build(),
             AgentConfig.builder()
-                .toolRegistry(ToolRegistry.builder().standard().include("web_search", "web_fetch").build())
+                .toolRegistry(ToolRegistry.builder().standard().include(BaseToolNames.WEB_SEARCH, BaseToolNames.WEB_FETCH).build())
                 .build(),
             model);
 

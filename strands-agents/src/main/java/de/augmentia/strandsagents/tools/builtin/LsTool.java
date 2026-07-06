@@ -11,10 +11,10 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-import de.augmentia.strandsagents.core.internal.WorkspacePaths;
 import de.augmentia.strandsagents.tools.AgentTool;
 import de.augmentia.strandsagents.tools.TextContent;
 import de.augmentia.strandsagents.tools.ToolResult;
+import de.augmentia.strandsagents.tools.security.FileSandboxGuard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,19 +22,16 @@ public class LsTool implements AgentTool<LsTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(LsTool.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final DateTimeFormatter ISO_FORMAT = DateTimeFormatter.ISO_INSTANT.withZone(ZoneId.of("UTC"));
-    private final WorkspacePaths workspacePaths;
+    private final FileSandboxGuard sandboxGuard;
 
-    public LsTool(Path cwd) {
-        try {
-            this.workspacePaths = new WorkspacePaths(cwd);
-        } catch (java.io.IOException e) {
-            throw new IllegalArgumentException("Invalid workspace path: " + cwd, e);
-        }
+    // Konstruktor-basierte Konfiguration analog zu ReadTool
+    public LsTool(Path workDir) {
+        this.sandboxGuard = new FileSandboxGuard(workDir.toString());
     }
 
     @Override
     public String name() {
-        return "ls";
+        return BaseToolNames.LS;
     }
 
     @Override
@@ -87,7 +84,16 @@ public class LsTool implements AgentTool<LsTool.Params> {
             throw new RuntimeException("Operation aborted");
         }
 
-        var targetPath = params.path() != null ? workspacePaths.resolve(params.path()) : workspacePaths.workspace();
+        Path targetPath = params.path() != null ? Path.of(params.path) : sandboxGuard.getWorkspaceRoot();
+
+        Path secureDir;
+        try {
+            secureDir = sandboxGuard.validateAndResolve(targetPath.toString());
+        } catch (Exception e) {
+            return ToolResult.error("Security violation: " + e.getMessage());
+        }
+
+
 
         if (!Files.exists(targetPath)) {
             throw new RuntimeException("Path does not exist: " + params.path());

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.augmentia.strandsagents.config.StrandsAgentConfig;
 import de.augmentia.strandsagents.core.conversation.ConversationManager;
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import de.augmentia.strandsagents.interceptor.guardrails.GuardrailPlugin;
 import de.augmentia.strandsagents.interceptor.plugin.Plugin;
 
@@ -34,7 +35,7 @@ class AgentFactoryTest {
             "skills", ".sessions", true, "logs/llm.log", List.of(),
             true, true, "config.json", "", true, true, "", "", "");
         var registry = AgentFactory.createToolRegistry(config);
-        assertThat(registry.getToolNames()).contains("bash");
+        assertThat(registry.getToolNames()).contains(BaseToolNames.BASH);
     }
 
     @Test

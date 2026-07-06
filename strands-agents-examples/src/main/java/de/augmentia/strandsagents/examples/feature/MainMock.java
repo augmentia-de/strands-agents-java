@@ -6,6 +6,7 @@ import de.augmentia.strandsagents.core.DefaultToolExecutor;
 import de.augmentia.strandsagents.core.ToolRegistry;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.core.subagent.SubAgentTool;
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import de.augmentia.strandsagents.features.swarm.SwarmOrchestrator;
 import de.augmentia.strandsagents.config.AgentConfig;
 import de.augmentia.strandsagents.config.AgentSettings;
@@ -123,12 +124,12 @@ public class MainMock {
             .name("research-agent")
             .modelName("openai/gpt-4o")
             .systemPrompt("You are a research agent.")
-            .maxIterations(15)
+            .maxToolIterations(15)
             .build();
         var infra = AgentConfig.builder()
             .toolRegistry(ToolRegistry.builder()
                 .standard()
-                .include("bash", "read", "ls")
+                .include(BaseToolNames.BASH, "read", BaseToolNames.LS)
                 .build())
             .build();
 
@@ -136,7 +137,7 @@ public class MainMock {
         System.out.println("  Model: " + settings.modelName());
         System.out.println("  SystemPrompt: " + settings.systemPrompt());
         System.out.println("  Tools: " + infra.toolRegistry().getToolNames());
-        System.out.println("  MaxIterations: " + settings.maxIterations());
+        System.out.println("  MaxIterations: " + settings.maxToolIterations());
 
         var agent = AgentFactory.buildAgent(settings, infra, new DemoMockModel());
         System.out.println("  Agent created via AgentFactory.buildAgent(settings, infra, model)");

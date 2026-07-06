@@ -11,7 +11,7 @@ import de.augmentia.strandsagents.tools.ToolActivator;
 import de.augmentia.strandsagents.tools.builtin.BashTool;
 import de.augmentia.strandsagents.tools.builtin.CommandTool;
 import de.augmentia.strandsagents.tools.builtin.DockerRunTool;
-import de.augmentia.strandsagents.tools.builtin.EditTool;
+import de.augmentia.strandsagents.tools.builtin.MultiEditTool;
 import de.augmentia.strandsagents.tools.builtin.FindTool;
 import de.augmentia.strandsagents.tools.builtin.GrepTool;
 import de.augmentia.strandsagents.tools.ListToolsTool;
@@ -38,7 +38,7 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
     CapabilitySearchTool.Params.class,
     CommandTool.Params.class,
     DockerRunTool.Params.class,
-    EditTool.Params.class,
+    MultiEditTool.Params.class,
     FindTool.Params.class,
     GdprDeleteTool.Params.class,
     GdprExportTool.Params.class,

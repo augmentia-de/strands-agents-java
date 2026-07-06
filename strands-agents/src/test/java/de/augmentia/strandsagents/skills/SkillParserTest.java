@@ -7,8 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import de.augmentia.strandsagents.skills.Skill;
-import de.augmentia.strandsagents.skills.SkillParser;
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -44,7 +43,7 @@ class SkillParserTest {
         assertThat(skill.name()).isEqualTo("test-skill");
         assertThat(skill.description()).isEqualTo("A test skill");
         assertThat(skill.instructions()).isEqualTo("This is the skill instructions.\nSecond line.");
-        assertThat(skill.allowedTools()).containsExactly("bash", "grep");
+        assertThat(skill.allowedTools()).containsExactly(BaseToolNames.BASH, "grep");
         assertThat(skill.license()).isEqualTo("MIT");
         assertThat(skill.compatibility()).isEqualTo("java21");
         assertThat(skill.metadata()).containsEntry("author", "test");

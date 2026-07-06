@@ -9,7 +9,7 @@ public record AgentSettings(
     String name,
     String modelName,
     String systemPrompt,
-    int maxIterations,
+    int maxToolIterations,
     ResilienceConfig resilienceConfig,
     Path skillsDir,
     List<String> initialSkills,
@@ -19,6 +19,7 @@ public record AgentSettings(
     ModelTier modelTier
 ) {
     public static final int DEFAULT_MAX_ITERATIONS = 10;
+    public static final int DEFAULT_MAX_TOOL_ITERATIONS = 20;
 
     public static Builder builder() {
         return new Builder();
@@ -28,7 +29,7 @@ public record AgentSettings(
         private String name = "unnamed";
         private String modelName = "gpt-4o";
         private String systemPrompt = "";
-        private int maxIterations = DEFAULT_MAX_ITERATIONS;
+        private int maxToolIterations = DEFAULT_MAX_TOOL_ITERATIONS;
         private ResilienceConfig resilienceConfig = ResilienceConfig.DEFAULT;
         private Path skillsDir = null;
         private List<String> initialSkills = List.of();
@@ -42,7 +43,7 @@ public record AgentSettings(
         public Builder name(String name) { this.name = name; return this; }
         public Builder modelName(String modelName) { this.modelName = modelName; return this; }
         public Builder systemPrompt(String systemPrompt) { this.systemPrompt = systemPrompt; return this; }
-        public Builder maxIterations(int maxIterations) { this.maxIterations = maxIterations; return this; }
+        public Builder maxToolIterations(int maxToolIterations) { this.maxToolIterations = maxToolIterations; return this; }
         public Builder resilienceConfig(ResilienceConfig resilienceConfig) { this.resilienceConfig = resilienceConfig; return this; }
         public Builder skillsDir(Path skillsDir) { this.skillsDir = skillsDir; return this; }
         public Builder initialSkills(List<String> initialSkills) { this.initialSkills = initialSkills; return this; }
@@ -54,7 +55,7 @@ public record AgentSettings(
         public Builder modelTier(ModelTier modelTier) { this.modelTier = modelTier; return this; }
 
         public AgentSettings build() {
-            return new AgentSettings(name, modelName, systemPrompt, maxIterations, resilienceConfig,
+            return new AgentSettings(name, modelName, systemPrompt, maxToolIterations, resilienceConfig,
                 skillsDir, initialSkills, structuredOutputConfig, llmLogPath, tieredConfig, modelTier);
         }
     }

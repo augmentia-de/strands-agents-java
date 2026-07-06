@@ -20,6 +20,7 @@ public class ConfigModel {
     private Integer maxRetries;
     private ModelProviderType provider;
     private Integer maxIterations;
+    private Integer maxToolIterations;
     private Integer maxMessages;
     private Integer maxTokens;
     private Integer keepLastUserMessages;
@@ -63,6 +64,9 @@ public class ConfigModel {
 
     public Integer getMaxIterations() { return maxIterations; }
     public void setMaxIterations(Integer maxIterations) { this.maxIterations = maxIterations; }
+
+    public Integer getMaxToolIterations() { return maxToolIterations; }
+    public void setMaxToolIterations(Integer maxToolIterations) { this.maxToolIterations = maxToolIterations; }
 
     public Integer getMaxMessages() { return maxMessages; }
     public void setMaxMessages(Integer maxMessages) { this.maxMessages = maxMessages; }
@@ -294,6 +298,7 @@ public class ConfigModel {
             "modelName='" + modelName + '\'' +
             ", provider=" + provider +
             ", maxIterations=" + maxIterations +
+            ", maxToolIterations=" + maxToolIterations +
             ", maxMessages=" + maxMessages +
             ", tools=" + tools +
             ", plugins=" + plugins +
@@ -306,6 +311,7 @@ public class ConfigModel {
         model.modelName = "gpt-4o-mini";
         model.provider = ModelProviderType.OPENAI;
         model.maxIterations = 5;
+        model.maxToolIterations = 12;
         model.maxMessages = 20;
         model.maxTokens = 4000;
         model.keepLastUserMessages = 3;

@@ -14,6 +14,7 @@ import de.augmentia.strandsagents.model.event.ToolExecutionFinishedEvent;
 import de.augmentia.strandsagents.model.event.ToolExecutionStartedEvent;
 
 import dev.langchain4j.model.chat.ChatModel;
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import de.augmentia.strandsagents.tools.builtin.CalculatorTool;
 
 public class SwarmDemo {
@@ -49,7 +50,7 @@ public class SwarmDemo {
                 Always conclude with a clear summary of your findings.""")
             .build(),
             AgentConfig.builder()
-                .toolRegistry(ToolRegistry.builder().standard().include("web_search", "web_fetch").build())
+                .toolRegistry(ToolRegistry.builder().standard().include(BaseToolNames.WEB_SEARCH, BaseToolNames.WEB_FETCH).build())
                 .build(),
             model);
 
@@ -126,7 +127,7 @@ public class SwarmDemo {
             .build(),
             AgentConfig.builder()
                 .toolRegistry(ToolRegistry.builder()
-                    .standard().include("web_search", "web_fetch")
+                    .standard().include(BaseToolNames.WEB_SEARCH, BaseToolNames.WEB_FETCH)
                     .build())
                 .build(),
             model);

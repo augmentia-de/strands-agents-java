@@ -23,7 +23,7 @@ public class WebFetchTool implements AgentTool<WebFetchTool.Params> {
 
     @Override
     public String name() {
-        return "web_fetch";
+        return BaseToolNames.WEB_FETCH;
     }
 
     @Override

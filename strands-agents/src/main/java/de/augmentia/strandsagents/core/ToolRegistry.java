@@ -2,7 +2,6 @@ package de.augmentia.strandsagents.core;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.augmentia.strandsagents.tools.*;
 import de.augmentia.strandsagents.tools.AgentTool;
 import de.augmentia.strandsagents.tools.TextContent;
 import de.augmentia.strandsagents.tools.ToolCapability;
@@ -343,12 +342,14 @@ private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name
             agentTools.add(new DockerRunTool(wd));
             agentTools.add(new ReadTool(wd));
             agentTools.add(new WriteTool(wd));
-            agentTools.add(new EditTool(wd));
+            agentTools.add(new MultiEditTool(wd));
             agentTools.add(new FindTool(wd));
             agentTools.add(new GrepTool(wd));
             agentTools.add(new LsTool(wd));
             agentTools.add(new WebFetchTool());
             agentTools.add(new WebSearchTool());
+            agentTools.add(new ApplyPatchTool(wd));
+            agentTools.add(new MultiEditTool(wd));
             return this;
         }
 

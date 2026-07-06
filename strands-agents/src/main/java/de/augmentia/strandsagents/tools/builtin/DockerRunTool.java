@@ -48,7 +48,7 @@ public class DockerRunTool implements AgentTool<DockerRunTool.Params> {
 
     @Override
     public String name() {
-        return "run";
+        return BaseToolNames.RUN;
     }
 
     @Override

@@ -8,6 +8,7 @@ import de.augmentia.strandsagents.config.AgentSettings;
 import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.tools.AgentTool;
 import de.augmentia.strandsagents.tools.ToolResult;
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +34,7 @@ class AgentConfigTest {
         var config = AgentConfig.builder().build();
 
         assertThat(settings.name()).isEqualTo("unnamed");
-        assertThat(settings.maxIterations()).isEqualTo(10);
+        assertThat(settings.maxToolIterations()).isEqualTo(20);
         assertThat(config.toolRegistry()).isNotNull();
         assertThat(settings.systemPrompt()).isEqualTo("");
         assertThat(config.plugins()).isEmpty();
@@ -42,13 +43,13 @@ class AgentConfigTest {
     @Test
     void shouldBuildWithCustomValues() {
         var tools = new ToolRegistry();
-        tools.register(testTool("bash"));
+        tools.register(testTool(BaseToolNames.BASH));
         tools.register(testTool("read"));
         var settings = AgentSettings.builder()
             .name("recherche-agent")
             .modelName("openai/gpt-4o")
             .systemPrompt("Du bist ein Recherche-Agent")
-            .maxIterations(15)
+            .maxToolIterations(20)
             .build();
         var config = AgentConfig.builder()
             .toolRegistry(tools)
@@ -56,9 +57,9 @@ class AgentConfigTest {
 
         assertThat(settings.name()).isEqualTo("recherche-agent");
         assertThat(settings.modelName()).isEqualTo("openai/gpt-4o");
-        assertThat(config.toolRegistry().getToolNames()).contains("bash", "read");
+        assertThat(config.toolRegistry().getToolNames()).contains(BaseToolNames.BASH, "read");
         assertThat(settings.systemPrompt()).isEqualTo("Du bist ein Recherche-Agent");
-        assertThat(settings.maxIterations()).isEqualTo(15);
+        assertThat(settings.maxToolIterations()).isEqualTo(20);
     }
 
     @Test

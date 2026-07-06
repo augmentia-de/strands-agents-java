@@ -33,7 +33,7 @@ public class BashTool implements AgentTool<BashTool.Params> {
 
     @Override
     public String name() {
-        return "bash";
+        return BaseToolNames.BASH;
     }
 
     @Override

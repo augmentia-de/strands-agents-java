@@ -1,5 +1,6 @@
 package de.augmentia.strandsagents.core;
 
+import de.augmentia.strandsagents.config.AgentSettings;
 import de.augmentia.strandsagents.config.ModelTier;
 import de.augmentia.strandsagents.core.conversation.ConversationManager;
 import de.augmentia.strandsagents.core.sessions.SessionManager;
@@ -69,7 +70,6 @@ public class Agent implements AutoCloseable {
         .configure(JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true)
         .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-    static int MAX_TOOL_ITERATIONS = 5;
     static final int MAX_HOOK_RETRIES = 3;
     static final int DEFAULT_MAX_MESSAGES = 75;
     static final ExecutorService VIRTUAL_EXECUTOR =
@@ -92,6 +92,7 @@ public class Agent implements AutoCloseable {
     private final SubmissionPublisher<AgentEvent> eventPublisher;
     private final List<AgentEventListener> eventListeners = new CopyOnWriteArrayList<>();
     private String systemPrompt = "";
+    private int maxToolIterations = AgentSettings.DEFAULT_MAX_TOOL_ITERATIONS;
     private List<Plugin> plugins = new ArrayList<>();
     CheckpointService checkpointService;
     volatile String lastThinking;
@@ -276,6 +277,7 @@ public class Agent implements AutoCloseable {
         runConfig.setHookRegistry(hookRegistry);
         runConfig.setSystemPrompt(systemPrompt);
         runConfig.setStructuredOutputConfig(structuredOutputConfig);
+        runConfig.setMaxToolIterations(maxToolIterations);
     }
 
     /**
@@ -355,6 +357,15 @@ public class Agent implements AutoCloseable {
     public void setSystemPrompt(String systemPrompt) {
         this.systemPrompt = systemPrompt;
         runConfig.setSystemPrompt(systemPrompt);
+    }
+
+    public int getMaxToolIterations() {
+        return runConfig.getMaxToolIterations();
+    }
+
+    public void setMaxToolIterations(int maxToolIterations) {
+        this.maxToolIterations = maxToolIterations;
+        runConfig.setMaxToolIterations(maxToolIterations);
     }
 
     /**

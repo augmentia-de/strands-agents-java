@@ -1,5 +1,6 @@
 package de.augmentia.strandsagents.config;
 
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Properties;
@@ -74,7 +75,7 @@ public record StrandsAgentConfig(
             resolveBool("mcp_ingest", fc, env("STRANDS_MCP_INGEST", null)),
             env("STRANDS_MCP_CONFIG", "config/MCP_SERVER_CONFIG.json"),
             env("STRANDS_AGENT_WORKSPACE", ""),
-            resolveBool("bash", fc, env("STRANDS_AGENT_BASH_ALLOW", null)),
+            resolveBool(BaseToolNames.BASH, fc, env("STRANDS_AGENT_BASH_ALLOW", null)),
             !resolveBool("http_allow_private", fc, env("STRANDS_AGENT_HTTP_ALLOW_PRIVATE", null)),
             env("STRANDS_AGENT_TOOLS", ""),
             env("STRANDS_AGENT_HITL_TOOLS", ""),

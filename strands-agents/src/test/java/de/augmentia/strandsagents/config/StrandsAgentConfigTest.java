@@ -2,6 +2,7 @@ package de.augmentia.strandsagents.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import java.nio.file.Path;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
@@ -95,7 +96,7 @@ class StrandsAgentConfigTest {
     @Test
     void fromYaml_usesFeatureConfig() {
         var fc = new FeatureConfig(java.util.Map.of(
-            "bash", new FeatureConfig.FeatureToggle(true, "enable bash"),
+            BaseToolNames.BASH, new FeatureConfig.FeatureToggle(true, "enable bash"),
             "llm_logging", new FeatureConfig.FeatureToggle(false, "disable logging")
         ));
         var cfg = StrandsAgentConfig.fromYaml(fc);

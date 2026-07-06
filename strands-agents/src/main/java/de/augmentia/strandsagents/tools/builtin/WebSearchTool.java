@@ -36,7 +36,7 @@ public class WebSearchTool implements AgentTool<WebSearchTool.Params> {
 
     @Override
     public String name() {
-        return "web_search";
+        return BaseToolNames.WEB_SEARCH;
     }
 
     @Override
