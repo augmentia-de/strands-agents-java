@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Set;
 
 import de.augmentia.strandsagents.tools.builtin.ReadTool;
@@ -13,8 +12,7 @@ import org.slf4j.LoggerFactory;
 
 public class TextFileReader implements FileReader {
     private static final Logger log = LoggerFactory.getLogger(TextFileReader.class);
-    private static final int MAX_LINES = 200;
-    private static final int MAX_BYTES = 51_200;
+    private static final int MAX_CHARS = 20_000;
     private static final int BINARY_SCAN_SIZE = 8192;
 
     @Override
@@ -96,36 +94,32 @@ public class TextFileReader implements FileReader {
 
         if (end < start) end = start;
 
-        List<String> selected = lines.subList(start, end);
+        var hasExplicitRange = params.offset() != null || params.line_start() != null
+            || params.limit() != null || params.line_end() != null;
 
-        var sb = new StringBuilder();
-        var outLines = 0;
-        var outBytes = 0L;
-        var truncatedLines = false;
-        var truncatedBytes = false;
-
-        for (var line : selected) {
-            var lb = line.getBytes().length + 1;
-            if (outLines >= MAX_LINES) {
-                truncatedLines = true;
-                break;
+        if (hasExplicitRange) {
+            var sb = new StringBuilder();
+            for (int i = start; i < end; i++) {
+                sb.append(lines.get(i)).append("\n");
             }
-            if (outBytes + lb > MAX_BYTES) {
-                truncatedBytes = true;
-                break;
-            }
-            sb.append(line).append("\n");
-            outLines++;
-            outBytes += lb;
+            return ToolResult.success(sb.toString());
         }
 
-        if (truncatedLines || truncatedBytes) {
-            sb.append("\n[Truncated: read ")
-                .append(outLines).append(" of ").append(total).append(" lines")
-                .append(" (").append(outBytes / 1024).append("KB of ")
-                .append(Files.size(path) / 1024).append("KB)")
-                .append(" — limit is ").append(MAX_LINES).append(" lines / ")
-                .append(MAX_BYTES / 1024).append("KB]");
+        var sb = new StringBuilder();
+        var charsOut = 0;
+        for (var line : lines) {
+            var toAppend = line + "\n";
+            if (charsOut + toAppend.length() > MAX_CHARS) {
+                var remaining = MAX_CHARS - charsOut;
+                if (remaining > 0) {
+                    sb.append(toAppend, 0, Math.min(remaining, toAppend.length()));
+                }
+                sb.append("\n[Truncated at ")
+                    .append(MAX_CHARS).append(" chars — use limit=N to read more]");
+                return ToolResult.success(sb.toString());
+            }
+            sb.append(toAppend);
+            charsOut += toAppend.length();
         }
 
         return ToolResult.success(sb.toString());

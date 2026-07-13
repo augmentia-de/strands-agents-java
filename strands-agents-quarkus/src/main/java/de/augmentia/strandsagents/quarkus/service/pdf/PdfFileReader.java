@@ -13,8 +13,7 @@ import org.slf4j.LoggerFactory;
 
 public class PdfFileReader implements FileReader {
     private static final Logger log = LoggerFactory.getLogger(PdfFileReader.class);
-    private static final int MAX_LINES = 200;
-    private static final int MAX_BYTES = 51_200;
+    private static final int MAX_CHARS = 20_000;
 
     @Override
     public String name() {
@@ -48,39 +47,12 @@ public class PdfFileReader implements FileReader {
             var text = stripper.getText(document);
             if (text == null) text = "";
 
-            var sb = new StringBuilder();
-            var lines = text.split("\n", -1);
-            var totalLines = lines.length;
-            var outLines = 0;
-            var outBytes = 0L;
-            var truncatedLines = false;
-            var truncatedBytes = false;
-
-            for (var line : lines) {
-                var lb = line.getBytes().length + 1;
-                if (outLines >= MAX_LINES) {
-                    truncatedLines = true;
-                    break;
-                }
-                if (outBytes + lb > MAX_BYTES) {
-                    truncatedBytes = true;
-                    break;
-                }
-                sb.append(line).append("\n");
-                outLines++;
-                outBytes += lb;
+            if (text.length() <= MAX_CHARS) {
+                return ToolResult.success(text);
             }
 
-            if (truncatedLines || truncatedBytes) {
-                sb.append("\n[Truncated: read ")
-                    .append(outLines).append(" of ").append(totalLines).append(" lines")
-                    .append(" (").append(outBytes / 1024).append("KB of ")
-                    .append(pdfBytes.length / 1024).append("KB)")
-                    .append(" — limit is ").append(MAX_LINES).append(" lines / ")
-                    .append(MAX_BYTES / 1024).append("KB]");
-            }
-
-            return ToolResult.success(sb.toString());
+            return ToolResult.success(text.substring(0, MAX_CHARS)
+                + "\n[Truncated at " + MAX_CHARS + " chars — use limit=N to read more]");
         }
     }
 }

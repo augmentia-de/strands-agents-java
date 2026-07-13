@@ -6,6 +6,7 @@ import java.util.List;
 
 public class FileReaderFactory {
     private final List<FileReader> readers = new ArrayList<>();
+    private final FileReader fallback = new BinaryAwareFallbackReader();
 
     public FileReaderFactory register(FileReader reader) {
         readers.add(reader);
@@ -18,7 +19,7 @@ public class FileReaderFactory {
                 return reader;
             }
         }
-        return null;
+        return fallback;
     }
 
     public List<FileReader> readers() {

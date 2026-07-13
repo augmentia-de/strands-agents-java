@@ -1,25 +1,27 @@
 package de.augmentia.strandsagents.tools.builtin;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.augmentia.strandsagents.tools.*;
 import de.augmentia.strandsagents.tools.security.FileSandboxGuard;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-
 public class ReadTool implements AgentTool<ReadTool.Params> {
 
     private static final ObjectMapper SCHEMA_MAPPER = new ObjectMapper();
+    private static final int MAX_FILES = 20;
+
     private final FileSandboxGuard sandboxGuard;
     private final FileReaderFactory readerFactory;
 
-    // Konstruktor-basierte Konfiguration
     public ReadTool(Path workDir) {
         this.sandboxGuard = new FileSandboxGuard(workDir.toString());
         this.readerFactory = FileReaderFactory.withDefaults();
@@ -34,7 +36,6 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
         }
     }
 
-
     @Override
     public String name() {
         return BaseToolNames.READ_FILES;
@@ -42,7 +43,7 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
 
     @Override
     public String description() {
-        return "Reads the contents of one or multiple files or directories securely inside the sandbox.";
+        return "Reads the contents of files matching a glob pattern securely inside the sandbox.";
     }
 
     @Override
@@ -55,7 +56,7 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
         var schema = SCHEMA_MAPPER.createObjectNode();
         schema.put("type", "object");
         var props = schema.putObject("properties");
-        addStr(props, "path", "Path to the file relative to workspace root");
+        addStr(props, "path", "Glob pattern matching file paths relative to workspace root (e.g. **/*.java, src/**/Read*.java, or a literal path like src/main/Foo.java). Supports * (any filename), ** (any directory tree), and ? (single char).");
         addInt(props, "offset", "Line number to start reading from (1-indexed)");
         addInt(props, "line_start", "Line number to start reading from (1-indexed, alias for offset)");
         addInt(props, "limit", "Maximum number of lines to read");
@@ -78,34 +79,99 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
 
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) throws Exception {
-        if (params.filePaths() == null || params.filePaths().isEmpty()) {
-            return ToolResult.error("No file paths provided.");
+        if (params.path() == null || params.path().isBlank()) {
+            return ToolResult.json(errorNode("No pattern provided."));
         }
 
-        List<String> allBlocks = new ArrayList<>();
-        for (String pathStr : params.filePaths()) {
+        var root = sandboxGuard.getWorkspaceRoot();
+        var matcher = root.getFileSystem().getPathMatcher("glob:" + params.path());
+
+        var matchedFiles = new ArrayList<Path>();
+        try (var stream = Files.walk(root)) {
+            stream.filter(Files::isRegularFile)
+                .filter(p -> matcher.matches(root.relativize(p)))
+                .forEach(matchedFiles::add);
+        }
+
+        var result = SCHEMA_MAPPER.createObjectNode();
+        result.put("pattern", params.path());
+        result.put("matched", matchedFiles.size());
+
+        var files = result.putArray("files");
+        var limit = Math.min(matchedFiles.size(), MAX_FILES);
+        for (int i = 0; i < limit; i++) {
             if (abortFlag != null && abortFlag.get()) {
-                return ToolResult.error("Operation aborted.");
+                result.put("aborted", true);
+                break;
             }
-
-            try {
-                // ABSICHERUNG
-                Path securePath = sandboxGuard.validateAndResolve(pathStr);
-
-                FileReader reader = readerFactory.findReader(securePath);
-                if (reader == null) {
-                    allBlocks.add("Unsupported file type or directory format for: " + pathStr);
-                    continue;
-                }
-
-                ToolResult fileResult = reader.read(securePath, params);
-                allBlocks.addAll(fileResult.content().stream().map(Object::toString).toList());
-            } catch (Exception e) {
-                allBlocks.add("Security or I/O Error reading " + pathStr + ": " + e.getMessage());
-            }
+            addFileToResult(matchedFiles.get(i), root, params, files);
         }
-        return new ToolResult(Arrays.asList(allBlocks.toArray()), null);
+
+        if (matchedFiles.size() > MAX_FILES) {
+            result.put("truncated", true);
+        }
+
+        if (matchedFiles.isEmpty()) {
+            result.put("error", "No files found matching: " + params.path());
+        }
+
+        return ToolResult.json(result);
     }
 
-    public record Params(List<String> filePaths, Integer offset, Integer limit, Integer line_start, Integer line_end) {}
+    private void addFileToResult(Path absolutePath, Path root, Params params, ArrayNode files) {
+        var fileObj = SCHEMA_MAPPER.createObjectNode();
+        var relativePath = root.relativize(absolutePath).toString();
+        fileObj.put("path", relativePath);
+
+        try {
+            sandboxGuard.validateAndResolve(relativePath);
+
+            var reader = readerFactory.findReader(absolutePath);
+            var readerResult = reader.read(absolutePath, params);
+            var contentList = readerResult.content();
+
+            long size = 0;
+            try { size = Files.size(absolutePath); } catch (IOException ignored) {}
+            fileObj.put("size", size);
+
+            if ("image".equals(reader.name())) {
+                fileObj.put("type", "image");
+                if (!contentList.isEmpty()) fileObj.put("description", String.valueOf(contentList.get(0)));
+                if (contentList.size() > 1) fileObj.put("base64", String.valueOf(contentList.get(1)));
+            } else if ("fallback".equals(reader.name()) && isBinaryResult(contentList)) {
+                fileObj.put("type", "binary");
+                for (var entry : contentList) {
+                    var s = String.valueOf(entry);
+                    var eq = s.indexOf('=');
+                    if (eq > 0) {
+                        fileObj.put(s.substring(0, eq), s.substring(eq + 1));
+                    }
+                }
+            } else {
+                fileObj.put("type", reader.name());
+                var content = contentList.isEmpty() ? "" : String.valueOf(contentList.get(0));
+                fileObj.put("content", content);
+                fileObj.put("lines", content.split("\n", -1).length);
+                if (params.offset() != null) fileObj.put("offset", params.offset());
+                if (params.limit() != null) fileObj.put("limit", params.limit());
+            }
+
+            files.add(fileObj);
+        } catch (Exception e) {
+            fileObj.put("error", "Error reading " + relativePath + ": " + e.getMessage());
+            files.add(fileObj);
+        }
+    }
+
+    private static boolean isBinaryResult(List<Object> content) {
+        return !content.isEmpty() && "type=binary".equals(String.valueOf(content.get(0)));
+    }
+
+    private ObjectNode errorNode(String message) {
+        var node = SCHEMA_MAPPER.createObjectNode();
+        node.put("error", message);
+        return node;
+    }
+
+    public record Params(String path, Integer offset, Integer limit, Integer line_start, Integer line_end) {}
 }

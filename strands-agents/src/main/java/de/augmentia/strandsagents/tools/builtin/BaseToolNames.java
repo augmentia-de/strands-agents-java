@@ -33,7 +33,7 @@ public final class BaseToolNames {
     public static final String GREP_SEARCH = "grep_search";
 
     /** {@link LsTool} */
-    public static final String LS = "list_files";
+    public static final String LS = "list_directory";
 
     /** {@link MultiEditTool} */
     public static final String MULTI_EDIT = "multi_edit";
