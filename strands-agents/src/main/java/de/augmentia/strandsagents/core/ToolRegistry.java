@@ -3,7 +3,8 @@ package de.augmentia.strandsagents.core;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.augmentia.strandsagents.tools.AgentTool;
-import de.augmentia.strandsagents.tools.TextContent;
+import de.augmentia.strandsagents.tools.AsyncAgentTool;
+import de.augmentia.strandsagents.tools.JsonContent;
 import de.augmentia.strandsagents.tools.ToolCapability;
 import de.augmentia.strandsagents.interceptor.security.CapabilityToken;
 import de.augmentia.strandsagents.tools.ToolResult;
@@ -12,9 +13,11 @@ import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.agent.tool.ToolSpecifications;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+import dev.langchain4j.model.chat.request.json.JsonSchema;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +44,7 @@ public class ToolRegistry {
 
     private void validate(ToolSpecification spec) {
         if (validators == null) return;
-        for (var v : validators) {
+        for (ToolDescriptionValidator v : validators) {
             v.validate(spec).ifPresent(warning -> {
                 if (strictValidation) {
                     throw new IllegalArgumentException(warning);
@@ -293,8 +296,10 @@ private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name
             }
             var sb = new StringBuilder();
             for (var block : result.content()) {
-                if (block instanceof TextContent t) {
-                    sb.append(t.text());
+                if (block instanceof String s) {
+                    sb.append(s);
+                } else if (block instanceof JsonContent j) {
+                    sb.append("\n").append(j);
                 } else {
                     sb.append(block.toString());
                 }
@@ -304,6 +309,7 @@ private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name
             }
             return sb.toString();
         }
+
     }
 
     public static class Builder {

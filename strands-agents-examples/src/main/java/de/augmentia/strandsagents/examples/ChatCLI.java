@@ -134,7 +134,7 @@ public class ChatCLI {
             switch (event) {
                 case AgentStartedEvent e -> System.out.println("\n  Agent started");
                 case ModelRequestedEvent e -> System.out.println("  LLM-Call (" + e.promptHistory().size() + " messages)");
-                case ToolExecutionStartedEvent e -> System.out.println("  Tool: " + e.toolCall().toolName());
+                case ToolExecutionStartedEvent e -> System.out.println("  Tool: " + e.toolExecutionRequest().name());
                 case ToolExecutionFinishedEvent e ->
                     System.out.println("  " + e.result().toolName() + " -> " + truncate(e.result().result(), 80));
                 case BeforeInvocationEvent e -> {}

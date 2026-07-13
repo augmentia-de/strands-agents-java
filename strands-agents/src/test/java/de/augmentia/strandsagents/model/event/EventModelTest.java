@@ -3,9 +3,9 @@ package de.augmentia.strandsagents.model.event;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.augmentia.strandsagents.model.agent.AgentPhase;
-import de.augmentia.strandsagents.model.message.UserMessage;
-import de.augmentia.strandsagents.model.tool.ToolCall;
+import de.augmentia.strandsagents.model.message.Message;
 import de.augmentia.strandsagents.model.tool.ToolExecutionResult;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -39,9 +39,9 @@ class ToolExecutionStartedEventTest {
     @Test
     void constructor_setsAllFields() {
         var now = Instant.now();
-        var tc = new ToolCall("c1", "calc", "{}");
+        var tc = ToolExecutionRequest.builder().id("c1").name("calc").arguments("{}").build();
         var e = new ToolExecutionStartedEvent("sid1", now, tc);
-        assertThat(e.toolCall().toolName()).isEqualTo("calc");
+        assertThat(e.toolExecutionRequest().name()).isEqualTo("calc");
     }
 }
 
@@ -62,7 +62,7 @@ class BeforeInvocationEventTest {
     void constructor_setsAllFields() {
         var now = Instant.now();
         var sb = new StringBuilder("prompt");
-        var msgs = List.<de.augmentia.strandsagents.model.message.Message>of(new UserMessage("id1", now, "hi", Map.of()));
+        var msgs = List.<de.augmentia.strandsagents.model.message.Message>of(Message.user("id1", now, "hi", Map.of()));
         var e = new BeforeInvocationEvent("sid1", now, sb, msgs);
         assertThat(e.systemPrompt().toString()).isEqualTo("prompt");
         assertThat(e.currentMessages()).hasSize(1);

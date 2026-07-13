@@ -2,6 +2,7 @@ package de.augmentia.strandsagents.tools.builtin;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.augmentia.strandsagents.tools.AgentTool;
+import de.augmentia.strandsagents.tools.JsonContent;
 import de.augmentia.strandsagents.tools.ToolResult;
 import de.augmentia.strandsagents.tools.security.FileSandboxGuard;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,9 +40,9 @@ public class WriteTool implements AgentTool<WriteTool.Params> {
         var schema = SCHEMA_MAPPER.createObjectNode();
         schema.put("type", "object");
         var props = schema.putObject("properties");
-        addStr(props, "path", "Path to the file relative to workspace root");
+        addStr(props, "filePath", "filePath to the file relative to workspace root");
         addStr(props, "content", "Content to write to the file");
-        schema.putArray("required").add("path").add("content");
+        schema.putArray("required").add("filePath").add("content");
         return schema;
     }
 
@@ -65,14 +66,17 @@ public class WriteTool implements AgentTool<WriteTool.Params> {
         }
 
         try {
-            Path securePath = sandboxGuard.validateAndResolve(params.filePath());
+            Path securePath = sandboxGuard.validateAndResolve(AgentTool.relativePath(params.filePath()));
 
             if (securePath.getParent() != null) {
                 Files.createDirectories(securePath.getParent());
             }
 
-            Files.writeString(securePath, params.content());
-            return ToolResult.success("Successfully wrote file to: " + securePath.getFileName());
+            var bytes = Files.writeString(securePath, params.content());
+            var json = SCHEMA_MAPPER.createObjectNode();
+            json.put("filePath", params.filePath());
+            json.put("bytes", params.content().length());
+            return ToolResult.mixed("Successfully wrote " + params.content().length() + " bytes to: " + params.filePath(), json);
 
         } catch (Exception e) {
             return ToolResult.error("Failed to write file due to security or I/O error: " + e.getMessage());

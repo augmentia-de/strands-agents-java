@@ -9,9 +9,10 @@ import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 import de.augmentia.strandsagents.tools.AgentTool;
+import de.augmentia.strandsagents.tools.JsonContent;
 import de.augmentia.strandsagents.tools.NetworkGuard;
-import de.augmentia.strandsagents.tools.TextContent;
 import de.augmentia.strandsagents.tools.ToolResult;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,6 +20,7 @@ public class WebFetchTool implements AgentTool<WebFetchTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(WebFetchTool.class);
     private static final Pattern URL_PATTERN = Pattern.compile("^https?://[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(/.*)?$");
     private static final int MAX_CHARS = 30_000;
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Override
@@ -87,12 +89,18 @@ public class WebFetchTool implements AgentTool<WebFetchTool.Params> {
             }
             result.append(text);
 
-            if (result.length() > MAX_CHARS) {
+            var truncated = result.length() > MAX_CHARS;
+            if (truncated) {
                 result.setLength(MAX_CHARS);
                 result.append("\n\n[Output truncated]");
             }
 
-            return new ToolResult(List.of(new TextContent(result.toString())), null);
+            var meta = MAPPER.createObjectNode();
+            meta.put("url", url);
+            meta.put("title", title != null ? title : "");
+            meta.put("contentLength", result.length());
+            meta.put("truncated", truncated);
+            return ToolResult.mixed(result.toString(), meta);
         } catch (Exception e) {
             return ToolResult.error("Failed to fetch: " + e.getMessage());
         }

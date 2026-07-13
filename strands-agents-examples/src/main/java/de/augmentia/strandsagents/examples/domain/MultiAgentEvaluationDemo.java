@@ -10,6 +10,8 @@ import de.augmentia.strandsagents.config.AgentSettings;
 import de.augmentia.strandsagents.config.ModelFactory;
 import de.augmentia.strandsagents.model.agent.AgentResult;
 import de.augmentia.strandsagents.model.event.ToolExecutionFinishedEvent;
+import de.augmentia.strandsagents.tools.AsyncAgentTool;
+import de.augmentia.strandsagents.tools.ToolResult;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.model.chat.ChatModel;
@@ -19,6 +21,8 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Multi-Agent Evaluation Demo (Java).
@@ -50,7 +54,8 @@ public class MultiAgentEvaluationDemo {
 
     public void run() throws Exception {
         ChatModel model = ModelFactory.createOpenAiFromEnv();
-        Method executeMethod = SubAgentTool.class.getMethod("execute", String.class);
+        Method executeMethod = SubAgentTool.class.getMethod("execute", String.class, Object.class, AtomicBoolean.class, java.util.function.Consumer.class);
+        Method executeAsyncMethod = SubAgentTool.class.getMethod("executeAsync", String.class, Object.class, AtomicBoolean.class, java.util.function.Consumer.class);
 
         // 1. Setup Specialists
         Agent techAgent = AgentFactory.buildAgent(AgentSettings.builder()
@@ -77,7 +82,7 @@ public class MultiAgentEvaluationDemo {
                 .build(),
             model);
 
-        // 2. Wrap Specialists as Tools
+        // 2. Wrap Specialists as Tools (ASYNC for long-running operations)
         SubAgentTool techTool = new SubAgentTool(techAgent, "technical_support", "Handle technical issues, bugs, and crashes.");
         SubAgentTool billingTool = new SubAgentTool(billingAgent, "billing_support", "Handle payments, invoices, and subscriptions.");
         SubAgentTool returnsTool = new SubAgentTool(returnsAgent, "returns_exchanges", "Handle returns, exchanges, and shipping status.");
@@ -101,9 +106,10 @@ public class MultiAgentEvaluationDemo {
             .build(),
             AgentConfig.builder().build(), model);
 
-        orchestrator.getToolRegistry().register("technical_support", techTool, executeMethod);
-        orchestrator.getToolRegistry().register("billing_support", billingTool, executeMethod);
-        orchestrator.getToolRegistry().register("returns_exchanges", returnsTool, executeMethod);
+        // Register tools - SubAgentTool supports both sync and async via the same interface
+        orchestrator.getToolRegistry().register(techTool);
+        orchestrator.getToolRegistry().register(billingTool);
+        orchestrator.getToolRegistry().register(returnsTool);
 
         // 4. Trace Interactions (Coordination Data)
         List<Interaction> interactions = new ArrayList<>();
@@ -113,9 +119,10 @@ public class MultiAgentEvaluationDemo {
             }
         });
 
-        // 5. Test Case: Technical Issue
+        // 5. Test Case: Technical Issue (uses async SubAgentTool)
         String testInput = "My app keeps crashing when I try to login. Customer ID: user123";
         System.out.println("[Test Input]: " + testInput);
+        System.out.println("[Async Tool] SubAgentTool uses executeAsync() internally for non-blocking execution\n");
         
         AgentResult systemResult = orchestrator.execute(testInput);
         
@@ -171,7 +178,7 @@ public class MultiAgentEvaluationDemo {
     public record Interaction(String nodeName, String input, String response) {}
 
     /**
-     * Simulated Database Tools.
+     * Simulated Database Tools (SYNC - for quick operations).
      */
     public static class DatabaseTools {
         @Tool("Creates a support ticket for a customer")
@@ -183,5 +190,63 @@ public class MultiAgentEvaluationDemo {
         public String lookup_customer(@P("Customer ID") String customerId) {
             return "Customer " + customerId + ": John Doe, Pro Subscription, Active.";
         }
+    }
+
+    /**
+     * Async Database Tools (ASYNC - for simulated long-running operations).
+     * Demonstrates how to implement AsyncAgentTool for operations that benefit from true async execution.
+     */
+    public static class AsyncDatabaseTools implements AsyncAgentTool<AsyncDatabaseTools.Params> {
+        @Override
+        public String name() { return "async_database"; }
+        
+        @Override
+        public String description() { return "Async database operations for complex queries"; }
+        
+        @Override
+        public Class<Params> parameterType() { return Params.class; }
+        
+        @Override
+        public com.fasterxml.jackson.databind.node.ObjectNode parameterSchema() {
+            var factory = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance;
+            var schema = factory.objectNode();
+            schema.put("type", "object");
+            var props = factory.objectNode();
+            var queryProp = factory.objectNode();
+            queryProp.put("type", "string");
+            queryProp.put("description", "The query to execute");
+            props.set("query", queryProp);
+            schema.set("properties", props);
+            var required = factory.arrayNode();
+            required.add("query");
+            schema.set("required", required);
+            return schema;
+        }
+
+        @Override
+        public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, java.util.function.Consumer<ToolResult> onUpdate) {
+            try {
+                Thread.sleep(100);
+                return ToolResult.success("Quick sync result for: " + params.query());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return ToolResult.error("Interrupted");
+            }
+        }
+
+        @Override
+        public CompletableFuture<ToolResult> executeAsync(String toolCallId, Params params, AtomicBoolean abortFlag, java.util.function.Consumer<ToolResult> onUpdate) {
+            return CompletableFuture.supplyAsync(() -> {
+                try {
+                    Thread.sleep(2000);
+                    return ToolResult.success("Async result after 2s for: " + params.query());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return ToolResult.error("Interrupted");
+                }
+            });
+        }
+
+        public record Params(String query) {}
     }
 }

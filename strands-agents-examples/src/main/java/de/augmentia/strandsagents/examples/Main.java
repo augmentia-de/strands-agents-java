@@ -145,7 +145,7 @@ public class Main {
                 case AgentStartedEvent e ->
                     System.out.println("  [EVENT] Started");
                 case ToolExecutionStartedEvent e ->
-                    System.out.println("  [EVENT] Tool: " + e.toolCall().toolName());
+                    System.out.println("  [EVENT] Tool: " + e.toolExecutionRequest().name());
                 case ToolExecutionFinishedEvent e ->
                     System.out.println("  [EVENT] Result: " + e.result().toolName()
                         + " -> " + e.result().result());

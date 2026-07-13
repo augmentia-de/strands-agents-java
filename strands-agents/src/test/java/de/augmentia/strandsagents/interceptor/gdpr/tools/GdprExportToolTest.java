@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.augmentia.strandsagents.core.sessions.SessionManager;
 import de.augmentia.strandsagents.model.agent.AgentState;
 import de.augmentia.strandsagents.model.agent.AgentStatus;
-import de.augmentia.strandsagents.model.message.UserMessage;
+import de.augmentia.strandsagents.model.message.Message;
 import de.augmentia.strandsagents.model.session.Session;
 import java.time.Instant;
 import java.util.*;
@@ -22,7 +22,7 @@ class GdprExportToolTest {
     private SessionManager sessionWithMessages(String sessionId, String... messages) {
         var msgs = new ArrayList<de.augmentia.strandsagents.model.message.Message>();
         for (int i = 0; i < messages.length; i++) {
-            msgs.add(new UserMessage(String.valueOf(i), NOW, messages[i], Map.of()));
+            msgs.add(Message.user(String.valueOf(i), NOW, messages[i], Map.of()));
         }
         var session = new Session(sessionId, "test-agent", msgs,
             new AgentState(sessionId, List.of(), Map.of(), AgentStatus.IDLE), Map.of("userId", "user-1"), NOW, NOW);

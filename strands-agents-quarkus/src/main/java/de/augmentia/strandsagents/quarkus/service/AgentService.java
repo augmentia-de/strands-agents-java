@@ -402,8 +402,8 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
             if (event instanceof AgentStateChangedEvent sce) {
                 phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
             } else if (event instanceof ToolExecutionStartedEvent te) {
-                var tc = te.toolCall();
-                toolCallMap.put(tc.id(), new ToolCallCapture(tc.toolName(), tc.arguments()));
+                var ter = te.toolExecutionRequest();
+                toolCallMap.put(ter.id(), new ToolCallCapture(ter.name(), ter.arguments()));
             } else if (event instanceof ToolExecutionFinishedEvent te) {
                 var existing = toolCallMap.get(te.result().toolCallId());
                 if (existing != null) {
@@ -482,8 +482,8 @@ public class AgentService implements de.augmentia.strandsagents.core.service.Age
             if (event instanceof AgentStateChangedEvent sce) {
                 phases.add(sce.previousPhase() + "\u2192" + sce.currentPhase());
             } else if (event instanceof ToolExecutionStartedEvent te) {
-                var tc = te.toolCall();
-                toolCallMap.put(tc.id(), new ToolCallCapture(tc.toolName(), tc.arguments()));
+                var ter = te.toolExecutionRequest();
+                toolCallMap.put(ter.id(), new ToolCallCapture(ter.name(), ter.arguments()));
             } else if (event instanceof ToolExecutionFinishedEvent te) {
                 var existing = toolCallMap.get(te.result().toolCallId());
                 if (existing != null) {

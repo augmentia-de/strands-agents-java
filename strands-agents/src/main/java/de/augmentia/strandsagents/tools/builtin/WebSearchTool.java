@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import de.augmentia.strandsagents.tools.AgentTool;
-import de.augmentia.strandsagents.tools.TextContent;
+import de.augmentia.strandsagents.tools.JsonContent;
 import de.augmentia.strandsagents.tools.ToolResult;
 import de.augmentia.strandsagents.prompt.PromptRegistry;
 import org.slf4j.Logger;
@@ -105,7 +105,7 @@ public class WebSearchTool implements AgentTool<WebSearchTool.Params> {
             var root = MAPPER.readTree(json);
             var arr = root.get("results");
             if (arr == null || !arr.isArray() || arr.isEmpty()) {
-                return ToolResult.success(buildEmptyJson(query));
+                return ToolResult.json(buildEmptyJson(query));
             }
 
             var resultRoot = MAPPER.createObjectNode();
@@ -124,22 +124,17 @@ public class WebSearchTool implements AgentTool<WebSearchTool.Params> {
             }
             resultRoot.put("totalResults", resultsArr.size());
 
-            return new ToolResult(List.of(new TextContent(resultRoot.toString())), null);
+            return ToolResult.json(resultRoot);
         } catch (Exception e) {
             log.debug("Tool: web_search parse error: {}", e.getMessage());
             return ToolResult.error("Failed to parse results: " + e.getMessage());
         }
     }
 
-    private String buildEmptyJson(String query) {
-        try {
-            return MAPPER.createObjectNode()
-                .put("query", query)
-                .put("totalResults", 0)
-                .toString();
-        } catch (Exception e) {
-            return "{\"query\":\"" + query + "\",\"totalResults\":0}";
-        }
+    private ObjectNode buildEmptyJson(String query) {
+        return MAPPER.createObjectNode()
+            .put("query", query)
+            .put("totalResults", 0);
     }
 
     private ToolResult mockSearch(String query) {
@@ -147,14 +142,13 @@ public class WebSearchTool implements AgentTool<WebSearchTool.Params> {
         try {
             var root = MAPPER.createObjectNode();
             root.put("query", query);
-            // Wrap mock text as a single result
             var arr = root.putArray("results");
             arr.addObject()
                 .put("title", "Mock Result")
                 .put("url", "https://example.com")
                 .put("content", mockText);
             root.put("totalResults", 1);
-            return ToolResult.success(root.toString());
+            return ToolResult.json(root);
         } catch (Exception e) {
             var root = MAPPER.createObjectNode();
             root.put("query", query);
@@ -164,7 +158,7 @@ public class WebSearchTool implements AgentTool<WebSearchTool.Params> {
                 .put("url", "https://example.com")
                 .put("content", mockText);
             root.put("totalResults", 1);
-            return ToolResult.success(root.toString());
+            return ToolResult.json(root);
         }
     }
 

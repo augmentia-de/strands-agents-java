@@ -16,7 +16,6 @@ import de.augmentia.strandsagents.model.agent.AgentState;
 import de.augmentia.strandsagents.model.agent.AgentStatus;
 import de.augmentia.strandsagents.model.agent.StopReason;
 import de.augmentia.strandsagents.model.message.Message;
-import de.augmentia.strandsagents.model.message.UserMessage;
 import de.augmentia.strandsagents.model.session.Session;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -51,8 +50,8 @@ class SessionManagerTest {
         var session = manager.createSession("test-agent", Map.of());
 
         var messages = List.<Message>of(
-            new UserMessage("id-1", Instant.now(), "Hallo", Map.of()),
-            new UserMessage("id-2", Instant.now(), "Wie geht es?", Map.of())
+            Message.user("id-1", Instant.now(), "Hallo", Map.of()),
+            Message.user("id-2", Instant.now(), "Wie geht es?", Map.of())
         );
         var updated = new Session(
             session.sessionId(), session.agentName(), messages,
@@ -114,7 +113,7 @@ class SessionManagerTest {
         var m1 = new FileSessionManager(tempDir);
         var session = m1.createSession("persist-test", Map.of());
         var messages = List.<Message>of(
-            new UserMessage("u1", Instant.now(), "Frage 1", Map.of())
+            Message.user("u1", Instant.now(), "Frage 1", Map.of())
         );
         var updated = new Session(
             session.sessionId(), session.agentName(), messages,
@@ -154,7 +153,7 @@ class SessionManagerTest {
         var session = manager.createSession("msg-test", Map.of());
 
         var messages = List.<Message>of(
-            new UserMessage("u1", Instant.now(), "Erste Nachricht", Map.of())
+            Message.user("u1", Instant.now(), "Erste Nachricht", Map.of())
         );
         var updated = new Session(
             session.sessionId(), session.agentName(), messages,
@@ -283,8 +282,8 @@ class SessionManagerTest {
         var session = manager.createSession("test-agent", Map.of());
 
         var messages = List.<Message>of(
-            new UserMessage("id-1", Instant.now(), "Hallo", Map.of()),
-            new UserMessage("id-2", Instant.now(), "Wie geht es?", Map.of())
+            Message.user("id-1", Instant.now(), "Hallo", Map.of()),
+            Message.user("id-2", Instant.now(), "Wie geht es?", Map.of())
         );
         var updated = new Session(
             session.sessionId(), session.agentName(), messages,
@@ -484,8 +483,8 @@ class SessionManagerTest {
         var manager = new InMemorySessionManager();
         var original = manager.createSession("source", Map.of("key", "val"));
         var messages = List.<Message>of(
-            new UserMessage("u1", Instant.now(), "eins", Map.of()),
-            new UserMessage("u2", Instant.now(), "zwei", Map.of())
+            Message.user("u1", Instant.now(), "eins", Map.of()),
+            Message.user("u2", Instant.now(), "zwei", Map.of())
         );
         var updated = new Session(original.sessionId(), original.agentName(), messages,
             new AgentState(original.sessionId(), messages, Map.of(), AgentStatus.COMPLETED),
@@ -506,9 +505,9 @@ class SessionManagerTest {
         var manager = new InMemorySessionManager();
         var original = manager.createSession("source", Map.of());
         var messages = List.<Message>of(
-            new UserMessage("u1", Instant.now(), "eins", Map.of()),
-            new UserMessage("u2", Instant.now(), "zwei", Map.of()),
-            new UserMessage("u3", Instant.now(), "drei", Map.of())
+            Message.user("u1", Instant.now(), "eins", Map.of()),
+            Message.user("u2", Instant.now(), "zwei", Map.of()),
+            Message.user("u3", Instant.now(), "drei", Map.of())
         );
         var updated = new Session(original.sessionId(), original.agentName(), messages,
             new AgentState(original.sessionId(), messages, Map.of(), AgentStatus.COMPLETED),
@@ -527,7 +526,7 @@ class SessionManagerTest {
         var manager = new InMemorySessionManager();
         var original = manager.createSession("source", Map.of());
         var messages = List.<Message>of(
-            new UserMessage("u1", Instant.now(), "eins", Map.of())
+            Message.user("u1", Instant.now(), "eins", Map.of())
         );
         var updated = new Session(original.sessionId(), original.agentName(), messages,
             new AgentState(original.sessionId(), messages, Map.of(), AgentStatus.COMPLETED),
@@ -551,7 +550,7 @@ class SessionManagerTest {
         var manager = new FileSessionManager(tempDir);
         var original = manager.createSession("source", Map.of());
         var messages = List.<Message>of(
-            new UserMessage("u1", Instant.now(), "aa", Map.of())
+            Message.user("u1", Instant.now(), "aa", Map.of())
         );
         var updated = new Session(original.sessionId(), original.agentName(), messages,
             new AgentState(original.sessionId(), messages, Map.of(), AgentStatus.COMPLETED),
@@ -576,8 +575,8 @@ class SessionManagerTest {
 
         var original = manager.createSession("source", Map.of());
         var messages = List.<Message>of(
-            new UserMessage("u1", Instant.now(), "eins", Map.of()),
-            new UserMessage("u2", Instant.now(), "zwei", Map.of())
+            Message.user("u1", Instant.now(), "eins", Map.of()),
+            Message.user("u2", Instant.now(), "zwei", Map.of())
         );
         var updated = new Session(original.sessionId(), original.agentName(), messages,
             new AgentState(original.sessionId(), messages, Map.of(), AgentStatus.COMPLETED),

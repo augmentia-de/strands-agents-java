@@ -1,10 +1,6 @@
 package de.augmentia.strandsagents.core.conversation;
 
 import de.augmentia.strandsagents.model.message.Message;
-import de.augmentia.strandsagents.model.message.SystemMessage;
-import de.augmentia.strandsagents.model.message.UserMessage;
-import de.augmentia.strandsagents.model.message.AssistantMessage;
-import de.augmentia.strandsagents.model.message.ToolMessage;
 import de.augmentia.strandsagents.prompt.PromptRegistry;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
@@ -48,7 +44,7 @@ public record SummarizingSlidingWindowConversationManager(
         List<Message> systemMsgs = new ArrayList<>();
         List<Message> nonSystemMsgs = new ArrayList<>();
         for (var msg : messages) {
-            if (msg instanceof SystemMessage) {
+            if (msg.isSystem()) {
                 systemMsgs.add(msg);
             } else {
                 nonSystemMsgs.add(msg);
@@ -82,7 +78,7 @@ public record SummarizingSlidingWindowConversationManager(
         }
 
         String summary = generateSummary(toSummarize);
-        result.add(new SystemMessage(
+        result.add(Message.system(
             UUID.randomUUID().toString(),
             Instant.now(),
             PromptRegistry.get("summarizing_sliding.prefix") + summary,
@@ -97,7 +93,7 @@ public record SummarizingSlidingWindowConversationManager(
         int userCount = 0;
         int cutIndex = nonSystemMsgs.size();
         for (int i = nonSystemMsgs.size() - 1; i >= 0; i--) {
-            if (nonSystemMsgs.get(i) instanceof UserMessage) {
+            if (nonSystemMsgs.get(i).isUser()) {
                 userCount++;
                 if (userCount == keepLastUserMessages) {
                     cutIndex = i;
@@ -134,7 +130,7 @@ public record SummarizingSlidingWindowConversationManager(
         ChatResponse response = summarizer.chat(request);
         String combined = response.aiMessage().text();
 
-        return List.of(new SystemMessage(
+        return List.of(Message.system(
             UUID.randomUUID().toString(),
             Instant.now(),
             combined,
@@ -146,13 +142,20 @@ public record SummarizingSlidingWindowConversationManager(
         var sb = new StringBuilder();
         sb.append(PromptRegistry.get("summarizing_sliding.instruction")).append("\n\n");
         for (var msg : messages) {
-            String role = switch (msg) {
-                case UserMessage u -> "User";
-                case AssistantMessage a ->
-                    a.toolCalls() != null && !a.toolCalls().isEmpty() ? "Assistant (Tool-Call)" : "Assistant";
-                case SystemMessage s -> "System";
-                case ToolMessage t -> "Tool (" + t.toolName() + ")";
-            };
+            String role;
+            if (msg.isUser()) {
+                role = "User";
+            } else if (msg.isAssistant() && msg.hasToolExecutionRequests()) {
+                role = "Assistant (Tool-Call)";
+            } else if (msg.isAssistant()) {
+                role = "Assistant";
+            } else if (msg.isSystem()) {
+                role = "System";
+            } else if (msg.isToolResult()) {
+                role = "Tool (" + msg.toolName() + ")";
+            } else {
+                role = "Unknown";
+            }
             sb.append(role).append(": ").append(msg.content() != null ? msg.content() : "").append("\n");
         }
 

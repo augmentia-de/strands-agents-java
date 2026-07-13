@@ -2,7 +2,7 @@ package de.augmentia.strandsagents.model.agent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.augmentia.strandsagents.model.message.UserMessage;
+import de.augmentia.strandsagents.model.message.Message;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +43,7 @@ class AgentStateTest {
 
     @Test
     void historyAndContextAreDefensive() {
-        var msgs = List.<de.augmentia.strandsagents.model.message.Message>of(new UserMessage("id1", Instant.now(), "hello", Map.of()));
+        var msgs = List.<de.augmentia.strandsagents.model.message.Message>of(Message.user("id1", Instant.now(), "hello", Map.of()));
         var ctx = Map.<String, Object>of("k", "v");
         var state = new AgentState("sid1", msgs, ctx, AgentStatus.RUNNING);
         assertThat(state.history()).hasSize(1);

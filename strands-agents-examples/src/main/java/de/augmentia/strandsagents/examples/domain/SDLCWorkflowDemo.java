@@ -59,8 +59,8 @@ public class SDLCWorkflowDemo {
 
         this.agent.addEventListener(event -> {
             if (event instanceof de.augmentia.strandsagents.model.event.ToolExecutionStartedEvent startEvent) {
-                var tc = startEvent.toolCall();
-                System.out.printf("\n🛠️  [Tool-Aufruf] Tool '%s' wird gestartet mit Parametern: %s\n", tc.toolName(), tc.arguments());
+                var ter = startEvent.toolExecutionRequest();
+                System.out.printf("\n🛠️  [Tool-Aufruf] Tool '%s' wird gestartet mit Parametern: %s\n", ter.name(), ter.arguments());
             } else if (event instanceof de.augmentia.strandsagents.model.event.ToolExecutionFinishedEvent finishEvent) {
                 var res = finishEvent.result();
                 if (res.isError()) {

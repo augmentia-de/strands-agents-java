@@ -5,7 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +20,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 import de.augmentia.strandsagents.tools.AgentTool;
-import de.augmentia.strandsagents.tools.TextContent;
 import de.augmentia.strandsagents.tools.ToolResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,8 @@ public class DockerRunTool implements AgentTool<DockerRunTool.Params> {
     private static final int MAX_LINES = 300;
     private static final int MAX_BYTES = 30_720;
     private static final String DEFAULT_IMAGE = "strands-runner:latest";
+    private static final String DOCKERFILE_RESOURCE = "/Dockerfile.runner";
+    private static volatile boolean imageReady = false;
     private static final ObjectMapper SCHEMA_MAPPER = new ObjectMapper();
 
     private final Path workspace;
@@ -54,7 +57,7 @@ public class DockerRunTool implements AgentTool<DockerRunTool.Params> {
     @Override
     public String description() {
         return "Run a command inside a sandboxed Docker container. "
-                + "The workspace directory is mounted at /workspace. "
+                + "The workspace directory is a dedicated directory. "
                 + "Has no network access and limited memory.";
     }
 
@@ -68,19 +71,29 @@ public class DockerRunTool implements AgentTool<DockerRunTool.Params> {
         var schema = SCHEMA_MAPPER.createObjectNode();
         schema.put("type", "object");
         var props = schema.putObject("properties");
-        var cmdProp = props.putObject("command");
-        cmdProp.put("type", "string");
-        cmdProp.put("description", "Command to execute inside the container");
-        var tProp = props.putObject("timeout");
-        tProp.put("type", "integer");
-        tProp.put("description", "Timeout in seconds (optional)");
+        addStr(props, "command", "Command to execute inside the container");
+        addInt(props, "timeout", "Timeout in seconds (optional)");
         schema.putArray("required").add("command");
         return schema;
+    }
+
+    private static void addStr(ObjectNode p, String n, String d) {
+        var node = p.putObject(n);
+        node.put("type", "string");
+        node.put("description", d);
+    }
+
+    private static void addInt(ObjectNode p, String n, String d) {
+        var node = p.putObject(n);
+        node.put("type", "integer");
+        node.put("description", d);
     }
 
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         log.debug("Tool: run START command={}", trunc(params.command(), 500));
+
+        ensureImage();
 
         // Generate a unique container name to allow safe external termination
         String containerName = "strands-agent-" + UUID.randomUUID();
@@ -136,7 +149,7 @@ public class DockerRunTool implements AgentTool<DockerRunTool.Params> {
                             }
                         }
                         if (onUpdate != null) {
-                            onUpdate.accept(new ToolResult(List.of(new TextContent(String.join("\n", lines))), null));
+                            onUpdate.accept(ToolResult.success(String.join("\n", lines)));
                         }
                     }
                 } catch (IOException ignored) {
@@ -202,6 +215,54 @@ public class DockerRunTool implements AgentTool<DockerRunTool.Params> {
             }
             log.debug("Tool: run ERROR: {}", e.getMessage());
             throw new RuntimeException(e.getMessage(), e);
+        }
+    }
+
+    private void ensureImage() {
+        if (!imageReady) {
+            synchronized (DockerRunTool.class) {
+                if (!imageReady) {
+                    if (!imageExists()) {
+                        buildImage();
+                    }
+                    imageReady = true;
+                }
+            }
+        }
+    }
+
+    private boolean imageExists() {
+        try {
+            var proc = new ProcessBuilder("docker", "image", "inspect", image)
+                    .redirectErrorStream(true).start();
+            return proc.waitFor() == 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void buildImage() {
+        log.info("Docker image {} not found – building from embedded Dockerfile.runner", image);
+        try (InputStream in = getClass().getResourceAsStream(DOCKERFILE_RESOURCE)) {
+            if (in == null) {
+                log.warn("Embedded {} not found in classpath – cannot auto-build", DOCKERFILE_RESOURCE);
+                return;
+            }
+            var tempDir = Files.createTempDirectory("strands-runner-");
+            var dockerfile = tempDir.resolve("Dockerfile.runner");
+            Files.copy(in, dockerfile);
+
+            var pb = new ProcessBuilder("docker", "build", "-f", dockerfile.toString(), "-t", image, tempDir.toString());
+            pb.inheritIO();
+            var proc = pb.start();
+            int exitCode = proc.waitFor();
+            if (exitCode != 0) {
+                log.warn("Auto-build of image {} failed with exit code {}", image, exitCode);
+            } else {
+                log.info("Successfully built Docker image {}", image);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to auto-build Docker image {}", image, e);
         }
     }
 

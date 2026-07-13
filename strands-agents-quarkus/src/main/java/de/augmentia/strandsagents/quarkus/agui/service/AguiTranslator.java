@@ -56,10 +56,10 @@ public class AguiTranslator implements AgentEventListener, Consumer<String>, Aut
 
     private void onToolExecutionStarted(ToolExecutionStartedEvent e) {
         closeCurrentMessage();
-        var toolCall = e.toolCall();
+        var req = e.toolExecutionRequest();
         var tcId = "tc_" + toolCallCounter.incrementAndGet();
-        enqueue(AguiEvent.toolCallStart(tcId, toolCall.toolName(), currentMessageId));
-        enqueue(AguiEvent.toolCallArgs(tcId, toolCall.arguments()));
+        enqueue(AguiEvent.toolCallStart(tcId, req.name(), currentMessageId));
+        enqueue(AguiEvent.toolCallArgs(tcId, req.arguments()));
         enqueue(AguiEvent.toolCallEnd(tcId));
     }
 

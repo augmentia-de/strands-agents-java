@@ -1,7 +1,6 @@
 package de.augmentia.strandsagents.core;
 
 import de.augmentia.strandsagents.core.context.AgentContext;
-import de.augmentia.strandsagents.core.internal.ChatMessageConverter;
 import de.augmentia.strandsagents.interceptor.pipeline.HookContexts;
 import de.augmentia.strandsagents.interceptor.pipeline.HookResult;
 import de.augmentia.strandsagents.interceptor.plugin.Plugin;
@@ -17,7 +16,6 @@ import de.augmentia.strandsagents.model.agent.ExecutionMetrics;
 import de.augmentia.strandsagents.model.agent.StopReason;
 import de.augmentia.strandsagents.model.event.*;
 import de.augmentia.strandsagents.model.message.Message;
-import de.augmentia.strandsagents.model.tool.ToolCall;
 import de.augmentia.strandsagents.model.tool.ToolExecutionResult;
 import de.augmentia.strandsagents.prompt.PromptRegistry;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
@@ -228,15 +226,14 @@ final class AgentLoop {
                 }
                 log.debug("Tool change detected — added={}, removed={}", added, removed);
                 beforeMcCtx.additionalMessages().add(
-                    new de.augmentia.strandsagents.model.message.SystemMessage(
-                        UUID.randomUUID().toString(), Instant.now(), notice.toString(), Map.of()));
+                    Message.system(UUID.randomUUID().toString(), Instant.now(), notice.toString(), Map.of()));
             }
             agent.lastToolNames = currentToolNames;
         }
 
         if (!beforeMcCtx.additionalMessages().isEmpty()) {
             for (var msg : beforeMcCtx.additionalMessages()) {
-                agent.chatMemory.add(ChatMessageConverter.toLangChain4j(msg));
+                agent.chatMemory.add(msg.toChatMessage());
             }
         }
 
@@ -247,16 +244,16 @@ final class AgentLoop {
 
     private List<Message> pruneConversation() {
         var currentMessages = agent.chatMemory.messages();
-        var domainMessages = ChatMessageConverter.toDomainMessages(currentMessages);
+        var domainMessages = currentMessages.stream().map(Message::from).toList();
 
         if (agent.conversationManager != null) {
             domainMessages = agent.conversationManager.prune(domainMessages);
-            var prunedLangChain = ChatMessageConverter.toLangChain4jMessages(domainMessages);
+            var prunedLangChain = domainMessages.stream().map(Message::toChatMessage).toList();
             agent.chatMemory.clear();
             for (var msg : prunedLangChain) {
                 agent.chatMemory.add(msg);
             }
-            domainMessages = ChatMessageConverter.toDomainMessages(prunedLangChain);
+            domainMessages = prunedLangChain.stream().map(Message::from).toList();
         }
 
         return domainMessages;
@@ -385,7 +382,7 @@ final class AgentLoop {
         AiMessage aiMessage = null;
 
         for (int hookRetry = 0; hookRetry < Agent.MAX_HOOK_RETRIES; hookRetry++) {
-            var domainMessages = ChatMessageConverter.toDomainMessages(currentMessages);
+            var domainMessages = currentMessages.stream().map(Message::from).toList();
             agent.fire(new ModelRequestedEvent(sid, Instant.now(), domainMessages));
 
             ChatResponse response;
@@ -493,7 +490,7 @@ final class AgentLoop {
             if (schemaStr != null) {
                 var rawSchema = JsonRawSchema.from(schemaStr);
                 var jsonSchema = JsonSchema.builder()
-                    .name(soConfig.mode().name())
+                    .name(soConfig.outputClass() != null ? soConfig.outputClass().getSimpleName() : "structured")
                     .rootElement(rawSchema)
                     .build();
                 builder.responseFormat(ResponseFormat.builder()
@@ -524,15 +521,13 @@ final class AgentLoop {
                 new HookContexts.BeforeToolCallContext(sid, req.name(), args));
             if (beforeTc instanceof HookResult.Cancel c) {
                 log.debug("beforeToolCall hook cancelled tool '{}' — reason={}", req.name(), c.reason());
-                agent.fire(new ToolExecutionStartedEvent(sid, Instant.now(),
-                    new ToolCall(req.id(), req.name(), req.arguments())));
+                agent.fire(new ToolExecutionStartedEvent(sid, Instant.now(), req));
                 agent.fire(new ToolExecutionFinishedEvent(sid, Instant.now(),
                     new ToolExecutionResult(req.id(), req.name(), "Skipped: " + c.reason(), false)));
                 continue;
             }
 
-            agent.fire(new ToolExecutionStartedEvent(sid, Instant.now(),
-                new ToolCall(req.id(), req.name(), req.arguments())));
+            agent.fire(new ToolExecutionStartedEvent(sid, Instant.now(), req));
 
             // Link agent's abort flag to toolRegistry for tool execution
             run.toolRegistry().setAbortFlag(agent.abortFlag);
@@ -576,7 +571,7 @@ final class AgentLoop {
                     agent.chatMemory.add(ToolExecutionResultMessage.from(request, modifiedResult));
                 }
                 for (var msg : afterTcMessages) {
-                    agent.chatMemory.add(ChatMessageConverter.toLangChain4j(msg));
+                    agent.chatMemory.add(msg.toChatMessage());
                 }
                 agent.fire(new ToolExecutionFinishedEvent(sid, Instant.now(), finalToolResult));
             } catch (Exception e) {
@@ -646,7 +641,7 @@ final class AgentLoop {
         var doneResult = new AgentResult(
             sid,
             responseText,
-            ChatMessageConverter.toDomainMessages(agent.chatMemory.messages()),
+            agent.chatMemory.messages().stream().map(Message::from).toList(),
             new ExecutionMetrics(durationMs(), totalInputTokens, totalOutputTokens, toolCallCount),
             StopReason.COMPLETED,
             structuredOutputResult
@@ -673,7 +668,7 @@ final class AgentLoop {
         var result = new AgentResult(
             sid,
             PromptRegistry.getOrDefault("agent.max_iterations", "Maximum iterations reached"),
-            ChatMessageConverter.toDomainMessages(agent.chatMemory.messages()),
+            agent.chatMemory.messages().stream().map(Message::from).toList(),
             new ExecutionMetrics(durationMs(), totalInputTokens, totalOutputTokens, toolCallCount),
             StopReason.MAX_ITERATIONS
         );
@@ -693,7 +688,7 @@ final class AgentLoop {
         var result = new AgentResult(
             sid,
             PromptRegistry.getOrDefault("agent.stuck", "Stuck-state detected — repeated identical tool calls"),
-            ChatMessageConverter.toDomainMessages(agent.chatMemory.messages()),
+            agent.chatMemory.messages().stream().map(Message::from).toList(),
             new ExecutionMetrics(durationMs(), totalInputTokens, totalOutputTokens, toolCallCount),
             StopReason.STUCK
         );
@@ -736,7 +731,7 @@ final class AgentLoop {
         return new AgentResult(
             sid,
             answer,
-            ChatMessageConverter.toDomainMessages(agent.chatMemory.messages()),
+            agent.chatMemory.messages().stream().map(Message::from).toList(),
             new ExecutionMetrics(durationMs(), totalInputTokens, totalOutputTokens, toolCallCount),
             reason
         );

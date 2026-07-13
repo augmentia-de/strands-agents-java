@@ -7,7 +7,7 @@ import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.core.MockChatModel;
 import de.augmentia.strandsagents.interceptor.telemetry.*;
 import de.augmentia.strandsagents.model.event.*;
-import de.augmentia.strandsagents.model.tool.ToolCall;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import de.augmentia.strandsagents.model.tool.ToolExecutionResult;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.opentelemetry.api.OpenTelemetry;
@@ -48,7 +48,7 @@ class TelemetryTest {
 
         registry.onEvent(new AgentStartedEvent("s1", Instant.now(), "test"));
         registry.onEvent(new ToolExecutionStartedEvent("s1", Instant.now(),
-            new ToolCall("id1", "tool", "{}")));
+            ToolExecutionRequest.builder().id("id1").name("tool").arguments("{}").build()));
 
         assertThat(toolEvents).hasSize(1);
         assertThat(toolEvents.get(0)).isInstanceOf(ToolExecutionStartedEvent.class);
@@ -111,7 +111,7 @@ class TelemetryTest {
     @Test
     void loggingHookShouldAcceptAllEventTypes() {
         var hook = new LoggingHook();
-        var toolCall = new ToolCall("id1", "test-tool", "{}");
+        var toolCall = ToolExecutionRequest.builder().id("id1").name("test-tool").arguments("{}").build();
         var toolResult = new ToolExecutionResult("id1", "test-tool", "ok", false);
         // should not throw
         hook.onEvent(new AgentStartedEvent("s1", Instant.now(), "test"));

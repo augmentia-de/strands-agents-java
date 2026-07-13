@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import de.augmentia.strandsagents.core.DefaultToolExecutor;
 import de.augmentia.strandsagents.core.ToolExecutor;
 import de.augmentia.strandsagents.tools.AgentTool;
-import de.augmentia.strandsagents.tools.TextContent;
 import de.augmentia.strandsagents.tools.ToolResult;
 import de.augmentia.strandsagents.tools.builtin.BaseToolNames;
 import dev.langchain4j.model.chat.ChatModel;
@@ -220,7 +219,7 @@ public class CapabilitySearchTool implements AgentTool<CapabilitySearchTool.Para
             }
 
             root.put("instruction", "Proceed with the matching tools to complete the task. Activate tools via `tool_activator` to get the full skill instructions injected automatically.");
-            return new ToolResult(List.of(new TextContent(root.toString())), null);
+            return ToolResult.success(root.toString());
         } catch (Exception e) {
             var sb = new StringBuilder();
             sb.append("## Capability Analysis\n\n");
@@ -236,7 +235,7 @@ public class CapabilitySearchTool implements AgentTool<CapabilitySearchTool.Para
             var root = MAPPER.createObjectNode();
             if (task != null) root.put("task", task);
             root.put("analysis", analysis);
-            return new ToolResult(List.of(new TextContent(root.toString())), null);
+            return ToolResult.success(root.toString());
         } catch (Exception e) {
             return ToolResult.success(analysis);
         }

@@ -5,7 +5,6 @@ import de.augmentia.strandsagents.config.ModelTier;
 import de.augmentia.strandsagents.core.conversation.ConversationManager;
 import de.augmentia.strandsagents.core.sessions.SessionManager;
 import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
-import de.augmentia.strandsagents.core.internal.ChatMessageConverter;
 import de.augmentia.strandsagents.interceptor.pipeline.AgentHook;
 import de.augmentia.strandsagents.interceptor.pipeline.HookRegistry;
 import de.augmentia.strandsagents.interceptor.resilience.CircuitBreaker;
@@ -21,6 +20,7 @@ import de.augmentia.strandsagents.interceptor.plugin.PluginRegistry;
 import de.augmentia.strandsagents.interceptor.hitl.checkpoint.CheckpointService;
 import de.augmentia.strandsagents.model.structured.StructuredOutputConfig;
 import de.augmentia.strandsagents.interceptor.telemetry.FileLlmLogger;
+import de.augmentia.strandsagents.model.message.Message;
 import de.augmentia.strandsagents.tools.AgentTool;
 import dev.langchain4j.memory.ChatMemory;
 
@@ -458,14 +458,14 @@ public class Agent implements AutoCloseable {
                 });
             log.debug("Session {} loaded — {} messages", sid, session.messages().size());
             chatMemory.clear();
-            ChatMessageConverter.toLangChain4jMessages(session.messages())
+            session.messages().stream().map(Message::toChatMessage)
                 .forEach(chatMemory::add);
         }
 
         var result = executeLoop(sid, prompt, contextVariables);
 
         if (useSessionManager && sessionManager != null) {
-            var messages = ChatMessageConverter.toDomainMessages(chatMemory.messages());
+            var messages = chatMemory.messages().stream().map(Message::from).toList();
             var loaded = sessionManager.loadSession(sid);
             loaded.ifPresent(session -> {
                 var status = result.stopReason() == StopReason.ERROR

@@ -199,8 +199,8 @@ class AgentSkillsPluginTest {
         plugin.beforeModelCall(ctx);
 
         assertThat(additional).hasSize(1);
-        assertThat(additional.get(0)).isInstanceOf(de.augmentia.strandsagents.model.message.SystemMessage.class);
-        assertThat(((de.augmentia.strandsagents.model.message.SystemMessage) additional.get(0)).content())
+        assertThat(additional.get(0)).isInstanceOf(de.augmentia.strandsagents.model.message.Message.class);
+        assertThat(additional.get(0).content())
             .contains("test-skill");
     }
 

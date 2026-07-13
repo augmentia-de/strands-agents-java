@@ -2,6 +2,7 @@ package de.augmentia.strandsagents.tools.builtin;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.augmentia.strandsagents.tools.AgentTool;
+import de.augmentia.strandsagents.tools.JsonContent;
 import de.augmentia.strandsagents.tools.ToolResult;
 import de.augmentia.strandsagents.tools.security.FileSandboxGuard;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -79,7 +80,7 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
 
         Path secureStartDir;
         try {
-            secureStartDir = sandboxGuard.validateAndResolve(subDir);
+            secureStartDir = sandboxGuard.validateAndResolve(AgentTool.relativePath(subDir));
         } catch (Exception e) {
             return ToolResult.error("Security violation on directory: " + e.getMessage());
         }
@@ -128,11 +129,21 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
             }
         }
 
+        var json = SCHEMA_MAPPER.createObjectNode();
+        json.put("pattern", params.pattern());
+        json.put("total", matchCount);
+        var matchesArr = json.putArray("matches");
+
         if (matchCount == 0) {
-            return ToolResult.success("No matches found for pattern: " + params.pattern());
+            return ToolResult.mixed("No matches found for pattern: " + params.pattern(), json);
         }
 
-        return ToolResult.success(searchResults.toString());
+        var lines = searchResults.toString().stripTrailing().split("\n");
+        for (var line : lines) {
+            var obj = matchesArr.addObject();
+            obj.put("text", line);
+        }
+        return ToolResult.mixed(searchResults.toString(), json);
     }
 
     public record Params(String pattern, String directory, Boolean isRegex, Integer maxResults) {}

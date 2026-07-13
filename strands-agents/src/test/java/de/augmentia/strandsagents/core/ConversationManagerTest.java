@@ -6,11 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.augmentia.strandsagents.core.conversation.SlidingWindowConversationManager;
 import de.augmentia.strandsagents.core.conversation.SummarizingSlidingWindowConversationManager;
 import de.augmentia.strandsagents.model.agent.StopReason;
-import de.augmentia.strandsagents.model.message.AssistantMessage;
 import de.augmentia.strandsagents.model.message.Message;
-import de.augmentia.strandsagents.model.message.SystemMessage;
-import de.augmentia.strandsagents.model.message.ToolMessage;
-import de.augmentia.strandsagents.model.message.UserMessage;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -79,7 +75,7 @@ class ConversationManagerTest {
         var pruned = manager.prune(messages);
 
         assertThat(pruned).hasSize(3);
-        assertThat(pruned).allMatch(m -> !(m instanceof SystemMessage));
+        assertThat(pruned).allMatch(m -> !m.isSystem());
     }
 
     @Test
@@ -90,8 +86,8 @@ class ConversationManagerTest {
         var pruned = manager.prune(messages);
 
         assertThat(pruned).isNotEmpty();
-        assertThat(pruned.get(0)).isInstanceOf(SystemMessage.class);
-        var summary = (SystemMessage) pruned.get(0);
+        assertThat(pruned.get(0).isSystem()).isTrue();
+        var summary = pruned.get(0);
         assertThat(summary.content()).startsWith("Conversation summary:");
     }
 
@@ -117,8 +113,7 @@ class ConversationManagerTest {
         var pruned = manager.prune(messages);
 
         assertThat(pruned).hasSizeGreaterThan(1);
-        var types = pruned.stream().map(m -> m.getClass().getSimpleName()).toList();
-        assertThat(types.get(0)).isEqualTo("SystemMessage");
+        assertThat(pruned.get(0).isSystem()).isTrue();
     }
 
     @Test
@@ -135,7 +130,7 @@ class ConversationManagerTest {
         var pruned = manager.prune(messages);
 
         assertThat(pruned).hasSize(1);
-        assertThat(pruned.get(0)).isInstanceOf(UserMessage.class);
+        assertThat(pruned.get(0).isUser()).isTrue();
     }
 
     @Test
@@ -152,14 +147,14 @@ class ConversationManagerTest {
     void hybridPreservesSystemMessages() {
         var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 10_000, 3);
         var messages = new ArrayList<Message>();
-        messages.add(new SystemMessage("id-1", Instant.now(), "Sys-Anweisung", Map.of()));
+        messages.add(Message.system("id-1", Instant.now(), "Sys-Anweisung", Map.of()));
         for (int i = 0; i < 5; i++) {
-            messages.add(new UserMessage("id-" + (i + 2), Instant.now(), "Frage " + i, Map.of()));
+            messages.add(Message.user("id-" + (i + 2), Instant.now(), "Frage " + i, Map.of()));
         }
 
         var pruned = manager.prune(messages);
 
-        assertThat(pruned).anyMatch(m -> m instanceof SystemMessage);
+        assertThat(pruned).anyMatch(m -> m.isSystem());
     }
 
     @Test
@@ -172,13 +167,13 @@ class ConversationManagerTest {
     void hybridKeepsSystemMessagesUnaggregatedWhenUnderThreshold() {
         var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 10_000, 3);
         var messages = List.<Message>of(
-            new SystemMessage("id-1", Instant.now(), "Regel A", Map.of()),
-            new SystemMessage("id-2", Instant.now(), "Regel B", Map.of()));
+            Message.system("id-1", Instant.now(), "Regel A", Map.of()),
+            Message.system("id-2", Instant.now(), "Regel B", Map.of()));
 
         var pruned = manager.prune(messages);
 
         assertThat(pruned).hasSize(2);
-        assertThat(pruned.get(0)).isInstanceOf(SystemMessage.class);
+        assertThat(pruned.get(0).isSystem()).isTrue();
     }
 
     @Test
@@ -186,16 +181,16 @@ class ConversationManagerTest {
         var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 1, 3);
         var messages = new ArrayList<Message>();
         for (int i = 0; i < 6; i++) {
-            messages.add(new SystemMessage("s-" + i, Instant.now(), "Regel " + i, Map.of()));
+            messages.add(Message.system("s-" + i, Instant.now(), "Regel " + i, Map.of()));
         }
         for (int i = 0; i < 11; i++) {
-            messages.add(new UserMessage("u-" + i, Instant.now(), "Frage " + i, Map.of()));
+            messages.add(Message.user("u-" + i, Instant.now(), "Frage " + i, Map.of()));
         }
 
         var pruned = manager.prune(messages);
 
         assertThat(pruned).hasSize(5);
-        assertThat(pruned.get(0)).isInstanceOf(SystemMessage.class);
+        assertThat(pruned.get(0).isSystem()).isTrue();
     }
 
     @Test
@@ -210,18 +205,18 @@ class ConversationManagerTest {
     void hybridHandlesMixedTypes() {
         var manager = new SummarizingSlidingWindowConversationManager(new MockChatModel(), 4000, 3);
         var messages = new ArrayList<Message>();
-        messages.add(new SystemMessage("s1", Instant.now(), "Anweisung", Map.of()));
-        messages.add(new UserMessage("u1", Instant.now(), "Hallo", Map.of()));
-        messages.add(new AssistantMessage("a1", Instant.now(), "Hi!", Map.of(), List.of()));
-        messages.add(new UserMessage("u2", Instant.now(), "Wetter?", Map.of()));
-        messages.add(new AssistantMessage("a2", Instant.now(), "Sonnig", Map.of(), List.of()));
-        messages.add(new ToolMessage("t1", Instant.now(), "tool-result", Map.of(), "call-1", "get_weather"));
-        messages.add(new UserMessage("u3", Instant.now(), "Danke", Map.of()));
+        messages.add(Message.system("s1", Instant.now(), "Anweisung", Map.of()));
+        messages.add(Message.user("u1", Instant.now(), "Hallo", Map.of()));
+        messages.add(Message.assistant("a1", Instant.now(), "Hi!", Map.of(), List.of()));
+        messages.add(Message.user("u2", Instant.now(), "Wetter?", Map.of()));
+        messages.add(Message.assistant("a2", Instant.now(), "Sonnig", Map.of(), List.of()));
+        messages.add(Message.toolResult("t1", Instant.now(), "tool-result", Map.of(), "call-1", "get_weather"));
+        messages.add(Message.user("u3", Instant.now(), "Danke", Map.of()));
 
         var pruned = manager.prune(messages);
 
         assertThat(pruned).isNotEmpty();
-        var sysCount = pruned.stream().filter(m -> m instanceof SystemMessage).count();
+        var sysCount = pruned.stream().filter(Message::isSystem).count();
         assertThat(sysCount).isGreaterThanOrEqualTo(1);
     }
 
@@ -233,21 +228,21 @@ class ConversationManagerTest {
         var pruned = manager.prune(messages);
 
         assertThat(pruned).hasSizeLessThan(12);
-        assertThat(pruned.get(0)).isInstanceOf(SystemMessage.class);
+        assertThat(pruned.get(0).isSystem()).isTrue();
     }
 
     @Test
     void slidingWindowPreservesSystemMessages() {
         var manager = new SlidingWindowConversationManager(3);
         var messages = new ArrayList<Message>();
-        messages.add(new SystemMessage("s1", Instant.now(), "System", Map.of()));
+        messages.add(Message.system("s1", Instant.now(), "System", Map.of()));
         for (int i = 1; i <= 5; i++) {
-            messages.add(new UserMessage("id-" + i, Instant.now(), "Nachricht " + i, Map.of()));
+            messages.add(Message.user("id-" + i, Instant.now(), "Nachricht " + i, Map.of()));
         }
 
         var pruned = manager.prune(messages);
 
-        assertThat(pruned.get(0)).isInstanceOf(SystemMessage.class);
+        assertThat(pruned.get(0).isSystem()).isTrue();
         assertThat(pruned).hasSize(4);
     }
 
@@ -323,7 +318,7 @@ class ConversationManagerTest {
     private static List<Message> createMessages(int count) {
         var messages = new ArrayList<Message>();
         for (int i = 0; i < count; i++) {
-            messages.add(new UserMessage(
+            messages.add(Message.user(
                 "id-" + i, Instant.now(), "Nachricht " + i, Map.of()));
         }
         return messages;
@@ -332,7 +327,7 @@ class ConversationManagerTest {
     private static List<Message> createLongMessages(int count) {
         var messages = new ArrayList<Message>();
         for (int i = 0; i < count; i++) {
-            messages.add(new UserMessage(
+            messages.add(Message.user(
                 "id-" + i, Instant.now(),
                 "Dies ist eine sehr lange Nachricht Nummer " + i
                 + " mit vielen Zeichen, um den Token-Counter zu aktivieren. "

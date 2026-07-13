@@ -110,7 +110,7 @@ public class MultiEditTool implements AgentTool<MultiEditTool.Params> {
 
             try {
                 // ABSICHERUNG
-                Path securePath = sandboxGuard.validateAndResolve(edit.filePath());
+                Path securePath = sandboxGuard.validateAndResolve(AgentTool.relativePath(edit.filePath()));
 
                 if (!Files.exists(securePath)) {
                     return ToolResult.error("File does not exist: " + edit.filePath());

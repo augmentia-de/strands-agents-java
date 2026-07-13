@@ -1,5 +1,7 @@
 package de.augmentia.strandsagents.tools.security;
 
+import de.augmentia.strandsagents.tools.AgentTool;
+
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.AccessControlException;
@@ -26,7 +28,7 @@ public class FileSandboxGuard {
         }
 
         // Absolute und normalisierte Auflösung (entfernt alle '..' und '.')
-        Path resolvedPath = workspaceRoot.resolve(unsafeRequestedPath).toAbsolutePath().normalize();
+        Path resolvedPath = workspaceRoot.resolve(AgentTool.relativePath(unsafeRequestedPath)).toAbsolutePath().normalize();
 
         // Path-Traversal-Erkennung: Beginnt der Pfad mit dem erlaubten Root-Verzeichnis?
         if (!resolvedPath.startsWith(workspaceRoot)) {

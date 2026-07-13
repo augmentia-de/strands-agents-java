@@ -15,7 +15,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import de.augmentia.strandsagents.tools.AgentTool;
-import de.augmentia.strandsagents.tools.TextContent;
 import de.augmentia.strandsagents.tools.ToolResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,7 +111,7 @@ public class BashTool implements AgentTool<BashTool.Params> {
                                 }
                             }
                             if (finalOnUpdate != null) {
-                                finalOnUpdate.accept(new ToolResult(List.of(new TextContent(String.join("\n", lines))), null));
+                                finalOnUpdate.accept(ToolResult.success(String.join("\n", lines)));
                             }
                             if (Thread.currentThread().isInterrupted()) {
                                 finalProcess.destroyForcibly();
@@ -153,7 +152,7 @@ public class BashTool implements AgentTool<BashTool.Params> {
             }
 
             log.debug("Tool: bash DONE exitCode={} lines={}", exitCode, lines.size());
-            return new ToolResult(List.of(new TextContent(trunc(result, 500))), null);
+            return ToolResult.success(trunc(result, 500));
         } catch (IOException | InterruptedException e) {
             if (process != null && process.isAlive()) {
                 process.destroyForcibly();

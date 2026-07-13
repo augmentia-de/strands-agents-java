@@ -4,15 +4,16 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.augmentia.strandsagents.core.Agent;
 import de.augmentia.strandsagents.core.context.AgentContext;
-import de.augmentia.strandsagents.tools.AgentTool;
+import de.augmentia.strandsagents.tools.AsyncAgentTool;
 import de.augmentia.strandsagents.tools.ToolResult;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-public class SubAgentTool implements AgentTool<SubAgentTool.Params> {
+public class SubAgentTool implements AsyncAgentTool<SubAgentTool.Params> {
 
     public static final int MAX_RECURSION_DEPTH = 5;
-    private static final ThreadLocal<Integer> RECURSION_DEPTH = new ThreadLocal<>();
+    private static final ThreadLocal<Integer> RECURSION_DEPTH = ThreadLocal.withInitial(() -> 0);
 
     private final Agent subAgent;
     private final String toolName;
@@ -72,12 +73,10 @@ public class SubAgentTool implements AgentTool<SubAgentTool.Params> {
 
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
-        Integer prevDepthVal = RECURSION_DEPTH.get();
-        int currentDepth = prevDepthVal != null ? prevDepthVal : 0;
+        int currentDepth = RECURSION_DEPTH.get();
         if (currentDepth >= MAX_RECURSION_DEPTH) {
             return ToolResult.error("Maximum recursion depth of " + MAX_RECURSION_DEPTH + " reached.");
         }
-        var prevDepth = RECURSION_DEPTH.get();
         RECURSION_DEPTH.set(currentDepth + 1);
         try {
             var sessionId = AgentContext.SESSION_ID.get();
@@ -88,12 +87,38 @@ public class SubAgentTool implements AgentTool<SubAgentTool.Params> {
         } catch (Exception e) {
             return ToolResult.error("Error in sub-agent: " + e.getMessage());
         } finally {
-            if (prevDepth != null) {
-                RECURSION_DEPTH.set(prevDepth);
-            } else {
-                RECURSION_DEPTH.remove();
-            }
+            RECURSION_DEPTH.set(currentDepth);
         }
+    }
+
+    @Override
+    public CompletableFuture<ToolResult> executeAsync(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
+        int currentDepth = RECURSION_DEPTH.get();
+        if (currentDepth >= MAX_RECURSION_DEPTH) {
+            return CompletableFuture.completedFuture(
+                ToolResult.error("Maximum recursion depth of " + MAX_RECURSION_DEPTH + " reached."));
+        }
+
+        var sessionId = AgentContext.SESSION_ID.get();
+        RECURSION_DEPTH.set(currentDepth + 1);
+
+        CompletableFuture<SubAgentResult> futureResult;
+        try {
+            futureResult = sessionId != null
+                ? executor.callAsync(subAgent, params.prompt(), toolName, sessionId)
+                : executor.callAsync(subAgent, params.prompt(), toolName);
+        } finally {
+            RECURSION_DEPTH.set(currentDepth);
+        }
+
+        return futureResult
+            .thenApply(a2aResult -> {
+                if (a2aResult.result().startsWith("A2A-Fehler:")) {
+                    return ToolResult.error(a2aResult.result());
+                }
+                return ToolResult.success(a2aResult.result());
+            })
+            .exceptionally(e -> ToolResult.error("Error in sub-agent: " + e.getMessage()));
     }
 
     public record Params(String prompt) {}

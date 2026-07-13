@@ -3,7 +3,11 @@ package de.augmentia.strandsagents.interceptor.gdpr;
 import de.augmentia.strandsagents.interceptor.pipeline.AgentHook;
 import de.augmentia.strandsagents.interceptor.pipeline.HookContexts;
 import de.augmentia.strandsagents.interceptor.pipeline.HookResult;
-import de.augmentia.strandsagents.model.message.*;
+import de.augmentia.strandsagents.model.message.Message;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 
 import java.util.*;
 import java.util.regex.Pattern;
@@ -88,16 +92,26 @@ public class PiiAnonymizerHook implements AgentHook {
         return result;
     }
 
-    @SuppressWarnings("unchecked")
-    private <T extends Message> T createMaskedMessage(T original, String sanitized) {
-        return switch (original) {
-            case UserMessage m -> (T) new UserMessage(m.id(), m.timestamp(), sanitized, m.metadata());
-            case SystemMessage m -> (T) new SystemMessage(m.id(), m.timestamp(), sanitized, m.metadata());
-            case AssistantMessage m -> (T) new AssistantMessage(
-                m.id(), m.timestamp(), sanitized, m.metadata(), m.toolCalls());
-            case ToolMessage m -> (T) new ToolMessage(
-                m.id(), m.timestamp(), sanitized, m.metadata(), m.toolCallId(), m.toolName());
-            default -> original;
-        };
+    private Message createMaskedMessage(Message original, String sanitized) {
+        ChatMessage newDelegate;
+        if (original.isUser()) {
+            newDelegate = dev.langchain4j.data.message.UserMessage.from(sanitized);
+        } else if (original.isSystem()) {
+            newDelegate = new dev.langchain4j.data.message.SystemMessage(sanitized);
+        } else if (original.isAssistant()) {
+            var tools = original.hasToolExecutionRequests() ? original.toolExecutionRequests() : null;
+            newDelegate = tools != null
+                ? AiMessage.from(sanitized, tools)
+                : new AiMessage(sanitized);
+        } else if (original.isToolResult()) {
+            var request = ToolExecutionRequest.builder()
+                .id(original.toolCallId())
+                .name(original.toolName())
+                .build();
+            newDelegate = ToolExecutionResultMessage.from(request, sanitized);
+        } else {
+            newDelegate = original.delegate();
+        }
+        return new Message(original.id(), original.timestamp(), newDelegate, original.metadata());
     }
 }

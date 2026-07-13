@@ -138,7 +138,7 @@ public class SwarmDemo {
         researcher.setEventListener(event -> {
             switch (event) {
                 case ToolExecutionStartedEvent e ->
-                    System.out.println("  → Tool call: " + e.toolCall().toolName());
+                    System.out.println("  → Tool call: " + e.toolExecutionRequest().name());
                 case ToolExecutionFinishedEvent e ->
                     System.out.println("  ← Tool done: " + e.result().toolName()
                         + " (" + truncate(e.result().result(), 80) + ")");

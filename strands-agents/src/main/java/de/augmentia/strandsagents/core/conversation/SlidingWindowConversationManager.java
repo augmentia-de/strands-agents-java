@@ -1,7 +1,6 @@
 package de.augmentia.strandsagents.core.conversation;
 
 import de.augmentia.strandsagents.model.message.Message;
-import de.augmentia.strandsagents.model.message.SystemMessage;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -20,10 +19,10 @@ public record SlidingWindowConversationManager(int windowSize) implements Conver
         }
 
         var systemMessages = messages.stream()
-            .filter(m -> m instanceof SystemMessage)
+            .filter(Message::isSystem)
             .toList();
         var nonSystem = messages.stream()
-            .filter(m -> !(m instanceof SystemMessage))
+            .filter(m -> !m.isSystem())
             .toList();
 
         if (nonSystem.size() <= windowSize) {

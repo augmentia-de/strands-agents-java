@@ -2,6 +2,7 @@ package de.augmentia.strandsagents.tools.builtin;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.augmentia.strandsagents.tools.AgentTool;
+import de.augmentia.strandsagents.tools.JsonContent;
 import de.augmentia.strandsagents.tools.ToolResult;
 import de.augmentia.strandsagents.tools.security.FileSandboxGuard;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -41,8 +42,7 @@ public class FindTool implements AgentTool<FindTool.Params> {
 
     @Override
     public ObjectNode parameterSchema() {
-        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        var schema = mapper.createObjectNode();
+        var schema = SCHEMA_MAPPER.createObjectNode();
         schema.put("type", "object");
         var props = schema.putObject("properties");
         addStr(props, "pattern", "Glob pattern (e.g., *.java, src/**/*.ts)");
@@ -52,13 +52,13 @@ public class FindTool implements AgentTool<FindTool.Params> {
         return schema;
     }
 
-    private void addStr(ObjectNode p, String n, String d) {
+    private static void addStr(ObjectNode p, String n, String d) {
         var node = p.putObject(n);
         node.put("type", "string");
         node.put("description", d);
     }
 
-    private void addInt(ObjectNode p, String n, String d) {
+    private static void addInt(ObjectNode p, String n, String d) {
         var node = p.putObject(n);
         node.put("type", "integer");
         node.put("description", d);
@@ -70,13 +70,19 @@ public class FindTool implements AgentTool<FindTool.Params> {
             return ToolResult.error("Glob pattern is required.");
         }
 
-        Path rootDir = sandboxGuard.getWorkspaceRoot();
+        Path searchDir;
+        if (params.path() != null && !params.path().isBlank()) {
+            searchDir = sandboxGuard.validateAndResolve(AgentTool.relativePath(params.path()));
+        } else {
+            searchDir = sandboxGuard.validateAndResolve(".");
+        }
         String cleanPattern = params.pattern().replace("\\", "/");
         PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + cleanPattern);
 
         List<String> matchedFiles = new ArrayList<>();
+        int maxResults = params.maxResults() != null ? params.maxResults() : 100;
 
-        try (Stream<Path> walk = Files.walk(rootDir)) {
+        try (Stream<Path> walk = Files.walk(searchDir)) {
             List<Path> allPaths = walk.toList();
 
             for (Path path : allPaths) {
@@ -84,12 +90,15 @@ public class FindTool implements AgentTool<FindTool.Params> {
                     return ToolResult.error("Glob operation aborted.");
                 }
 
-                Path relativePath = rootDir.relativize(path);
+                Path relativePath = sandboxGuard.getWorkspaceRoot().relativize(path);
 
                 if (matcher.matches(relativePath)) {
                     try {
                         sandboxGuard.validateAndResolve(path.toString());
                         matchedFiles.add(relativePath.toString().replace("\\", "/"));
+                        if (matchedFiles.size() >= maxResults) {
+                            break;
+                        }
                     } catch (Exception e) {
                         // Ignoriere unbefugte Pfade
                     }
@@ -99,12 +108,24 @@ public class FindTool implements AgentTool<FindTool.Params> {
             return ToolResult.error("Error during file system traversal: " + e.getMessage());
         }
 
+        var json = SCHEMA_MAPPER.createObjectNode();
+        json.put("pattern", cleanPattern);
+        json.put("total", matchedFiles.size());
+        var filesArr = json.putArray("files");
+        var truncated = matchedFiles.size() >= maxResults;
+        json.put("truncated", truncated);
+
         if (matchedFiles.isEmpty()) {
-            return ToolResult.success("No files matched the pattern: " + params.pattern());
+            return ToolResult.mixed("No files matched the pattern: " + params.pattern(), json);
         }
 
-        return ToolResult.success("Found matching files:\n" + String.join("\n", matchedFiles));
+        matchedFiles.forEach(filesArr::add);
+        var text = "Found matching files:\n" + String.join("\n", matchedFiles);
+        if (truncated) {
+            text += "\n\n[Truncated: Maximum results reached]";
+        }
+        return ToolResult.mixed(text, json);
     }
 
-    public record Params(String pattern) {}
+    public record Params(String pattern, String path, Integer maxResults) {}
 }

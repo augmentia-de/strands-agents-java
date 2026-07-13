@@ -1,10 +1,10 @@
 package de.augmentia.strandsagents.model.event;
 
-import de.augmentia.strandsagents.model.tool.ToolCall;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import java.time.Instant;
 
 public record ToolExecutionStartedEvent(
     String sessionId,
     Instant timestamp,
-    ToolCall toolCall
+    ToolExecutionRequest toolExecutionRequest
 ) implements AgentEvent {}

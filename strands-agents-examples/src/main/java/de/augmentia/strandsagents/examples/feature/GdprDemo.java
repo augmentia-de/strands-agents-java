@@ -10,7 +10,7 @@ import de.augmentia.strandsagents.interceptor.gdpr.PiiAnonymizerHook.BlockAction
 import de.augmentia.strandsagents.interceptor.gdpr.PiiAnonymizerHook.MaskType;
 import de.augmentia.strandsagents.interceptor.pipeline.HookRegistry;
 import de.augmentia.strandsagents.core.sessions.SessionManager;
-import de.augmentia.strandsagents.model.message.UserMessage;
+import de.augmentia.strandsagents.model.message.Message;
 import de.augmentia.strandsagents.interceptor.pipeline.HookContexts;
 import de.augmentia.strandsagents.interceptor.pipeline.HookResult;
 import de.augmentia.strandsagents.tools.feature.GdprDeleteTool;
@@ -53,9 +53,9 @@ public class GdprDemo {
             BlockAction.REDACT,
             "[PII]");
 
-        var messages = List.<de.augmentia.strandsagents.model.message.Message>of(
-            new UserMessage("1", NOW, "Kontakt: hans@example.com oder +49 170 1234567", EMPTY_META),
-            new UserMessage("2", NOW, "Ich bin Herr Max Mustermann, Musterstr. 42, 12345 Berlin", EMPTY_META));
+        var messages = List.of(
+            Message.user("1", NOW, "Kontakt: hans@example.com oder +49 170 1234567", EMPTY_META),
+            Message.user("2", NOW, "Ich bin Herr Max Mustermann, Musterstr. 42, 12345 Berlin", EMPTY_META));
 
         var ctx = new HookContexts.BeforeModelCallContext(
             "s1", new StringBuilder(), new ArrayList<>(messages), List.of(), new ArrayList<>());
@@ -171,7 +171,7 @@ public class GdprDemo {
             EnumSet.of(MaskType.EMAIL), BlockAction.THROW, "[PII]");
 
         var messages = List.<de.augmentia.strandsagents.model.message.Message>of(
-            new UserMessage("1", NOW, "email@test.com", EMPTY_META));
+            Message.user("1", NOW, "email@test.com", EMPTY_META));
 
         var ctx = new HookContexts.BeforeModelCallContext(
             "s1", new StringBuilder(), new ArrayList<>(messages), List.of(), new ArrayList<>());
@@ -189,7 +189,7 @@ public class GdprDemo {
     private static SessionManager createSessionManager() {
         var session = new de.augmentia.strandsagents.model.session.Session(
             "s1", "test-agent",
-            List.of(new UserMessage("1", NOW, "Hallo Welt", EMPTY_META)),
+            List.of(Message.user("1", NOW, "Hallo Welt", EMPTY_META)),
             new de.augmentia.strandsagents.model.agent.AgentState(
                 "s1", List.of(), Map.of(),
                 de.augmentia.strandsagents.model.agent.AgentStatus.IDLE),

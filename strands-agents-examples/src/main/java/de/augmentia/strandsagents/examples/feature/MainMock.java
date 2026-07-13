@@ -45,7 +45,7 @@ public class MainMock {
             switch (event) {
                 case AgentStartedEvent e -> System.out.println("  [EVENT] Started");
                 case ModelRequestedEvent e -> System.out.println("  [EVENT] LLM-Call (" + e.promptHistory().size() + " messages)");
-                case ToolExecutionStartedEvent e -> System.out.println("  [EVENT] Tool: " + e.toolCall().toolName());
+                case ToolExecutionStartedEvent e -> System.out.println("  [EVENT] Tool: " + e.toolExecutionRequest().name());
                 case ToolExecutionFinishedEvent e -> System.out.println("  [EVENT] Result: " + e.result().toolName() + " -> " + e.result().result());
                 case BeforeInvocationEvent e -> {}
                 case AfterInvocationEvent e -> {}

@@ -17,7 +17,7 @@ public class LoggingHook implements AgentEventListener {
             case ModelRequestedEvent e -> log.debug("LLM-Call: session={}, messages={}",
                 e.sessionId(), e.promptHistory().size());
             case ToolExecutionStartedEvent e -> log.info("Tool gestartet: session={}, tool={}",
-                e.sessionId(), e.toolCall().toolName());
+                e.sessionId(), e.toolExecutionRequest().name());
             case ToolExecutionFinishedEvent e -> log.debug("Tool beendet: session={}, tool={}, error={}",
                 e.sessionId(), e.result().toolName(), e.result().isError());
             case TokenEvent e -> log.trace("Token: session={}, token=\"{}\"",

@@ -31,20 +31,20 @@ public class ConfigReader {
     public String getValue(String key) {
         var val = System.getProperty("vault." + key);
         if (val != null && !val.isBlank()) {
-            instanceLog.info("ConfigReader.get({}) → vault.{} = {}", key, key, mask(val));
+            instanceLog.debug("ConfigReader.get({}) → vault.{} = {}", key, key, mask(val));
             return val;
         }
         val = System.getenv(key);
         if (val != null && !val.isBlank()) {
-            instanceLog.info("ConfigReader.get({}) → env.{} = {}", key, key, mask(val));
+            instanceLog.debug("ConfigReader.get({}) → env.{} = {}", key, key, mask(val));
             return val;
         }
         val = System.getProperty(key);
         if (val != null && !val.isBlank()) {
-            instanceLog.info("ConfigReader.get({}) → sysprop.{} = {}", key, key, mask(val));
+            instanceLog.debug("ConfigReader.get({}) → sysprop.{} = {}", key, key, mask(val));
             return val;
         }
-        instanceLog.info("ConfigReader.get({}) → null", key);
+        instanceLog.debug("ConfigReader.get({}) → null", key);
         return null;
     }
 

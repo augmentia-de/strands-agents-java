@@ -12,7 +12,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import de.augmentia.strandsagents.tools.AgentTool;
-import de.augmentia.strandsagents.tools.TextContent;
 import de.augmentia.strandsagents.tools.ToolResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -129,7 +128,7 @@ public class CommandTool implements AgentTool<CommandTool.Params> {
                             }
 
                             if (onUpdate != null) {
-                                onUpdate.accept(new ToolResult(List.of(new TextContent(String.join("\n", lines))), null));
+                                onUpdate.accept(ToolResult.success(String.join("\n", lines)));
                             }
                         }
                     } else {
@@ -148,7 +147,7 @@ public class CommandTool implements AgentTool<CommandTool.Params> {
             }
 
             log.debug("Tool: command DONE exitCode={} lines={}", exitCode, lines.size());
-            return new ToolResult(List.of(new TextContent(trunc(result, 500))), null);
+            return ToolResult.success(trunc(result, 500));
 
         } catch (IOException | InterruptedException e) {
             if (process != null && process.isAlive()) {

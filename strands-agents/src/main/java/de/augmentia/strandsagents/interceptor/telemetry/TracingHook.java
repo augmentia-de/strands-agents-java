@@ -33,8 +33,8 @@ public class TracingHook implements AgentEventListener {
                 spans.put(e.sessionId() + ":llm", span);
             }
             case ToolExecutionStartedEvent e -> {
-                var span = tracing.startToolSpan(e.sessionId(), e.toolCall().toolName());
-                spans.put(e.sessionId() + ":tool:" + e.toolCall().toolName(), span);
+                var span = tracing.startToolSpan(e.sessionId(), e.toolExecutionRequest().name());
+                spans.put(e.sessionId() + ":tool:" + e.toolExecutionRequest().name(), span);
             }
             case ToolExecutionFinishedEvent e -> {
                 tracing.endToolSpan(e.sessionId(), e.result().toolName(), e.result().isError());

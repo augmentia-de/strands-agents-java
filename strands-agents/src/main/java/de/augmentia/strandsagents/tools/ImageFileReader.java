@@ -25,7 +25,7 @@ public class ImageFileReader implements FileReader {
         var bytes = Files.readAllBytes(path);
         var base64 = Base64.getEncoder().encodeToString(bytes);
         return new ToolResult(
-            List.of(new TextContent("Read image file [" + mimeType + "]"), new ImageContent(base64, mimeType)),
+            List.of("Read image file [" + mimeType + "]", base64),
             null);
     }
 

@@ -2,6 +2,7 @@ package de.augmentia.strandsagents.model.tool;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import org.junit.jupiter.api.Test;
 
 class ToolModelTest {
@@ -22,10 +23,11 @@ class ToolModelTest {
     }
 
     @Test
-    void toolCall_constructor() {
-        var tc = new ToolCall("id1", "calculator", "{\"a\":1,\"b\":2}");
+    void toolExecutionRequestBuilder() {
+        var tc = ToolExecutionRequest.builder()
+            .id("id1").name("calculator").arguments("{\"a\":1,\"b\":2}").build();
         assertThat(tc.id()).isEqualTo("id1");
-        assertThat(tc.toolName()).isEqualTo("calculator");
+        assertThat(tc.name()).isEqualTo("calculator");
         assertThat(tc.arguments()).contains("a");
     }
 }

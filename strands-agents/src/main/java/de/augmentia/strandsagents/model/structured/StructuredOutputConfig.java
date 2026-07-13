@@ -5,7 +5,7 @@ import java.lang.reflect.ParameterizedType;
 import java.util.List;
 
 public record StructuredOutputConfig(
-    StructuredOutputMode mode,
+    boolean dynamicSchema,
     Class<?> outputClass,
     String jsonSchema,
     String forcePrompt
@@ -16,54 +16,32 @@ public record StructuredOutputConfig(
     }
 
     public static StructuredOutputConfig staticModel(Class<?> outputClass) {
-        return new StructuredOutputConfig(
-            StructuredOutputMode.STATIC,
-            outputClass,
-            null,
-            defaultForcePrompt()
-        );
+        return new StructuredOutputConfig(false, outputClass, null, defaultForcePrompt());
     }
 
     public static StructuredOutputConfig staticModel(Class<?> outputClass, String forcePrompt) {
-        return new StructuredOutputConfig(
-            StructuredOutputMode.STATIC,
-            outputClass,
-            null,
-            forcePrompt
-        );
+        return new StructuredOutputConfig(false, outputClass, null, forcePrompt);
     }
 
     public static StructuredOutputConfig dynamicSchema(String jsonSchema) {
-        return new StructuredOutputConfig(
-            StructuredOutputMode.DYNAMIC,
-            null,
-            jsonSchema,
-            defaultForcePrompt()
-        );
+        return new StructuredOutputConfig(true, null, jsonSchema, defaultForcePrompt());
     }
 
     public static StructuredOutputConfig dynamicSchema(String jsonSchema, String forcePrompt) {
-        return new StructuredOutputConfig(
-            StructuredOutputMode.DYNAMIC,
-            null,
-            jsonSchema,
-            forcePrompt
-        );
+        return new StructuredOutputConfig(true, null, jsonSchema, forcePrompt);
     }
 
     public boolean isEnabled() {
-        return (mode == StructuredOutputMode.STATIC && outputClass != null)
-            || (mode == StructuredOutputMode.DYNAMIC && jsonSchema != null && !jsonSchema.isBlank());
+        return (!dynamicSchema && outputClass != null)
+            || (dynamicSchema && jsonSchema != null && !jsonSchema.isBlank());
     }
 
     public String effectiveSchema() {
-        return switch (mode) {
-            case STATIC -> {
-                if (outputClass == null) yield null;
-                yield generateSchemaFromClass(outputClass);
-            }
-            case DYNAMIC -> jsonSchema;
-        };
+        if (!dynamicSchema) {
+            if (outputClass == null) return null;
+            return generateSchemaFromClass(outputClass);
+        }
+        return jsonSchema;
     }
 
     private static String generateSchemaFromClass(Class<?> cls) {

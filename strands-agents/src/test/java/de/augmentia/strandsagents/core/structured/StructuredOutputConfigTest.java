@@ -3,25 +3,16 @@ package de.augmentia.strandsagents.core.structured;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.augmentia.strandsagents.model.structured.StructuredOutputConfig;
-import de.augmentia.strandsagents.model.structured.StructuredOutputMode;
 import org.junit.jupiter.api.Test;
 
 class StructuredOutputConfigTest {
-
-    // --- Mode ---
-
-    @Test
-    void modeValues() {
-        assertThat(StructuredOutputMode.values()).containsExactly(
-            StructuredOutputMode.STATIC, StructuredOutputMode.DYNAMIC);
-    }
 
     // --- staticModel ---
 
     @Test
     void staticModelWithClass() {
         var config = StructuredOutputConfig.staticModel(TestRecord.class);
-        assertThat(config.mode()).isEqualTo(StructuredOutputMode.STATIC);
+        assertThat(config.dynamicSchema()).isFalse();
         assertThat(config.outputClass()).isEqualTo(TestRecord.class);
         assertThat(config.jsonSchema()).isNull();
         assertThat(config.forcePrompt()).isEqualTo(
@@ -42,7 +33,7 @@ class StructuredOutputConfigTest {
 
     @Test
     void staticModelIsDisabledWhenClassNull() {
-        var config = new StructuredOutputConfig(StructuredOutputMode.STATIC, null, null, "prompt");
+        var config = new StructuredOutputConfig(false, null, null, "prompt");
         assertThat(config.isEnabled()).isFalse();
     }
 
@@ -52,7 +43,7 @@ class StructuredOutputConfigTest {
     void dynamicSchema() {
         var schema = "{\"type\": \"object\", \"properties\": {}}";
         var config = StructuredOutputConfig.dynamicSchema(schema);
-        assertThat(config.mode()).isEqualTo(StructuredOutputMode.DYNAMIC);
+        assertThat(config.dynamicSchema()).isTrue();
         assertThat(config.outputClass()).isNull();
         assertThat(config.jsonSchema()).isEqualTo(schema);
     }
@@ -77,7 +68,7 @@ class StructuredOutputConfigTest {
 
     @Test
     void dynamicSchemaIsDisabledWhenNullSchema() {
-        var config = new StructuredOutputConfig(StructuredOutputMode.DYNAMIC, null, null, "prompt");
+        var config = new StructuredOutputConfig(true, null, null, "prompt");
         assertThat(config.isEnabled()).isFalse();
     }
 
@@ -104,7 +95,7 @@ class StructuredOutputConfigTest {
 
     @Test
     void effectiveSchemaForStaticWithNullClassReturnsNull() {
-        var config = new StructuredOutputConfig(StructuredOutputMode.STATIC, null, null, "prompt");
+        var config = new StructuredOutputConfig(false, null, null, "prompt");
         assertThat(config.effectiveSchema()).isNull();
     }
 

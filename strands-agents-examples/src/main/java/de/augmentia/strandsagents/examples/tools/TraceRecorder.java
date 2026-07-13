@@ -60,7 +60,7 @@ public class TraceRecorder implements AgentEventListener, AgentHook {
             case ModelRequestedEvent ignored ->
                 trace("[EVENT] Model requested");
             case ToolExecutionStartedEvent e ->
-                trace("[EVENT] Tool started: " + e.toolCall().toolName());
+                trace("[EVENT] Tool started: " + e.toolExecutionRequest().name());
             case ToolExecutionFinishedEvent e -> {
                 toolCallCount++;
                 var isTimeout = e.result().isError()

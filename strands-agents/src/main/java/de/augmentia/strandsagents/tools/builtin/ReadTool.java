@@ -5,6 +5,7 @@ import de.augmentia.strandsagents.tools.*;
 import de.augmentia.strandsagents.tools.security.FileSandboxGuard;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -81,7 +82,7 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
             return ToolResult.error("No file paths provided.");
         }
 
-        List<ContentBlock> allBlocks = new ArrayList<>();
+        List<String> allBlocks = new ArrayList<>();
         for (String pathStr : params.filePaths()) {
             if (abortFlag != null && abortFlag.get()) {
                 return ToolResult.error("Operation aborted.");
@@ -93,17 +94,17 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
 
                 FileReader reader = readerFactory.findReader(securePath);
                 if (reader == null) {
-                    allBlocks.add(new TextContent("Unsupported file type or directory format for: " + pathStr));
+                    allBlocks.add("Unsupported file type or directory format for: " + pathStr);
                     continue;
                 }
 
                 ToolResult fileResult = reader.read(securePath, params);
-                allBlocks.addAll(fileResult.content());
+                allBlocks.addAll(fileResult.content().stream().map(Object::toString).toList());
             } catch (Exception e) {
-                allBlocks.add(new TextContent("Security or I/O Error reading " + pathStr + ": " + e.getMessage()));
+                allBlocks.add("Security or I/O Error reading " + pathStr + ": " + e.getMessage());
             }
         }
-        return new ToolResult(allBlocks, null);
+        return new ToolResult(Arrays.asList(allBlocks.toArray()), null);
     }
 
     public record Params(List<String> filePaths, Integer offset, Integer limit, Integer line_start, Integer line_end) {}

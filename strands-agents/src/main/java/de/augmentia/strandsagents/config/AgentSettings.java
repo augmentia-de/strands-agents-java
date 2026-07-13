@@ -18,7 +18,6 @@ public record AgentSettings(
     TieredModelConfig tieredConfig,
     ModelTier modelTier
 ) {
-    public static final int DEFAULT_MAX_ITERATIONS = 10;
     public static final int DEFAULT_MAX_TOOL_ITERATIONS = 20;
 
     public static Builder builder() {

@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import de.augmentia.strandsagents.tools.AgentTool;
-import de.augmentia.strandsagents.tools.TextContent;
+import de.augmentia.strandsagents.tools.JsonContent;
 import de.augmentia.strandsagents.tools.ToolResult;
 import de.augmentia.strandsagents.tools.security.FileSandboxGuard;
 import org.slf4j.Logger;
@@ -95,10 +95,10 @@ public class LsTool implements AgentTool<LsTool.Params> {
 
 
 
-        if (!Files.exists(targetPath)) {
+        if (!Files.exists(secureDir)) {
             throw new RuntimeException("Path does not exist: " + params.path());
         }
-        if (!Files.isDirectory(targetPath)) {
+        if (!Files.isDirectory(secureDir)) {
             throw new RuntimeException("Path is not a directory: " + params.path());
         }
 
@@ -106,11 +106,11 @@ public class LsTool implements AgentTool<LsTool.Params> {
         try {
             if (Boolean.TRUE.equals(params.recursive())) {
                 int maxDepth = params.depth() != null ? params.depth() : Integer.MAX_VALUE;
-                try (var stream = Files.walk(targetPath, maxDepth)) {
+                try (var stream = Files.walk(secureDir, maxDepth)) {
                     stream.skip(1).forEach(entries::add);
                 }
             } else {
-                try (var stream = Files.list(targetPath)) {
+                try (var stream = Files.list(secureDir)) {
                     stream.forEach(entries::add);
                 }
             }
@@ -121,7 +121,7 @@ public class LsTool implements AgentTool<LsTool.Params> {
         entries.sort(Comparator.comparing(Path::toString));
 
         var root = MAPPER.createObjectNode();
-        root.put("directory", targetPath.toString());
+        root.put("directory", secureDir.toString());
 
         var arr = root.putArray("entries");
         boolean details = Boolean.TRUE.equals(params.details());
@@ -129,7 +129,7 @@ public class LsTool implements AgentTool<LsTool.Params> {
             if (abortFlag.get()) {
                 break;
             }
-            var name = targetPath.relativize(entry).toString();
+            var name = secureDir.relativize(entry).toString();
             var obj = arr.addObject();
             obj.put("name", Files.isDirectory(entry) ? name + "/" : name);
             obj.put("type", Files.isDirectory(entry) ? "dir" : "file");
@@ -146,19 +146,19 @@ public class LsTool implements AgentTool<LsTool.Params> {
         root.put("totalEntries", arr.size());
         root.put("details", details);
 
-        var output = arr.isEmpty()
+        var jsonNode = arr.isEmpty()
             ? MAPPER.createObjectNode()
-                .put("directory", targetPath.toString())
+                .put("directory", secureDir.toString())
                 .put("totalEntries", 0)
                 .put("details", details)
                 .put("empty", true)
-                .toString()
-            : root.toString();
+            : (com.fasterxml.jackson.databind.JsonNode) root;
 
         log.debug("Tool: ls DONE entries={}", entries.size());
+        var text = "Found " + arr.size() + " entries in " + secureDir;
         return new ToolResult(
-            List.of(new TextContent(output)),
-            new LsDetails(entries.size(), targetPath.toString()));
+            List.of(text, new JsonContent(jsonNode)),
+            new LsDetails(entries.size(), secureDir.toString()));
     }
 
     public record Params(String path, Boolean recursive, Boolean details, Integer depth) {}

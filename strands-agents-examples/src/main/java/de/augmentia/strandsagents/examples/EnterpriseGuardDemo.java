@@ -904,7 +904,7 @@ public class EnterpriseGuardDemo {
                 case AgentStartedEvent e -> "prompt=" + truncate(e.initialPrompt(), 60);
                 case AgentFinishedEvent e -> "answer=" + (e.finalAnswer() != null ? truncate(e.finalAnswer(), 60) : "null");
                 case ModelRequestedEvent e -> "messages=" + e.promptHistory().size();
-                case ToolExecutionStartedEvent e -> "tool=" + e.toolCall().toolName();
+                case ToolExecutionStartedEvent e -> "tool=" + e.toolExecutionRequest().name();
                 case ToolExecutionFinishedEvent e ->
                     "tool=" + e.result().toolName() + ",error=" + e.result().isError();
                 case AgentStateChangedEvent e ->

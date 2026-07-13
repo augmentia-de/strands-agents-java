@@ -3,7 +3,7 @@ package de.augmentia.strandsagents.skills;
 import de.augmentia.strandsagents.interceptor.pipeline.AgentHook;
 import de.augmentia.strandsagents.interceptor.pipeline.HookContexts;
 import de.augmentia.strandsagents.interceptor.pipeline.HookResult;
-import de.augmentia.strandsagents.model.message.SystemMessage;
+import de.augmentia.strandsagents.model.message.Message;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -47,7 +47,7 @@ public class SkillActivationHook implements AgentHook {
             + "<allowed_tools>" + String.join(", ", skill.allowedTools()) + "</allowed_tools>\n"
             + "</activated_skill>";
 
-        ctx.additionalMessages().add(new SystemMessage(
+        ctx.additionalMessages().add(Message.system(
             UUID.randomUUID().toString(), Instant.now(), xml, Map.of()));
 
         return new HookResult.Continue();

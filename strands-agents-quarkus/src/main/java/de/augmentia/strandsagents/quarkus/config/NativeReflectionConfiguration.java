@@ -20,20 +20,9 @@ import de.augmentia.strandsagents.tools.builtin.ReadTool;
 import de.augmentia.strandsagents.tools.builtin.WebFetchTool;
 import de.augmentia.strandsagents.tools.builtin.WebSearchTool;
 import de.augmentia.strandsagents.tools.builtin.WriteTool;
-import de.augmentia.strandsagents.model.message.AssistantMessage;
-import de.augmentia.strandsagents.model.message.SystemMessage;
-import de.augmentia.strandsagents.model.message.ToolMessage;
-import de.augmentia.strandsagents.model.message.UserMessage;
-import de.augmentia.strandsagents.model.tool.ToolCall;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection(targets = {
-    AssistantMessage.class,
-    UserMessage.class,
-    SystemMessage.class,
-    ToolMessage.class,
-    ToolCall.class,
-
     BashTool.Params.class,
     CapabilitySearchTool.Params.class,
     CommandTool.Params.class,

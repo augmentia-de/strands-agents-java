@@ -109,11 +109,6 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
     SkillSearchTool.class,
     SkillSearchTool.Params.class,
     de.augmentia.strandsagents.model.message.Message.class,
-    de.augmentia.strandsagents.model.message.MessageTypeIdResolver.class,
-    de.augmentia.strandsagents.model.message.UserMessage.class,
-    de.augmentia.strandsagents.model.message.AssistantMessage.class,
-    de.augmentia.strandsagents.model.message.SystemMessage.class,
-    de.augmentia.strandsagents.model.message.ToolMessage.class,
     de.augmentia.strandsagents.model.session.Session.class,
     de.augmentia.strandsagents.model.agent.AgentState.class,
     de.augmentia.strandsagents.model.agent.AgentStatus.class
