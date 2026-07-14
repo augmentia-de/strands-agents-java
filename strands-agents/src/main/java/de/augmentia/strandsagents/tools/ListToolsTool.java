@@ -11,6 +11,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+/**
+ * Tool that lists all registered tools with their names and descriptions.
+ */
 public class ListToolsTool implements AgentTool<ListToolsTool.Params> {
 
     private static final Logger log = LoggerFactory.getLogger(ListToolsTool.class);
@@ -35,11 +38,13 @@ public class ListToolsTool implements AgentTool<ListToolsTool.Params> {
         return Params.class;
     }
 
+    /** Returns an empty JSON schema (no parameters needed). */
     @Override
     public ObjectNode parameterSchema() {
         return JsonNodeFactory.instance.objectNode();
     }
 
+    /** Returns a formatted list of all registered tools excluding list_tools itself. */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         var lines = registry.getSpecifications().stream()
@@ -58,5 +63,6 @@ public class ListToolsTool implements AgentTool<ListToolsTool.Params> {
         return ToolResult.success(summary);
     }
 
+    /** Empty params record (no arguments needed). */
     public record Params() {}
 }

@@ -19,6 +19,13 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * An agent that plans and executes multi-step tasks using a {@link Planner}.
+ * <p>
+ * Creates a plan from a goal, executes steps sequentially, and revises on failure.
+ * Supports session resumption via {@link CheckpointStore}.
+ * </p>
+ */
 public class PlanningAgent extends Agent {
 
     private static final int MAX_EXECUTION_ITERATIONS = 50;
@@ -30,12 +37,18 @@ public class PlanningAgent extends Agent {
     private int revisionCount = 0;
     private final List<String> errorLog = new ArrayList<>();
 
+    /**
+     * Constructs a PlanningAgent with a model and planner.
+     */
     public PlanningAgent(ChatModel model, Planner planner) {
         super(model);
         this.planner = planner;
         this.checkpointStore = null;
     }
 
+    /**
+     * Constructs a PlanningAgent with model, tool registry, tool executor, and planner.
+     */
     public PlanningAgent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                          Planner planner) {
         super(model, toolRegistry, toolExecutor);
@@ -43,6 +56,9 @@ public class PlanningAgent extends Agent {
         this.checkpointStore = null;
     }
 
+    /**
+     * Constructs a PlanningAgent with an additional conversation manager.
+     */
     public PlanningAgent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                          ConversationManager conversationManager, Planner planner) {
         super(model, toolRegistry, toolExecutor, conversationManager);
@@ -50,6 +66,9 @@ public class PlanningAgent extends Agent {
         this.checkpointStore = null;
     }
 
+    /**
+     * Constructs a PlanningAgent with conversation manager, session manager, and resilience config.
+     */
     public PlanningAgent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                          ConversationManager conversationManager, SessionManager sessionManager,
                          ResilienceConfig resilienceConfig, Planner planner) {
@@ -58,6 +77,9 @@ public class PlanningAgent extends Agent {
         this.checkpointStore = null;
     }
 
+    /**
+     * Constructs a PlanningAgent with plugins and all other infrastructure components.
+     */
     public PlanningAgent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                          ConversationManager conversationManager, SessionManager sessionManager,
                          ResilienceConfig resilienceConfig, List<Plugin> plugins, Planner planner) {
@@ -66,6 +88,9 @@ public class PlanningAgent extends Agent {
         this.checkpointStore = null;
     }
 
+    /**
+     * Full constructor that includes a {@link CheckpointStore} for session resumption.
+     */
     public PlanningAgent(ChatModel model, ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                          ConversationManager conversationManager, SessionManager sessionManager,
                          ResilienceConfig resilienceConfig, List<Plugin> plugins,
@@ -75,11 +100,17 @@ public class PlanningAgent extends Agent {
         this.checkpointStore = checkpointStore;
     }
 
+    /**
+     * Delegates to {@link #executePlanned(String)}.
+     */
     @Override
     public AgentResult execute(String prompt) {
         return executePlanned(prompt);
     }
 
+    /**
+     * Core execution: plans the goal, executes steps, revises on failure, and reviews the result.
+     */
     public AgentResult executePlanned(String goal) {
         var start = Instant.now();
         phase = AgentPhase.PLANNING;
@@ -172,9 +203,7 @@ public class PlanningAgent extends Agent {
     }
 
     /**
-     * Setzt ab letztem completed Step fort.
-     * Skips all already COMPLETED steps.
-     * Erfordert nicht-null CheckpointStore.
+     * Resumes a session from the last completed step using the {@link CheckpointStore}.
      */
     public AgentResult resumeSession(String sessionId, String goal) {
         if (checkpointStore == null) {
@@ -231,6 +260,9 @@ public class PlanningAgent extends Agent {
         return revisionCount;
     }
 
+    /**
+     * Returns an unmodifiable list of step execution errors encountered during planning.
+     */
     public List<String> getErrorLog() {
         return List.copyOf(errorLog);
     }

@@ -6,6 +6,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * An agent session holding messages, state, metadata, and timestamps.
+ */
 public record Session(
     String sessionId,
     String agentName,

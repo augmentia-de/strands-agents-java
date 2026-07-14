@@ -6,6 +6,9 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Holds two tiers of chat model configuration (simple/advanced) and a default tier selector.
+ */
 public record TieredModelConfig(
     ChatModelConfig simple,
     ChatModelConfig advanced,
@@ -14,6 +17,7 @@ public record TieredModelConfig(
 
     private static final Logger log = LoggerFactory.getLogger(TieredModelConfig.class);
 
+    /** Builds a TieredModelConfig from environment variables. */
     public static TieredModelConfig fromEnv() {
         var openaiApiKey = get("OPENAI_API_KEY", null);
         log.info("TieredModelConfig.fromEnv: OPENAI_API_KEY={}", ConfigReader.mask(openaiApiKey));
@@ -61,6 +65,7 @@ public record TieredModelConfig(
         return new TieredModelConfig(simple, advanced, defaultTier);
     }
 
+    /** Returns the ChatModelConfig for the given tier. */
     public ChatModelConfig forTier(ModelTier tier) {
         return switch (tier) {
             case SIMPLE -> simple;

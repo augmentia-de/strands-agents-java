@@ -8,6 +8,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.*;
 
+/**
+ * Default ToolExecutor that runs tools in virtual threads with configurable timeout.
+ */
 public class DefaultToolExecutor implements ToolExecutor {
 
     private static final ExecutorService VIRTUAL_EXECUTOR =
@@ -63,6 +66,9 @@ public class DefaultToolExecutor implements ToolExecutor {
         return executeSingle(request, registry);
     }
 
+    /**
+     * Executes a single request with capability checking and timeout enforcement.
+     */
     ToolExecutionResult executeSingle(ToolExecutionRequest request, ToolRegistry registry)
             throws Exception {
 

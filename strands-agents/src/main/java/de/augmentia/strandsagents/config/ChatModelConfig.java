@@ -4,6 +4,9 @@ import java.util.HashMap;
 import java.util.Map;
 import static de.augmentia.strandsagents.config.ConfigReader.*;
 
+/**
+ * Configuration record for a single chat model (provider, API key, model name, etc.).
+ */
 public record ChatModelConfig(
     ModelProviderType provider,
     String apiKey,
@@ -16,12 +19,14 @@ public record ChatModelConfig(
     Boolean logResponses
 ) {
 
+    /** Normalizes null providerProperties to an empty map. */
     public ChatModelConfig {
         if (providerProperties == null) {
             providerProperties = Map.of();
         }
     }
 
+    /** Reads configuration from environment variables with the given prefix. */
     public static ChatModelConfig fromEnv(String prefix) {
         var provider = ModelProviderType.fromEnv(prefix);
         var props = new HashMap<String, String>();
@@ -40,6 +45,7 @@ public record ChatModelConfig(
         );
     }
 
+    /** Reads from env vars with fallback to default values when no prefixed vars are set. */
     public static ChatModelConfig fromEnvWithFallback(String prefix, ChatModelConfig fallback) {
         var provider = ModelProviderType.fromEnv(prefix);
         if (!hasAny(prefix)) return fallback;
@@ -59,6 +65,7 @@ public record ChatModelConfig(
         );
     }
 
+    /** Merges vault secrets into an existing config, falling back to the provided defaults. */
     public static ChatModelConfig fromVault(Map<String, String> secrets, ChatModelConfig fallback) {
         var props = new HashMap<>(fallback.providerProperties());
         if (secrets.containsKey("ollama_base_url")) {
@@ -77,14 +84,17 @@ public record ChatModelConfig(
         );
     }
 
+    /** Returns a copy of this config with a different API key. */
     public ChatModelConfig withApiKey(String apiKey) {
         return new ChatModelConfig(provider, apiKey, baseUrl, modelName, temperature, maxRetries, providerProperties, logRequests, logResponses);
     }
 
+    /** Returns a copy of this config with a different model name. */
     public ChatModelConfig withModelName(String modelName) {
         return new ChatModelConfig(provider, apiKey, baseUrl, modelName, temperature, maxRetries, providerProperties, logRequests, logResponses);
     }
 
+    /** Converts to a flat LlmConfig. */
     public LlmConfig toLlmConfig() {
         return new LlmConfig(apiKey, baseUrl, modelName, temperature, maxRetries, logRequests, logResponses);
     }

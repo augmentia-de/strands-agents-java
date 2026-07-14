@@ -10,6 +10,9 @@ import de.augmentia.strandsagents.tools.builtin.ReadTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Reads and extracts text from plain-text files with binary content detection.
+ */
 public class TextFileReader implements FileReader {
     private static final Logger log = LoggerFactory.getLogger(TextFileReader.class);
     private static final int MAX_CHARS = 20_000;
@@ -55,6 +58,9 @@ public class TextFileReader implements FileReader {
         return !containsBinaryContent(path);
     }
 
+    /**
+     * Scans the beginning of a file for null bytes to detect binary content.
+     */
     private boolean containsBinaryContent(Path path) {
         try (InputStream is = Files.newInputStream(path)) {
             var buf = new byte[BINARY_SCAN_SIZE];

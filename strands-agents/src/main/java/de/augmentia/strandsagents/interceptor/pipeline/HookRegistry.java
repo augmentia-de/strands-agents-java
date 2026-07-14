@@ -6,6 +6,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+/**
+ * Thread-safe registry for managing and triggering agent hooks.
+ */
 public class HookRegistry {
 
     private final List<AgentHook> hooks = new CopyOnWriteArrayList<>();
@@ -47,6 +50,9 @@ public class HookRegistry {
 
     // --- triggers ---
 
+    /**
+     * Invokes all before-agent hooks in order and returns the (possibly modified) prompt.
+     */
     public HookResult triggerBeforeAgent(HookContexts.BeforeAgentContext ctx) {
         var currentPrompt = ctx.prompt();
         for (var hook : getSortedHooks()) {
@@ -60,6 +66,9 @@ public class HookRegistry {
         return new HookResult.Modify<>(currentPrompt);
     }
 
+    /**
+     * Invokes all after-agent hooks and returns the (possibly modified) response.
+     */
     public HookResult triggerAfterAgent(HookContexts.AfterAgentContext ctx, String response) {
         var current = response;
         for (var hook : getSortedHooks()) {
@@ -74,6 +83,9 @@ public class HookRegistry {
         return new HookResult.Modify<>(current);
     }
 
+    /**
+     * Invokes all before-model-call hooks and returns the (possibly modified) tool list.
+     */
     public HookResult triggerBeforeModelCall(HookContexts.BeforeModelCallContext ctx) {
         var currentTools = ctx.tools();
         for (var hook : getSortedHooks()) {
@@ -93,6 +105,9 @@ public class HookRegistry {
         return new HookResult.Modify<>(currentTools);
     }
 
+    /**
+     * Invokes all after-model-call hooks and returns the (possibly modified) LLM response.
+     */
     public HookResult triggerAfterModelCall(HookContexts.AfterModelCallContext ctx, String response) {
         var current = response;
         for (var hook : getSortedHooks()) {
@@ -108,6 +123,9 @@ public class HookRegistry {
         return new HookResult.Modify<>(current);
     }
 
+    /**
+     * Invokes all before-tool-call hooks; returns cancel if any hook cancels.
+     */
     public HookResult triggerBeforeToolCall(HookContexts.BeforeToolCallContext ctx) {
         for (var hook : getSortedHooks()) {
             var result = wrap(() -> hook.beforeToolCall(ctx), hook.name());
@@ -116,6 +134,9 @@ public class HookRegistry {
         return new HookResult.Continue();
     }
 
+    /**
+     * Invokes all after-tool-call hooks and returns the (possibly modified) result.
+     */
     public HookResult triggerAfterToolCall(HookContexts.AfterToolCallContext ctx, String result) {
         var current = result;
         for (var hook : getSortedHooks()) {

@@ -7,10 +7,16 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Parses SKILL.md files, extracting YAML frontmatter and instruction body.
+ */
 public class SkillParser {
 
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
 
+    /**
+     * Parses a skill from a SKILL.md content string (YAML frontmatter delimited by ---).
+     */
     public static Skill fromContent(String content) {
         var stripped = content.strip();
         if (!stripped.startsWith("---"))
@@ -45,6 +51,9 @@ public class SkillParser {
         return new Skill(name, description, body, null, allowedTools, metadata, license, compatibility, declaredTools);
     }
 
+    /**
+     * Loads and parses a skill from a SKILL.md file or a directory containing one.
+     */
     public static Skill fromFile(Path path) {
         Path skillMd;
         if (Files.isDirectory(path)) {
@@ -67,6 +76,9 @@ public class SkillParser {
             skill.license(), skill.compatibility(), skill.declaredTools());
     }
 
+    /**
+     * Scans a directory for subdirectories each containing a SKILL.md and returns parsed skills.
+     */
     public static List<Skill> fromDirectory(Path dir) throws IOException {
         try (var files = Files.list(dir)) {
             return files
@@ -80,6 +92,9 @@ public class SkillParser {
         }
     }
 
+    /**
+     * Fetches and parses a skill from a remote URL asynchronously.
+     */
     public static CompletableFuture<Skill> fromUrl(String url) {
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -94,6 +109,9 @@ public class SkillParser {
         });
     }
 
+    /**
+     * Locates SKILL.md (case-insensitive) within the given directory.
+     */
     public static Path findSkillMdFile(Path dir) {
         for (var name : List.of("SKILL.md", "skill.md")) {
             var candidate = dir.resolve(name);

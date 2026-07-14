@@ -10,6 +10,9 @@ import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+/**
+ * Applies a high-level patch block (Add, Update, Move, Delete operations) securely within the sandbox.
+ */
 public class ApplyPatchTool implements AgentTool<ApplyPatchTool.Params> {
 
     private static final ObjectMapper SCHEMA_MAPPER = new ObjectMapper();
@@ -61,6 +64,15 @@ public class ApplyPatchTool implements AgentTool<ApplyPatchTool.Params> {
         return schema;
     }
 
+    /**
+     * Parses the patch text block and applies each operation (Add/Update/Delete/Move) sequentially.
+     *
+     * @param toolCallId unique identifier for this tool invocation
+     * @param params     the patch parameters (patchText)
+     * @param abortFlag  flag to signal premature cancellation
+     * @param onUpdate   callback for streaming intermediate results
+     * @return the tool result with a log of applied operations
+     */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) throws Exception {
         String patchText = params.patchText();
@@ -153,5 +165,8 @@ public class ApplyPatchTool implements AgentTool<ApplyPatchTool.Params> {
         }
     }
 
+    /**
+     * Parameters for applying a patch: the cleartext patch block string.
+     */
     public record Params(String patchText) {}
 }

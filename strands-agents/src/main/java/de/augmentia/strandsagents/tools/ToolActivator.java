@@ -12,11 +12,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+/** A tool that activates or deactivates other tools at runtime. */
 public class ToolActivator implements AgentTool<ToolActivator.Params> {
 
     private final ToolRegistry registry;
     private final Map<String, AgentTool<?>> available = new ConcurrentHashMap<>();
 
+    /** Creates a ToolActivator with the given registry and workspace path. */
     public ToolActivator(ToolRegistry registry, Path workspace) {
         this.registry = registry;
         available.put("write", new WriteTool(workspace));
@@ -25,9 +27,11 @@ public class ToolActivator implements AgentTool<ToolActivator.Params> {
 
     public record Params(String action, String tool) {}
 
+    /** Returns the tool name. */
     @Override
     public String name() { return "tool_activator"; }
 
+    /** Returns the tool description. */
     @Override
     public String description() {
         return "Activate or deactivate a tool by name. "
@@ -35,9 +39,11 @@ public class ToolActivator implements AgentTool<ToolActivator.Params> {
             + "Available tools: write, read.";
     }
 
+    /** Returns the parameter type class. */
     @Override
     public Class<Params> parameterType() { return Params.class; }
 
+    /** Returns the JSON schema for the tool parameters. */
     @Override
     public JsonNode parameterSchema() {
         var factory = JsonNodeFactory.instance;
@@ -62,6 +68,7 @@ public class ToolActivator implements AgentTool<ToolActivator.Params> {
         return schema;
     }
 
+    /** Executes the activation or deactivation of a tool. */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         var action = params.action();

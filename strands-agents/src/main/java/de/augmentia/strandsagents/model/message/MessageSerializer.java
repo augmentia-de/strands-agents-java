@@ -7,12 +7,14 @@ import dev.langchain4j.data.message.ChatMessageSerializer;
 import java.io.IOException;
 import java.util.List;
 
+/** Jackson serializer for Message. */
 public class MessageSerializer extends StdSerializer<Message> {
 
     public MessageSerializer() {
         super(Message.class);
     }
 
+    /** Serializes a Message to its JSON representation. */
     @Override
     public void serialize(Message msg, JsonGenerator gen, SerializerProvider provider) throws IOException {
         gen.writeStartObject();

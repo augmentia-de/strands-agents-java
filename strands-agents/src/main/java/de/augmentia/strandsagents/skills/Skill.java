@@ -5,6 +5,9 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * A skill record parsed from a SKILL.md file, containing metadata, instructions, and tool declarations.
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record Skill(
     String name,

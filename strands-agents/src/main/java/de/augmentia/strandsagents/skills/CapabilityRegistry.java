@@ -19,6 +19,9 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Discovers and aggregates capabilities from skills, MCP servers, and built-in tools.
+ */
 public class CapabilityRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(CapabilityRegistry.class);
@@ -37,15 +40,27 @@ public class CapabilityRegistry {
     private final boolean includeStandardTools;
     private final List<Capability> extraDefaultTools;
 
+    /**
+     * @param skillDirectories directories to scan for skills
+     * @param mcpServers       MCP server configurations
+     */
     public CapabilityRegistry(List<Path> skillDirectories, List<McpServerConfig> mcpServers) {
         this(skillDirectories, mcpServers, false, List.of());
     }
 
+    /**
+     * @param skillDirectories     directories to scan for skills
+     * @param mcpServers           MCP server configurations
+     * @param includeStandardTools whether to include built-in standard tools
+     */
     public CapabilityRegistry(List<Path> skillDirectories, List<McpServerConfig> mcpServers,
                                boolean includeStandardTools) {
         this(skillDirectories, mcpServers, includeStandardTools, List.of());
     }
 
+    /**
+     * Full constructor with optional extra default capabilities.
+     */
     public CapabilityRegistry(List<Path> skillDirectories, List<McpServerConfig> mcpServers,
                                boolean includeStandardTools, List<Capability> extraDefaultTools) {
         this.skillDirectories = List.copyOf(skillDirectories);
@@ -54,9 +69,19 @@ public class CapabilityRegistry {
         this.extraDefaultTools = List.copyOf(extraDefaultTools);
     }
 
+    /**
+     * Returns the immutable list of skill directories.
+     */
     public List<Path> skillDirectories() { return skillDirectories; }
+
+    /**
+     * Returns the immutable list of MCP server configurations.
+     */
     public List<McpServerConfig> mcpServers() { return mcpServers; }
 
+    /**
+     * Looks up an MCP server config by name, or null if not found.
+     */
     public McpServerConfig getServer(String name) {
         if (name == null) return null;
         return mcpServers.stream()
@@ -64,8 +89,14 @@ public class CapabilityRegistry {
             .findFirst().orElse(null);
     }
 
+    /**
+     * Whether built-in standard tools are included in discovery.
+     */
     public boolean isIncludeStandardTools() { return includeStandardTools; }
 
+    /**
+     * Discovers skill capabilities from all configured skill directories.
+     */
     public List<Capability> discoverSkills() {
         var results = new ArrayList<Capability>();
         var known = knownToolNames();
@@ -90,6 +121,9 @@ public class CapabilityRegistry {
         return results;
     }
 
+    /**
+     * Discovers tool capabilities from standard tools, extra defaults, and MCP servers.
+     */
     public List<Capability> discoverTools() {
         var results = new ArrayList<Capability>();
         if (includeStandardTools) {
@@ -122,6 +156,9 @@ public class CapabilityRegistry {
         return results;
     }
 
+    /**
+     * Discovers all capabilities (tools then skills).
+     */
     public List<Capability> discoverAll() {
         var results = new ArrayList<Capability>();
         results.addAll(discoverTools());
@@ -129,6 +166,9 @@ public class CapabilityRegistry {
         return results;
     }
 
+    /**
+     * Loads all Skill objects from all configured skill directories.
+     */
     public List<Skill> discoverAllSkills() {
         return skillDirectories.stream()
             .flatMap(d -> {
@@ -138,6 +178,9 @@ public class CapabilityRegistry {
             .toList();
     }
 
+    /**
+     * Finds a skill by name across all configured directories.
+     */
     public Skill getSkill(String name) {
         return discoverAllSkills().stream()
             .filter(s -> s.name().equals(name))
@@ -145,6 +188,9 @@ public class CapabilityRegistry {
             .orElse(null);
     }
 
+    /**
+     * Returns the set of known tool names from standard tools and extra defaults.
+     */
     public Set<String> knownToolNames() {
         var names = getStandardToolSpecs().stream()
             .map(ToolSpecification::name)
@@ -155,21 +201,43 @@ public class CapabilityRegistry {
         return names;
     }
 
+    /**
+     * Creates a new builder for constructing a CapabilityRegistry.
+     */
     public static Builder builder() {
         return new Builder();
     }
 
+    /**
+     * A named capability with a description, source identifier, and type.
+     */
     public record Capability(String name, String description, String source, CapabilityType type) {}
+
+    /**
+     * Classifies a capability origin: skill, MCP tool, or built-in default tool.
+     */
     public enum CapabilityType { SKILL, MCP_TOOL, DEFAULT }
 
+    /**
+     * Transport protocol for MCP client-server communication.
+     */
     public enum TransportType { SSE, STREAMABLE_HTTP }
 
+    /**
+     * Configuration for connecting to an MCP server, including optional SPI-based client factory.
+     */
     public record McpServerConfig(String name, String url, TransportType transportType,
                                    String clientType, Map<String, Object> clientConfig) {
+        /**
+         * Convenience constructor defaulting transport to SSE with no client type.
+         */
         public McpServerConfig(String name, String url) {
             this(name, url, TransportType.SSE, null, null);
         }
 
+        /**
+         * Convenience constructor with explicit transport type and no client type.
+         */
         public McpServerConfig(String name, String url, TransportType transportType) {
             this(name, url, transportType, null, null);
         }
@@ -211,6 +279,9 @@ public class CapabilityRegistry {
             return null;
         }
 
+        /**
+         * Creates the MCP transport based on the configured transport type.
+         */
         public dev.langchain4j.mcp.client.transport.McpTransport toTransport() {
             return switch (transportType) {
                 case SSE -> HttpMcpTransport.builder().sseUrl(url).build();
@@ -218,6 +289,9 @@ public class CapabilityRegistry {
             };
         }
 
+        /**
+         * Creates a direct MCP client using the SPI factory (if configured) or the default transport client.
+         */
         public McpClient toDirectClient() {
             if (clientType != null && !clientType.isBlank()) {
                 var factory = findMcpClientFactory(clientType.trim());
@@ -237,30 +311,55 @@ public class CapabilityRegistry {
         }
     }
 
+    /**
+     * Builder for constructing a CapabilityRegistry with fluent API.
+     */
     public static class Builder {
         private final List<Path> skillDirectories = new ArrayList<>();
         private final List<McpServerConfig> mcpServers = new ArrayList<>();
         private final List<Capability> extraDefaultTools = new ArrayList<>();
         private boolean includeStandardTools = false;
 
+        /**
+         * Adds a directory to scan for skills.
+         */
         public Builder skillDir(Path dir) { skillDirectories.add(dir); return this; }
+
+        /**
+         * Adds an MCP server by name and URL (SSE transport).
+         */
         public Builder mcpServer(String name, String url) {
             mcpServers.add(new McpServerConfig(name, url));
             return this;
         }
+
+        /**
+         * Adds a pre-configured MCP server.
+         */
         public Builder mcpServer(McpServerConfig config) {
             mcpServers.add(config);
             return this;
         }
+
+        /**
+         * Sets whether built-in standard tools should be included.
+         */
         public Builder includeStandardTools(boolean include) {
             this.includeStandardTools = include;
             return this;
         }
+
+        /**
+         * Registers a default tool capability.
+         */
         public Builder registerDefaultTool(String name, String description) {
             extraDefaultTools.add(new Capability(name, description, "default", CapabilityType.DEFAULT));
             return this;
         }
 
+        /**
+         * Builds the CapabilityRegistry with accumulated configuration.
+         */
         public CapabilityRegistry build() {
             return new CapabilityRegistry(skillDirectories, mcpServers, includeStandardTools, extraDefaultTools);
         }

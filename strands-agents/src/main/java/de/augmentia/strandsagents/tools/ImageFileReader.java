@@ -8,6 +8,9 @@ import java.nio.file.Path;
 import java.util.Base64;
 import java.util.List;
 
+/**
+ * Reads image files and returns them as base64-encoded data with MIME type information.
+ */
 public class ImageFileReader implements FileReader {
     @Override
     public String name() {
@@ -29,6 +32,9 @@ public class ImageFileReader implements FileReader {
             null);
     }
 
+    /**
+     * Detects the MIME type of an image file based on its extension.
+     */
     private String detectImageMimeType(Path path) {
         var n = path.getFileName().toString().toLowerCase();
         if (n.endsWith(".jpg") || n.endsWith(".jpeg")) return "image/jpeg";

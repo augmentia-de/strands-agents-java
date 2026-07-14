@@ -67,6 +67,7 @@ public final class BaseToolNames {
     /** {@link TimeTool#getCurrentDate()} */
     public static final String GET_CURRENT_DATE = "getCurrentDate";
 
+    /** {@link CapabilitySearchTool} */
     public static final String CAPABILITY_SEARCH = "capability_search";
 
 }

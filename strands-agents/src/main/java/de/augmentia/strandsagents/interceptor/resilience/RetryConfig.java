@@ -1,5 +1,8 @@
 package de.augmentia.strandsagents.interceptor.resilience;
 
+/**
+ * Configuration for retry behaviour with exponential backoff.
+ */
 public record RetryConfig(
     int maxAttempts,
     long backoffDelayMs,

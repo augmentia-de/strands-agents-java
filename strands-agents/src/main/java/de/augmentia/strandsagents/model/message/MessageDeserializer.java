@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 
+/** Jackson deserializer for Message. */
 public class MessageDeserializer extends StdDeserializer<Message> {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -19,6 +20,7 @@ public class MessageDeserializer extends StdDeserializer<Message> {
         super(Message.class);
     }
 
+    /** Deserializes a Message from its JSON representation. */
     @Override
     public Message deserialize(JsonParser p, DeserializationContext ctx) throws IOException {
         JsonNode node = p.getCodec().readTree(p);

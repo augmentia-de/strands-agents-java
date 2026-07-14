@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Conversation pruning strategy that summarizes older messages using an LLM while retaining recent user messages.
+ */
 public record SummarizingSlidingWindowConversationManager(
     ChatModel summarizer,
     int maxTokens,
@@ -89,6 +92,9 @@ public record SummarizingSlidingWindowConversationManager(
         return result;
     }
 
+    /**
+     * Selects the last block of conversation containing up to {@code keepLastUserMessages} user messages.
+     */
     private List<Message> selectLastUserMessagesBlock(List<Message> nonSystemMsgs) {
         int userCount = 0;
         int cutIndex = nonSystemMsgs.size();
@@ -110,6 +116,9 @@ public record SummarizingSlidingWindowConversationManager(
         return nonSystemMsgs.subList(cutIndex, nonSystemMsgs.size());
     }
 
+    /**
+     * Aggregates multiple system messages into a single condensed system message when they dominate the conversation.
+     */
     private List<Message> maybeAggregateSystem(List<Message> systemMsgs, int totalSize) {
         if (systemMsgs.size() < SYSTEM_AGGREGATE_MIN) {
             return systemMsgs;
@@ -138,6 +147,9 @@ public record SummarizingSlidingWindowConversationManager(
         ));
     }
 
+    /**
+     * Generates an LLM-produced summary of the provided messages.
+     */
     private String generateSummary(List<Message> messages) {
         var sb = new StringBuilder();
         sb.append(PromptRegistry.get("summarizing_sliding.instruction")).append("\n\n");
@@ -166,6 +178,9 @@ public record SummarizingSlidingWindowConversationManager(
         return response.aiMessage().text();
     }
 
+    /**
+     * Roughly estimates the token count of a list of messages based on character length.
+     */
     private int estimateTokens(List<Message> messages) {
         return messages.stream()
             .mapToInt(m -> {

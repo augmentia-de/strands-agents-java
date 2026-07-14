@@ -10,6 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+/** A tool that delegates execution to a sub-agent. */
 public class SubAgentTool implements AsyncAgentTool<SubAgentTool.Params> {
 
     public static final int MAX_RECURSION_DEPTH = 5;
@@ -20,10 +21,12 @@ public class SubAgentTool implements AsyncAgentTool<SubAgentTool.Params> {
     private final String description;
     private final SubAgentExecutor executor;
 
+    /** Creates a SubAgentTool with a default executor. */
     public SubAgentTool(Agent subAgent, String toolName, String description) {
         this(subAgent, toolName, description, new SubAgentExecutor());
     }
 
+    /** Creates a SubAgentTool with the given executor. */
     public SubAgentTool(Agent subAgent, String toolName, String description, SubAgentExecutor executor) {
         this.subAgent = subAgent;
         this.toolName = toolName;
@@ -31,29 +34,35 @@ public class SubAgentTool implements AsyncAgentTool<SubAgentTool.Params> {
         this.executor = executor;
     }
 
+    /** Creates a SubAgentTool with a default description. */
     public SubAgentTool(Agent subAgent, String toolName) {
         this(subAgent, toolName, "Executes a specialized sub-agent: " + toolName);
     }
 
+    /** Creates a SubAgentTool with a default description and the given executor. */
     public SubAgentTool(Agent subAgent, String toolName, SubAgentExecutor executor) {
         this(subAgent, toolName, "Executes a specialized sub-agent: " + toolName, executor);
     }
 
+    /** Returns the tool name. */
     @Override
     public String name() {
         return toolName;
     }
 
+    /** Returns the tool description. */
     @Override
     public String description() {
         return description;
     }
 
+    /** Returns the parameter type class. */
     @Override
     public Class<Params> parameterType() {
         return Params.class;
     }
 
+    /** Returns the JSON schema for the tool parameters. */
     @Override
     public ObjectNode parameterSchema() {
         var factory = JsonNodeFactory.instance;
@@ -71,6 +80,7 @@ public class SubAgentTool implements AsyncAgentTool<SubAgentTool.Params> {
         return schema;
     }
 
+    /** Executes the sub-agent synchronously. */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         int currentDepth = RECURSION_DEPTH.get();
@@ -91,6 +101,7 @@ public class SubAgentTool implements AsyncAgentTool<SubAgentTool.Params> {
         }
     }
 
+    /** Executes the sub-agent asynchronously. */
     @Override
     public CompletableFuture<ToolResult> executeAsync(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         int currentDepth = RECURSION_DEPTH.get();

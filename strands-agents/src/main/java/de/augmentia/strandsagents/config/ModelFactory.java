@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Factory for creating LangChain4j ChatModel and StreamingChatModel instances. */
 public class ModelFactory {
 
     private static final Logger log = LoggerFactory.getLogger(ModelFactory.class);
@@ -22,17 +23,20 @@ public class ModelFactory {
         register(ModelProviderType.OPENAI_COMPATIBLE, new OpenAiCompatibleProvider());
     }
 
+    /** Registers a ModelProvider for a given provider type. */
     public static void register(ModelProviderType type, ModelProvider provider) {
         providers.put(type, provider);
     }
 
     // ── Tier-based API (new) ──
 
+    /** Creates a ChatModel for the given tier using the tiered configuration. */
     public static ChatModel createChatModel(ModelTier tier, TieredModelConfig tieredConfig) {
         var config = tieredConfig.forTier(tier);
         return provider(config.provider()).createChatModel(config);
     }
 
+    /** Creates a StreamingChatModel for the given tier; falls back to a sync-to-streaming bridge. */
     public static StreamingChatModel createStreamingChatModel(ModelTier tier, TieredModelConfig tieredConfig) {
         var config = tieredConfig.forTier(tier);
         var streamingProvider = provider(config.provider());
@@ -43,12 +47,14 @@ public class ModelFactory {
         return new SyncToStreamingBridge(syncModel);
     }
 
+    /** Creates a ChatModel from a full ChatModelConfig. */
     public static ChatModel createChatModel(ChatModelConfig config) {
         return provider(config.provider()).createChatModel(config);
     }
 
     // ── BC: Old OpenAI-specific API ──
 
+    /** @deprecated Use tier-based API. Creates an OpenAI ChatModel from env with optional API key override. */
     public static ChatModel createOpenAiFromEnv(String api_key) {
         LlmConfig config = LlmConfig.fromEnv();
         if (api_key!=null) config = new LlmConfig(api_key, config.baseUrl(), config.modelName(), config.temperature(), config.maxRetries(), config.logRequests(), config.logResponses());
@@ -56,6 +62,7 @@ public class ModelFactory {
             ConfigReader.mask(config.apiKey()), config.baseUrl(), config.modelName());
         return createOpenAi(config);
     }
+    /** @deprecated Use tier-based API. Creates an OpenAI ChatModel from environment variables. */
     public static ChatModel createOpenAiFromEnv() {
         LlmConfig config = LlmConfig.fromEnv();
         log.info("createOpenAiFromEnv (no arg): apiKey={} baseUrl={} model={}",
@@ -63,6 +70,7 @@ public class ModelFactory {
         return createOpenAi(config);
     }
 
+    /** @deprecated Use tier-based API. Creates an OpenAI ChatModel from a flat LlmConfig. */
     public static ChatModel createOpenAi(LlmConfig config) {
         log.info("createOpenAi: apiKey={} baseUrl={} model={}",
             ConfigReader.mask(config.apiKey()), config.baseUrl(), config.modelName());
@@ -80,11 +88,13 @@ public class ModelFactory {
         return provider(ModelProviderType.OPENAI).createChatModel(c);
     }
 
+    /** @deprecated Use tier-based API. Creates an OpenAI StreamingChatModel from env with optional API key override. */
     public static StreamingChatModel createOpenAiStreamingFromEnv(String api_key) {
         LlmConfig config = LlmConfig.fromEnv();
         if (api_key!=null) config = new LlmConfig(api_key, config.baseUrl(), config.modelName(), config.temperature(), config.maxRetries(), config.logRequests(), config.logResponses());
         return createOpenAiStreaming(config);
     }
+    /** @deprecated Use tier-based API. Creates an OpenAI StreamingChatModel from a flat LlmConfig. */
     public static StreamingChatModel createOpenAiStreaming(LlmConfig config) {
         var c = new ChatModelConfig(
             ModelProviderType.OPENAI,
@@ -103,6 +113,7 @@ public class ModelFactory {
         return new SyncToStreamingBridge(syncModel);
     }
 
+    /** Looks up the registered ModelProvider for the given type. */
     private static ModelProvider provider(ModelProviderType type) {
         var p = providers.get(type);
         if (p == null) throw new IllegalStateException("No ModelProvider registered for " + type);
@@ -111,6 +122,7 @@ public class ModelFactory {
 
     // ── Provider Implementations ──
 
+    /** ModelProvider for OpenAI. */
     static class OpenAiProvider implements ModelProvider {
         @Override
         public ChatModel createChatModel(ChatModelConfig config) {
@@ -146,6 +158,7 @@ public class ModelFactory {
         }
     }
 
+    /** ModelProvider for OpenAI-compatible APIs. */
     static class OpenAiCompatibleProvider implements ModelProvider {
         @Override
         public ChatModel createChatModel(ChatModelConfig config) {
@@ -179,6 +192,7 @@ public class ModelFactory {
         }
     }
 
+    /** ModelProvider for Ollama. */
     static class OllamaProvider implements ModelProvider {
         @Override
         public ChatModel createChatModel(ChatModelConfig config) {

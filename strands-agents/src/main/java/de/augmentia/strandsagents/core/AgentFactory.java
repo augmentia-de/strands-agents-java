@@ -34,12 +34,22 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Factory for assembling fully configured {@link Agent} instances from configuration.
+ * <p>
+ * Provides static methods to create tools, sessions, conversations, plugins, and agents
+ * from {@link StrandsAgentConfig} and {@link AgentSettings} objects.
+ * </p>
+ */
 public class AgentFactory {
 
     private static final Logger log = LoggerFactory.getLogger(AgentFactory.class);
 
     private AgentFactory() {}
 
+    /**
+     * Creates a {@link ToolRegistry} with standard tools, HTTP tool, and extra tools from config.
+     */
     public static ToolRegistry createToolRegistry(StrandsAgentConfig config) {
         var workspace = config.resolvedWorkspace();
         var builder = ToolRegistry.builder()
@@ -57,6 +67,9 @@ public class AgentFactory {
         return registry;
     }
 
+    /**
+     * Creates a {@link CheckpointService} with console, SSE (optional), and email channels.
+     */
     public static CheckpointService createCheckpointService(StrandsAgentConfig config, SSEChannel sseChannel) {
         var svc = new CheckpointService(config.hitlTools(), 120_000);
         svc.registerChannel(new ConsoleChannel());
@@ -69,10 +82,16 @@ public class AgentFactory {
         return svc;
     }
 
+    /**
+     * Creates a {@link CheckpointService} without an SSE channel.
+     */
     public static CheckpointService createCheckpointService(StrandsAgentConfig config) {
         return createCheckpointService(config, null);
     }
 
+    /**
+     * Creates a file-based session manager in the given directory.
+     */
     public static SessionManager createSessionManager(Path sessionDir) {
         try {
             Files.createDirectories(sessionDir);
@@ -80,10 +99,16 @@ public class AgentFactory {
         return new FileSessionManager(sessionDir);
     }
 
+    /**
+     * Creates a sliding-window conversation manager with the given window size.
+     */
     public static ConversationManager createConversationManager(int windowSize) {
         return new SlidingWindowConversationManager(windowSize);
     }
 
+    /**
+     * Builds the plugin chain from skills and guardrails, sorted by execution order.
+     */
     public static List<Plugin> buildPlugins(List<Skill> skills, List<String> initialSkills,
                                            boolean skillSearchEnabled) {
         var plugins = new ArrayList<Plugin>();
@@ -97,15 +122,24 @@ public class AgentFactory {
         return List.copyOf(plugins);
     }
 
+    /**
+     * Builds a default plugin list (empty skills, guardrails only).
+     */
     public static List<Plugin> buildPlugins() {
         return buildPlugins(List.of(), List.of(), false);
     }
 
+    /**
+     * Sorts plugins by their execution order.
+     */
     public static List<Plugin> sortPlugins(List<Plugin> plugins) {
         plugins.sort(Comparator.comparingInt(Plugin::order));
         return plugins;
     }
 
+    /**
+     * Creates a fully wired {@link Agent} with optional checkpoint service.
+     */
     public static Agent createAgent(ChatModel model, ToolRegistry tools,
                                     SessionManager sessionManager,
                                     CheckpointService cpService,
@@ -119,10 +153,19 @@ public class AgentFactory {
         return agent;
     }
 
+    /**
+     * Builds an agent from settings and infrastructure config using an env-created model.
+     */
     public static Agent buildAgent(AgentSettings settings, AgentConfig infra) {
         return buildAgent(settings, infra, ModelFactory.createOpenAiFromEnv());
     }
 
+    /**
+     * Builds an agent from settings and infrastructure config with a specific model.
+     * <p>
+     * Applies system prompt, structured output config, LLM logger, and tool iteration limit.
+     * </p>
+     */
     public static Agent buildAgent(AgentSettings settings, AgentConfig infra, ChatModel model) {
         var effectiveRegistry = infra.toolRegistry() != null ? infra.toolRegistry() : new ToolRegistry();
         var effectivePlugins = infra.plugins() != null ? infra.plugins() : List.<Plugin>of();
@@ -149,6 +192,15 @@ public class AgentFactory {
         return agent;
     }
 
+    /**
+     * Builds an agent with tiered model support (simple, advanced, or routing).
+     * <p>
+     * Creates two model instances (simple/advanced) and optionally a {@link RoutingAgent}
+     * when the default tier is {@link ModelTier#ROUTING}.
+     * </p>
+     *
+     * @param useAdvancedModel unused (reserved); tier is determined by settings
+     */
     public static Agent buildTieredAgent(AgentSettings settings, AgentConfig infra, Boolean useAdvancedModel) {
         var effectiveRegistry = infra.toolRegistry() != null ? infra.toolRegistry() : new ToolRegistry();
         var effectivePlugins = infra.plugins() != null ? infra.plugins() : List.<Plugin>of();

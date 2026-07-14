@@ -24,6 +24,9 @@ public record AgentConfig(
         return new Builder();
     }
 
+    /**
+     * Fluent builder for {@link AgentConfig} with defaults for tool registry and plugins.
+     */
     public static class Builder {
         private ToolRegistry toolRegistry = new ToolRegistry();
         private ConversationManager conversationManager = null;

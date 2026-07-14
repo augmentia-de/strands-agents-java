@@ -13,6 +13,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
+/**
+ * Finds files by glob pattern (e.g., *.java, src/**&#47;*.ts) within the sandboxed workspace.
+ */
 public class FindTool implements AgentTool<FindTool.Params> {
 
     private static final ObjectMapper SCHEMA_MAPPER = new ObjectMapper();
@@ -64,6 +67,15 @@ public class FindTool implements AgentTool<FindTool.Params> {
         node.put("description", d);
     }
 
+    /**
+     * Walks the file system from the search directory and returns paths matching the glob pattern.
+     *
+     * @param toolCallId unique identifier for this tool invocation
+     * @param params     the find parameters (pattern, path, maxResults)
+     * @param abortFlag  flag to signal premature cancellation
+     * @param onUpdate   callback for streaming intermediate results
+     * @return the tool result containing matched file paths or an error
+     */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) throws Exception {
         if (params.pattern() == null || params.pattern().isBlank()) {
@@ -127,5 +139,8 @@ public class FindTool implements AgentTool<FindTool.Params> {
         return ToolResult.mixed(text, json);
     }
 
+    /**
+     * Parameters for file search: a glob pattern, optional subdirectory, and max results limit.
+     */
     public record Params(String pattern, String path, Integer maxResults) {}
 }

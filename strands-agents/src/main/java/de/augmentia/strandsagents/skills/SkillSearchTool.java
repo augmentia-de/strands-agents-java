@@ -10,12 +10,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+/**
+ * Tool for searching and activating skills by name or keyword.
+ */
 public record SkillSearchTool(
     Map<String, Skill> skills,
     AgentSkillsPlugin plugin,
     String skillsDirHint
 ) implements AgentTool<SkillSearchTool.Params> {
 
+    /**
+     * Parameters for skill search: either a keyword query or a specific skill name to activate.
+     */
     public record Params(String query, String skillName) {
         public Params {
             if (query != null && skillName != null) {
@@ -40,6 +46,7 @@ public record SkillSearchTool(
         return Params.class;
     }
 
+    /** Returns the JSON schema for the query/skillName parameters. */
     @Override
     public JsonNode parameterSchema() {
         var factory = JsonNodeFactory.instance;
@@ -61,6 +68,7 @@ public record SkillSearchTool(
         return schema;
     }
 
+    /** Executes the search or activation based on which parameter is set. */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         if (params.skillName() != null) {
@@ -69,6 +77,7 @@ public record SkillSearchTool(
         return listSkills(params.query());
     }
 
+    /** Activates a skill by name and returns its instructions. */
     private ToolResult activateSkill(String skillName) {
         var skill = skills.get(skillName);
         if (skill == null) {
@@ -92,6 +101,7 @@ public record SkillSearchTool(
         return ToolResult.success(sb.toString());
     }
 
+    /** Lists all skills, optionally filtered by a keyword query. */
     private ToolResult listSkills(String query) {
         var matching = query != null
             ? skills.values().stream()

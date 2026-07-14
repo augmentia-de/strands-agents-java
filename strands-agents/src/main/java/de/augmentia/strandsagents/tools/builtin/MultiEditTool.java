@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+/**
+ * Performs multiple exact string replacements across one or more files atomically within the sandbox.
+ */
 public class MultiEditTool implements AgentTool<MultiEditTool.Params> {
 
     private static final ObjectMapper SCHEMA_MAPPER = new ObjectMapper();
@@ -95,6 +98,15 @@ public class MultiEditTool implements AgentTool<MultiEditTool.Params> {
         return schema;
     }
 
+    /**
+     * Applies each FileEdit from the params sequentially, aborting on the first error.
+     *
+     * @param toolCallId unique identifier for this tool invocation
+     * @param params     the multi-edit parameters (list of edits)
+     * @param abortFlag  flag to signal premature cancellation
+     * @param onUpdate   callback for streaming intermediate results
+     * @return the tool result with an execution summary log
+     */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) throws Exception {
         if (params.edits() == null || params.edits().isEmpty()) {
@@ -142,6 +154,12 @@ public class MultiEditTool implements AgentTool<MultiEditTool.Params> {
         return ToolResult.success(logSummary.toString());
     }
 
+    /**
+     * Parameters for multi-edit: a list of individual file edit operations.
+     */
     public record Params(List<FileEdit> edits) {}
+    /**
+     * A single file edit operation: replace oldString with newString in the given file, optionally all occurrences.
+     */
     public record FileEdit(String filePath, String oldString, String newString, Boolean replaceAll) {}
 }

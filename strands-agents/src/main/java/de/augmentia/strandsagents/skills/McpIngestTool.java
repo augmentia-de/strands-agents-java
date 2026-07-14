@@ -13,9 +13,13 @@ import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+/**
+ * Tool for dynamically connecting to MCP servers via SSE and registering their tools.
+ */
 public record McpIngestTool(ToolRegistry toolRegistry)
     implements AgentTool<McpIngestTool.Params> {
 
+    /** Parameters: server name and SSE endpoint URL. */
     public record Params(String serverName, String url) {
         public Params {
             if (url == null || url.isBlank())
@@ -36,6 +40,7 @@ public record McpIngestTool(ToolRegistry toolRegistry)
     @Override
     public Class<Params> parameterType() { return Params.class; }
 
+    /** Returns the JSON schema requiring serverName and url. */
     @Override
     public JsonNode parameterSchema() {
         var factory = JsonNodeFactory.instance;
@@ -61,6 +66,7 @@ public record McpIngestTool(ToolRegistry toolRegistry)
         return schema;
     }
 
+    /** Connects to the MCP server, lists its tools, and registers them with a prefixed name. */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         try {

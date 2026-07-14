@@ -24,6 +24,9 @@ import de.augmentia.strandsagents.tools.ToolResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Runs a command inside a sandboxed Docker container with no network access and limited memory.
+ */
 public class DockerRunTool implements AgentTool<DockerRunTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(DockerRunTool.class);
     private static final int MAX_LINES = 300;
@@ -89,6 +92,15 @@ public class DockerRunTool implements AgentTool<DockerRunTool.Params> {
         node.put("description", d);
     }
 
+    /**
+     * Spawns a Docker container with the workspace mounted, executes the command, and captures output.
+     *
+     * @param toolCallId unique identifier for this tool invocation
+     * @param params     the docker run parameters (command, timeout)
+     * @param abortFlag  flag to signal premature cancellation
+     * @param onUpdate   callback for streaming intermediate results
+     * @return the tool result containing command output or an error
+     */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         log.debug("Tool: run START command={}", trunc(params.command(), 500));
@@ -282,5 +294,8 @@ public class DockerRunTool implements AgentTool<DockerRunTool.Params> {
         return s != null && s.length() > max ? s.substring(0, max) + "..." : s;
     }
 
+    /**
+     * Parameters for running a command in Docker: the command string and optional timeout in seconds.
+     */
     public record Params(String command, Integer timeout) {}
 }

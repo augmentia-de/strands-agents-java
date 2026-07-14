@@ -12,12 +12,18 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Connects to MCP (Model Context Protocol) servers and registers their tools with the local tool registry.
+ */
 public class McpConnector {
 
     private static final Logger log = LoggerFactory.getLogger(McpConnector.class);
 
     private McpConnector() {}
 
+    /**
+     * Connects to an MCP server and registers its tools under a prefixed namespace.
+     */
     public static McpClient connect(CapabilityRegistry.McpServerConfig config,
                                      ToolRegistry registry, Set<String> selectedTools) throws Exception {
         var client = config.toDirectClient();
@@ -40,6 +46,9 @@ public class McpConnector {
         return client;
     }
 
+    /**
+     * Discovers and returns available tools from an MCP server without registering them.
+     */
     public static List<ToolInfo> discoverTools(CapabilityRegistry.McpServerConfig config) {
         try {
             var client = config.toDirectClient();
@@ -61,6 +70,9 @@ public class McpConnector {
         }
     }
 
+    /**
+     * Builds a sanitized prefix string from an MCP server configuration name.
+     */
     public static String prefix(CapabilityRegistry.McpServerConfig config) {
         return "mcp_" + config.name().replaceAll("[^a-zA-Z0-9]", "_");
     }

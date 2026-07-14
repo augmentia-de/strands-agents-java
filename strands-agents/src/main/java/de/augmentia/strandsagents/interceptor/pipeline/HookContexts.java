@@ -8,6 +8,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Container for typed context records passed to hook lifecycle methods.
+ */
 public final class HookContexts {
 
     private HookContexts() {}

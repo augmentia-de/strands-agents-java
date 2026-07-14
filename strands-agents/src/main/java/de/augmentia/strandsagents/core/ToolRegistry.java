@@ -22,6 +22,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Registry for managing and looking up tools by name, supporting AgentTool and @Tool-annotated methods.
+ */
 public class ToolRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(ToolRegistry.class);
@@ -34,14 +37,23 @@ public class ToolRegistry {
 
     public ToolRegistry() {}
 
+    /**
+     * Sets the validators used to validate tool specifications during registration.
+     */
     public void setValidators(List<ToolDescriptionValidator> validators) {
         this.validators = validators != null ? validators : List.of();
     }
 
+    /**
+     * When true, validation failures throw exceptions instead of logging warnings.
+     */
     public void setStrictValidation(boolean strict) {
         this.strictValidation = strict;
     }
 
+    /**
+     * Runs all validators against the given tool specification.
+     */
     private void validate(ToolSpecification spec) {
         if (validators == null) return;
         for (ToolDescriptionValidator v : validators) {
@@ -54,6 +66,9 @@ public class ToolRegistry {
         }
     }
 
+    /**
+     * Registers all @Tool-annotated methods from the given object instance.
+     */
     public void register(Object toolInstance) {
         for (Method method : toolInstance.getClass().getMethods()) {
             if (method.isAnnotationPresent(Tool.class)) {
@@ -67,6 +82,9 @@ public class ToolRegistry {
         }
     }
 
+    /**
+     * Registers a specific method as a tool under the given name.
+     */
     public void register(String name, Object toolInstance, Method method) {
         var spec = ToolSpecifications.toolSpecificationFrom(method);
         validate(spec);
@@ -76,17 +94,26 @@ public class ToolRegistry {
         tools.put(name, new JavaToolMethod(toolInstance, method, spec, cap));
     }
 
+    /**
+     * Registers a tool by its specification and method implementation.
+     */
     public void register(String name, ToolSpecification spec, ToolMethod toolMethod) {
         validate(spec);
         tools.put(name, toolMethod);
     }
 
+    /**
+     * Registers an AgentTool implementation, automatically converting it to a ToolSpecification.
+     */
     public void register(AgentTool<?> agentTool) {
         var spec = toToolSpecification(agentTool);
         validate(spec);
         tools.put(agentTool.name(), new AgentToolMethod(agentTool, spec));
     }
 
+    /**
+     * Converts an AgentTool to its corresponding ToolSpecification.
+     */
     private static ToolSpecification toToolSpecification(AgentTool<?> tool) {
         var builder = ToolSpecification.builder()
             .name(tool.name())
@@ -115,7 +142,10 @@ public class ToolRegistry {
         return builder.build();
     }
 
-private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name, String type, String desc) {
+    /**
+     * Adds a JSON schema property to the builder based on its type string.
+     */
+    private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name, String type, String desc) {
         switch (type) {
             case "int", "integer" -> {
                 if (desc != null) b.addIntegerProperty(name, desc);
@@ -136,10 +166,18 @@ private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name
         }
     }
 
+    /**
+     * Returns an unmodifiable view of all registered tools.
+     */
     public Map<String, ToolMethod> getTools() {
         return Collections.unmodifiableMap(tools);
     }
 
+    /**
+     * Returns the tool method for the given name, throwing if not found.
+     *
+     * @throws IllegalArgumentException if the tool is not registered
+     */
     public ToolMethod get(String name) {
         var tm = tools.get(name);
         if (tm == null) {
@@ -150,24 +188,39 @@ private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name
 
     private volatile AtomicBoolean sharedAbortFlag = new AtomicBoolean(false);
 
+    /**
+     * Sets a shared abort flag that can interrupt tool execution.
+     */
     void setAbortFlag(AtomicBoolean flag) {
         this.sharedAbortFlag = flag;
     }
 
+    /**
+     * Returns the ToolSpecifications for all registered tools.
+     */
     public List<ToolSpecification> getSpecifications() {
         return tools.values().stream()
             .map(ToolMethod::spec)
             .toList();
     }
 
+    /**
+     * Returns the set of all registered tool names.
+     */
     public Set<String> getToolNames() {
         return tools.keySet();
     }
 
+    /**
+     * Creates a ToolMethod wrapper for the given AgentTool.
+     */
     public static ToolMethod createMethod(AgentTool<?> tool) {
         return new AgentToolMethod(tool, toToolSpecification(tool));
     }
 
+    /**
+     * Returns a new registry containing only the tools whose names are in the given set.
+     */
     public ToolRegistry withOnly(Set<String> names) {
         var filtered = new ToolRegistry();
         for (var name : names) {
@@ -179,37 +232,67 @@ private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name
         return filtered;
     }
 
+    /**
+     * Removes a tool by name.
+     */
     public void remove(String name) {
         tools.remove(name);
     }
 
+    /**
+     * Removes all tools whose names are in the given collection.
+     */
     public void removeAll(java.util.Collection<String> names) {
         names.forEach(tools::remove);
     }
 
+    /**
+     * Returns the number of registered tools.
+     */
     public int size() {
         return tools.size();
     }
 
+    /**
+     * Creates a new Builder for constructing a ToolRegistry.
+     */
     public static Builder builder() {
         return new Builder();
     }
 
+    /**
+     * Internal interface for executing a tool method given JSON arguments.
+     */
     public interface ToolMethod {
 
+        /**
+         * Returns the tool specification describing this tool.
+         */
         ToolSpecification spec();
 
+        /**
+         * Executes the tool with the given JSON-encoded arguments.
+         */
         String execute(String jsonArguments) throws Exception;
 
+        /**
+         * Returns the capability token required to invoke this tool, if any.
+         */
         default CapabilityToken requiredCapability() {
             return null;
         }
     }
 
+    /**
+     * A tool method backed by a Java reflect Method annotated with @Tool.
+     */
     record JavaToolMethod(Object instance, Method method, ToolSpecification spec,
                           CapabilityToken requiredCapability)
             implements ToolMethod {
 
+        /**
+         * Creates a JavaToolMethod with no specific capability requirement.
+         */
         JavaToolMethod(Object instance, Method method, ToolSpecification spec) {
             this(instance, method, spec, null);
         }
@@ -234,6 +317,9 @@ private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name
             return String.valueOf(method.invoke(instance, args));
         }
 
+        /**
+         * Converts a raw value to the target type using simple type coercion.
+         */
         private static Object convertValue(Object value, Class<?> targetType) {
             if (targetType == String.class) return String.valueOf(value);
             if (targetType == int.class || targetType == Integer.class)
@@ -248,15 +334,24 @@ private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name
         }
     }
 
+    /**
+     * A tool method backed by an AgentTool implementation.
+     */
     static final class AgentToolMethod implements ToolMethod {
         private final AgentTool<?> agentTool;
         private final ToolSpecification spec;
         private final AtomicBoolean abortFlag;
 
+        /**
+         * Creates an AgentToolMethod with no abort flag.
+         */
         AgentToolMethod(AgentTool<?> agentTool, ToolSpecification spec) {
             this(agentTool, spec, null);
         }
 
+        /**
+         * Creates an AgentToolMethod with an optional abort flag.
+         */
         AgentToolMethod(AgentTool<?> agentTool, ToolSpecification spec, AtomicBoolean abortFlag) {
             this.agentTool = agentTool;
             this.spec = spec;
@@ -312,6 +407,9 @@ private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name
 
     }
 
+    /**
+     * Builder for constructing a ToolRegistry with tools, filtering, and standard defaults.
+     */
     public static class Builder {
         private final List<AgentTool<?>> agentTools = new ArrayList<>();
         private final List<Object> annotatedTools = new ArrayList<>();
@@ -320,25 +418,40 @@ private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name
         private Set<String> excludes = null;
         private Path workspace = Path.of("").toAbsolutePath();
 
+        /**
+         * Adds an AgentTool to the registry being built.
+         */
         public Builder with(AgentTool<?> tool) {
             agentTools.add(tool);
             return this;
         }
 
+        /**
+         * Adds an object whose @Tool-annotated methods will be registered.
+         */
         public Builder with(Object annotatedTool) {
             annotatedTools.add(annotatedTool);
             return this;
         }
 
+        /**
+         * Adds a tool by fully qualified class name (loaded reflectively).
+         */
         public Builder with(String className) {
             classNames.add(className);
             return this;
         }
 
+        /**
+         * Adds the standard set of built-in tools (without bash).
+         */
         public Builder standard() {
             return standard(false);
         }
 
+        /**
+         * Adds the standard set of built-in tools, optionally including bash.
+         */
         public Builder standard(boolean includeBash) {
             var wd = workspace;
             if (includeBash) {
@@ -359,27 +472,42 @@ private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name
             return this;
         }
 
+        /**
+         * Restricts registered tools to only those with the given names.
+         */
         public Builder include(String... names) {
             if (this.includes == null) this.includes = new HashSet<>();
             this.includes.addAll(Arrays.asList(names));
             return this;
         }
 
+        /**
+         * Excludes tools with the given names from registration.
+         */
         public Builder exclude(String... names) {
             if (this.excludes == null) this.excludes = new HashSet<>();
             this.excludes.addAll(Arrays.asList(names));
             return this;
         }
 
+        /**
+         * Sets the working directory for file-based tools.
+         */
         public Builder workspace(Path workspace) {
             this.workspace = workspace;
             return this;
         }
 
+        /**
+         * Alias for workspace().
+         */
         public Builder cwd(Path cwd) {
             return workspace(cwd);
         }
 
+        /**
+         * Builds the ToolRegistry with all configured tools and filters.
+         */
         public ToolRegistry build() {
             var registry = new ToolRegistry();
 
@@ -418,6 +546,9 @@ private static void addPropertyToBuilder(JsonObjectSchema.Builder b, String name
             return registry;
         }
 
+        /**
+         * Returns true if the tool name should be excluded based on include/exclude rules.
+         */
         private boolean isFiltered(String name) {
             if (excludes != null && excludes.contains(name)) return true;
             if (includes != null && !includes.contains(name)) return true;

@@ -8,6 +8,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+/**
+ * Fallback reader that handles both text and binary files, returning metadata for binary content.
+ */
 public class BinaryAwareFallbackReader implements FileReader {
 
     private static final int SCAN_SIZE = 8192;
@@ -73,6 +76,9 @@ public class BinaryAwareFallbackReader implements FileReader {
         return ToolResult.success(text);
     }
 
+    /**
+     * Detects whether a file is binary by scanning for null bytes and non-printable characters.
+     */
     private boolean isBinary(Path path) {
         try (InputStream is = Files.newInputStream(path)) {
             var buf = new byte[SCAN_SIZE];

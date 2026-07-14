@@ -16,6 +16,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+/**
+ * AI-powered tool that analyzes a task and recommends matching capabilities (skills, default tools, MCP tools).
+ */
 public class CapabilitySearchTool implements AgentTool<CapabilitySearchTool.Params> {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -25,15 +28,27 @@ public class CapabilitySearchTool implements AgentTool<CapabilitySearchTool.Para
     private final ToolExecutor toolExecutor;
     private final CapabilityEmbeddingService embeddingService;
 
+    /**
+     * @param registry      capability registry to search
+     * @param subAgentModel LLM model used for analysis
+     */
     public CapabilitySearchTool(CapabilityRegistry registry, ChatModel subAgentModel) {
         this(registry, subAgentModel, new DefaultToolExecutor(), null);
     }
 
+    /**
+     * @param registry      capability registry to search
+     * @param subAgentModel LLM model used for analysis
+     * @param toolExecutor  executor for resolving tool enrichments
+     */
     public CapabilitySearchTool(CapabilityRegistry registry, ChatModel subAgentModel,
                                  ToolExecutor toolExecutor) {
         this(registry, subAgentModel, toolExecutor, null);
     }
 
+    /**
+     * Full constructor with optional embedding service for semantic pre-filtering.
+     */
     public CapabilitySearchTool(CapabilityRegistry registry, ChatModel subAgentModel,
                                  ToolExecutor toolExecutor,
                                  CapabilityEmbeddingService embeddingService) {
@@ -43,6 +58,9 @@ public class CapabilitySearchTool implements AgentTool<CapabilitySearchTool.Para
         this.embeddingService = embeddingService;
     }
 
+    /**
+     * Input parameters for the capability search.
+     */
     public record Params(String task) {}
 
     @Override
@@ -75,6 +93,9 @@ public class CapabilitySearchTool implements AgentTool<CapabilitySearchTool.Para
         return schema;
     }
 
+    /**
+     * Executes the capability search, optionally using embedding-based pre-filtering.
+     */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         if (params.task() == null || params.task().isBlank()) {

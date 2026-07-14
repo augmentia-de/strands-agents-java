@@ -5,6 +5,9 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Properties;
 
+/**
+ * Top-level agent configuration loaded from environment variables, Java Properties, or YAML.
+ */
 public record StrandsAgentConfig(
     String skillsDir,
     String sessionDir,
@@ -22,6 +25,7 @@ public record StrandsAgentConfig(
     String hitlEmailRecipient
 ) {
 
+    /** Loads configuration from environment variables. */
     public static StrandsAgentConfig fromEnv() {
         return new StrandsAgentConfig(
             env("STRANDS_SKILLS_DIR", "skills"),
@@ -41,6 +45,7 @@ public record StrandsAgentConfig(
         );
     }
 
+    /** Loads configuration from Java Properties. */
     public static StrandsAgentConfig fromProperties(Properties props) {
         return new StrandsAgentConfig(
             prop(props, "strands.agent.skills.dir", "skills"),
@@ -60,10 +65,12 @@ public record StrandsAgentConfig(
         );
     }
 
+    /** Loads configuration from YAML via FeatureConfig. */
     public static StrandsAgentConfig fromYaml() {
         return fromYaml(FeatureConfig.load());
     }
 
+    /** Internal: builds config from a FeatureConfig. */
     static StrandsAgentConfig fromYaml(FeatureConfig fc) {
         return new StrandsAgentConfig(
             env("STRANDS_SKILLS_DIR", "skills"),
@@ -83,6 +90,7 @@ public record StrandsAgentConfig(
         );
     }
 
+    /** Loads from YAML with system property overrides. */
     public static StrandsAgentConfig fromMixed() {
         var cfg = fromYaml();
         return new StrandsAgentConfig(
@@ -103,25 +111,30 @@ public record StrandsAgentConfig(
         );
     }
 
+    /** Resolves a boolean from env var (priority) or YAML feature flag. */
     private static boolean resolveBool(String feature, FeatureConfig fc, String envVal) {
         if (envVal != null) return Boolean.parseBoolean(envVal);
         return fc.isEnabled(feature);
     }
 
+    /** Resolves the workspace path, defaulting to the current directory. */
     public Path resolvedWorkspace() {
         return workspace.isBlank() ? Path.of("").toAbsolutePath()
             : Path.of(workspace).toAbsolutePath();
     }
 
+    /** Reads an environment variable with a fallback default. */
     private static String env(String key, String fallback) {
         var val = System.getenv(key);
         return val != null ? val : fallback;
     }
 
+    /** Reads a property with a fallback default. */
     private static String prop(Properties props, String key, String fallback) {
         return props.getProperty(key, fallback);
     }
 
+    /** Parses a comma-separated string into a list. */
     private static List<String> parseCsv(String s) {
         if (s == null || s.isBlank()) return List.of();
         return List.of(s.split(",")).stream().map(String::strip)

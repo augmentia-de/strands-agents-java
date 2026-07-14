@@ -5,6 +5,9 @@ import de.augmentia.strandsagents.interceptor.plugin.Plugin;
 import de.augmentia.strandsagents.prompt.PromptRegistry;
 import java.util.List;
 
+/**
+ * Plugin that applies input and output guardrails to agent interactions.
+ */
 public class GuardrailPlugin implements Plugin {
 
     private final List<Guardrail> inputGuardrails;
@@ -13,11 +16,17 @@ public class GuardrailPlugin implements Plugin {
     private final String fallbackMessage;
     private Agent agent;
 
+    /**
+     * Creates a guardrail plugin with FALLBACK block action and default message.
+     */
     public GuardrailPlugin(List<Guardrail> inputGuardrails, List<Guardrail> outputGuardrails) {
         this(inputGuardrails, outputGuardrails, BlockAction.FALLBACK,
             PromptRegistry.getOrDefault("guardrail_plugin.fallback", "I cannot process this request."));
     }
 
+    /**
+     * Creates a guardrail plugin with custom block action and fallback message.
+     */
     public GuardrailPlugin(List<Guardrail> inputGuardrails, List<Guardrail> outputGuardrails,
                            BlockAction blockAction, String fallbackMessage) {
         this.inputGuardrails = inputGuardrails;

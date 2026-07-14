@@ -18,6 +18,9 @@ import de.augmentia.strandsagents.tools.security.FileSandboxGuard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Lists directory contents within the sandboxed workspace, with optional recursive and detail modes.
+ */
 public class LsTool implements AgentTool<LsTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(LsTool.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -76,6 +79,15 @@ public class LsTool implements AgentTool<LsTool.Params> {
         node.put("description", d);
     }
 
+    /**
+     * Lists the contents of a directory, optionally recursing into subdirectories and showing file details.
+     *
+     * @param toolCallId unique identifier for this tool invocation
+     * @param params     the ls parameters (path, recursive, depth, details)
+     * @param abortFlag  flag to signal premature cancellation
+     * @param onUpdate   callback for streaming intermediate results
+     * @return the tool result containing directory entries or an error
+     */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         log.debug("Tool: ls START path={} recursive={} depth={}", params.path(), params.recursive(), params.depth());
@@ -161,6 +173,12 @@ public class LsTool implements AgentTool<LsTool.Params> {
             new LsDetails(entries.size(), secureDir.toString()));
     }
 
+    /**
+     * Parameters for listing a directory: path, recursive flag, details flag, and max depth.
+     */
     public record Params(String path, Boolean recursive, Boolean details, Integer depth) {}
+    /**
+     * Metadata about an ls operation result.
+     */
     public record LsDetails(int entryCount, String directory) {}
 }

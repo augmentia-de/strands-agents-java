@@ -1,5 +1,8 @@
 package de.augmentia.strandsagents.interceptor.pipeline;
 
+/**
+ * Hook interface for intercepting agent lifecycle events.
+ */
 public interface AgentHook {
 
     String name();

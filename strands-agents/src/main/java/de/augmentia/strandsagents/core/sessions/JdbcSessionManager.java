@@ -20,11 +20,17 @@ import java.util.Optional;
 import java.util.UUID;
 import javax.sql.DataSource;
 
+/**
+ * JDBC-based session persistence using a relational database with MERGE semantics.
+ */
 public class JdbcSessionManager implements SessionManager {
 
     private final DataSource dataSource;
     private final ObjectMapper mapper;
 
+    /**
+     * @param dataSource JDBC data source for the sessions table
+     */
     public JdbcSessionManager(DataSource dataSource) {
         this.dataSource = dataSource;
         this.mapper = createMapper();
@@ -51,6 +57,9 @@ public class JdbcSessionManager implements SessionManager {
         }
     }
 
+    /**
+     * Creates a new session and inserts it into the database.
+     */
     @Override
     public Session createSession(String agentName, Map<String, Object> metadata) {
         var now = Instant.now();
@@ -61,6 +70,9 @@ public class JdbcSessionManager implements SessionManager {
         return session;
     }
 
+    /**
+     * Loads a session from the database by ID, returning empty if not found.
+     */
     @Override
     public Optional<Session> loadSession(String sessionId) {
         var sql = "SELECT * FROM sessions WHERE id = ?";
@@ -78,6 +90,9 @@ public class JdbcSessionManager implements SessionManager {
         return Optional.empty();
     }
 
+    /**
+     * Upserts a session into the database using MERGE.
+     */
     @Override
     public void saveSession(Session session) {
         var sql = """
@@ -103,6 +118,9 @@ public class JdbcSessionManager implements SessionManager {
         }
     }
 
+    /**
+     * Deletes a session from the database by ID.
+     */
     @Override
     public void deleteSession(String sessionId) {
         var sql = "DELETE FROM sessions WHERE id = ?";
@@ -115,6 +133,9 @@ public class JdbcSessionManager implements SessionManager {
         }
     }
 
+    /**
+     * Lists all sessions for the given agent ordered by last update descending.
+     */
     @Override
     public List<Session> listSessions(String agentName) {
         var sql = "SELECT * FROM sessions WHERE agent_name = ? ORDER BY updated_at DESC";
@@ -133,6 +154,9 @@ public class JdbcSessionManager implements SessionManager {
         return sessions;
     }
 
+    /**
+     * Searches sessions by metadata key-value via LIKE on the JSON column.
+     */
     @Override
     public List<Session> searchByMetadata(String key, String value) {
         var sql = "SELECT * FROM sessions WHERE metadata_json LIKE ?";

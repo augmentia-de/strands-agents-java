@@ -19,6 +19,9 @@ import de.augmentia.strandsagents.tools.ToolResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Executes a bash command with output truncation and configurable timeout.
+ */
 public class BashTool implements AgentTool<BashTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(BashTool.class);
     private static final int MAX_LINES = 300;
@@ -74,6 +77,15 @@ public class BashTool implements AgentTool<BashTool.Params> {
         return s != null && s.length() > max ? s.substring(0, max) + "..." : s;
     }
 
+    /**
+     * Spawns a shell process, captures output with ring-buffer truncation, and supports abort/timeout.
+     *
+     * @param toolCallId unique identifier for this tool invocation
+     * @param params     the bash parameters (command, timeout)
+     * @param abortFlag  flag to signal premature cancellation
+     * @param onUpdate   callback for streaming intermediate results
+     * @return the tool result containing command output or an error
+     */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         log.debug("Tool: bash START command={}", trunc(params.command(), 500));
@@ -169,5 +181,8 @@ public class BashTool implements AgentTool<BashTool.Params> {
         }
     }
 
+    /**
+     * Parameters for executing a bash command: the command string and optional timeout in seconds.
+     */
     public record Params(String command, Integer timeout) {}
 }

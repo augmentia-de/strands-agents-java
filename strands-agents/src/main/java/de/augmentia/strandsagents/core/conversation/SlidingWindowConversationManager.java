@@ -4,6 +4,9 @@ import de.augmentia.strandsagents.model.message.Message;
 import java.util.List;
 import java.util.stream.Stream;
 
+/**
+ * Conversation pruning strategy that keeps a sliding window of the most recent non-system messages.
+ */
 public record SlidingWindowConversationManager(int windowSize) implements ConversationManager {
 
     public SlidingWindowConversationManager {

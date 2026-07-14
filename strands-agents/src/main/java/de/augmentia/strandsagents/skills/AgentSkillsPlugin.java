@@ -15,6 +15,9 @@ import java.nio.file.Files;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Plugin that manages skill definitions and injects skill context into model calls.
+ */
 public class AgentSkillsPlugin implements Plugin {
 
     private final Map<String, Skill> skills;
@@ -25,14 +28,23 @@ public class AgentSkillsPlugin implements Plugin {
     private boolean skillSearchEnabled;
     private Agent agent;
 
+    /**
+     * Creates a plugin with the given skills and no initial skills.
+     */
     public AgentSkillsPlugin(List<Skill> skills) {
         this(skills, List.of());
     }
 
+    /**
+     * Creates a plugin with skills and a list of initially activated skill names.
+     */
     public AgentSkillsPlugin(List<Skill> skills, List<String> initialSkills) {
         this(skills, 20, "agent_skills", initialSkills);
     }
 
+    /**
+     * Creates a fully configured skills plugin.
+     */
     public AgentSkillsPlugin(List<Skill> skills, int maxResourceFiles, String stateKey,
                              List<String> initialSkills) {
         this.skills = new LinkedHashMap<>();
@@ -81,6 +93,9 @@ public class AgentSkillsPlugin implements Plugin {
     }
 
     @Override
+    /**
+     * Injects skill definitions as additional system messages before a model call.
+     */
     public HookResult beforeModelCall(HookContexts.BeforeModelCallContext ctx) {
         if (getEffectiveSkills().isEmpty()) return new HookResult.Continue();
         var xml = generateSkillsXml();
@@ -99,6 +114,9 @@ public class AgentSkillsPlugin implements Plugin {
         return List.of(ToolRegistry.createMethod(tool));
     }
 
+    /**
+     * Replaces any previously injected skill XML in the given string builder with current data.
+     */
     void injectSkillsXml(StringBuilder sb) {
         var xml = generateSkillsXml();
         if (!lastInjectedXml.isEmpty()) {
@@ -154,6 +172,9 @@ public class AgentSkillsPlugin implements Plugin {
         return buf.toString();
     }
 
+    /**
+     * Activates a skill by name and returns its full description and instructions.
+     */
     public String activateSkill(String skillName) {
         var effective = getEffectiveSkills();
         var skill = effective.get(skillName);

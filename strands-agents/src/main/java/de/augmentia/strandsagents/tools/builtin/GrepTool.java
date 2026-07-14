@@ -13,6 +13,9 @@ import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+/**
+ * Searches for a regular expression pattern or substring inside files within the sandboxed workspace.
+ */
 public class GrepTool implements AgentTool<GrepTool.Params> {
 
     private static final ObjectMapper SCHEMA_MAPPER = new ObjectMapper();
@@ -70,6 +73,15 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
         node.put("description", d);
     }
 
+    /**
+     * Executes the grep search by walking the target directory and matching lines against the pattern.
+     *
+     * @param toolCallId unique identifier for this tool invocation
+     * @param params     the grep parameters (pattern, directory, isRegex, maxResults)
+     * @param abortFlag  flag to signal premature cancellation
+     * @param onUpdate   callback for streaming intermediate results
+     * @return the tool result containing matching lines or an error
+     */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) throws Exception {
         if (params.pattern() == null || params.pattern().isBlank()) {
@@ -146,5 +158,8 @@ public class GrepTool implements AgentTool<GrepTool.Params> {
         return ToolResult.mixed(searchResults.toString(), json);
     }
 
+    /**
+     * Parameters for grep search: the regex pattern, optional directory, regex flag, and max results limit.
+     */
     public record Params(String pattern, String directory, Boolean isRegex, Integer maxResults) {}
 }

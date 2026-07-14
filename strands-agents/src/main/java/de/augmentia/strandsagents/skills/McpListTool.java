@@ -9,9 +9,13 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+/**
+ * Tool for listing tools available from configured MCP servers.
+ */
 public record McpListTool(List<CapabilityRegistry.McpServerConfig> servers)
     implements AgentTool<McpListTool.Params> {
 
+    /** Parameters to optionally filter by a specific server name. */
     public record Params(String serverName) {}
 
     @Override
@@ -26,6 +30,7 @@ public record McpListTool(List<CapabilityRegistry.McpServerConfig> servers)
     @Override
     public Class<Params> parameterType() { return Params.class; }
 
+    /** Returns the JSON schema for the optional serverName filter. */
     @Override
     public JsonNode parameterSchema() {
         var factory = JsonNodeFactory.instance;
@@ -40,6 +45,7 @@ public record McpListTool(List<CapabilityRegistry.McpServerConfig> servers)
         return schema;
     }
 
+    /** Connects to each configured MCP server and lists their available tools. */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         var sb = new StringBuilder();

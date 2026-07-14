@@ -8,6 +8,9 @@ import de.augmentia.strandsagents.interceptor.guardrails.Guardrail;
 
 import java.util.List;
 
+/**
+ * Extends {@link AgentHook} with agent lifecycle, tool, and guardrail support.
+ */
 public interface Plugin extends AgentHook {
     String name();
     default int order() { return 0; }

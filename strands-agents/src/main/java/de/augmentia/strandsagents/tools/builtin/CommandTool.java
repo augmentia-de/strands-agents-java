@@ -16,6 +16,9 @@ import de.augmentia.strandsagents.tools.ToolResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Executes a local system command (e.g., mvn, git) with output truncation and configurable timeout.
+ */
 public class CommandTool implements AgentTool<CommandTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(CommandTool.class);
     private static final int MAX_LINES = 300;
@@ -70,6 +73,15 @@ public class CommandTool implements AgentTool<CommandTool.Params> {
         return s != null && s.length() > max ? s.substring(0, max) + "..." : s;
     }
 
+    /**
+     * Spawns a process with the given command tokens, captures output with ring-buffer truncation.
+     *
+     * @param toolCallId unique identifier for this tool invocation
+     * @param params     the command parameters (command, timeout)
+     * @param abortFlag  flag to signal premature cancellation
+     * @param onUpdate   callback for streaming intermediate results
+     * @return the tool result containing command output or an error
+     */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         log.debug("Tool: command START command={}", trunc(params.command(), 500));
@@ -165,5 +177,8 @@ public class CommandTool implements AgentTool<CommandTool.Params> {
         }
     }
 
+    /**
+     * Parameters for executing a system command: the command string and optional timeout in seconds.
+     */
     public record Params(String command, Integer timeout) {}
 }

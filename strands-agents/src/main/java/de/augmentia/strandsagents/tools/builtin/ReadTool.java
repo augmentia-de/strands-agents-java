@@ -14,6 +14,9 @@ import java.util.function.Consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+/**
+ * Reads the contents of files matching a glob pattern securely inside the sandboxed workspace.
+ */
 public class ReadTool implements AgentTool<ReadTool.Params> {
 
     private static final ObjectMapper SCHEMA_MAPPER = new ObjectMapper();
@@ -77,6 +80,15 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
         node.put("description", d);
     }
 
+    /**
+     * Executes the read operation: resolves the glob pattern, reads matching files, and returns their content.
+     *
+     * @param toolCallId unique identifier for this tool invocation
+     * @param params     the read parameters (path, offset, limit, etc.)
+     * @param abortFlag  flag to signal premature cancellation
+     * @param onUpdate   callback for streaming intermediate results
+     * @return the tool result containing file contents or error details
+     */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) throws Exception {
         if (params.path() == null || params.path().isBlank()) {
@@ -173,5 +185,8 @@ public class ReadTool implements AgentTool<ReadTool.Params> {
         return node;
     }
 
+    /**
+     * Parameters for reading files: a glob path, optional offset/limit/line_start/line_end for partial reads.
+     */
     public record Params(String path, Integer offset, Integer limit, Integer line_start, Integer line_end) {}
 }

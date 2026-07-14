@@ -4,6 +4,7 @@ import de.augmentia.strandsagents.prompt.PromptRegistry;
 import java.lang.reflect.ParameterizedType;
 import java.util.List;
 
+/** Configuration for structured JSON output from model responses. */
 public record StructuredOutputConfig(
     boolean dynamicSchema,
     Class<?> outputClass,
@@ -15,27 +16,33 @@ public record StructuredOutputConfig(
             "You must format the previous response as structured output.");
     }
 
+    /** Creates a config for a statically-typed output class. */
     public static StructuredOutputConfig staticModel(Class<?> outputClass) {
         return new StructuredOutputConfig(false, outputClass, null, defaultForcePrompt());
     }
 
+    /** Creates a config for a statically-typed output class with a custom force prompt. */
     public static StructuredOutputConfig staticModel(Class<?> outputClass, String forcePrompt) {
         return new StructuredOutputConfig(false, outputClass, null, forcePrompt);
     }
 
+    /** Creates a config with a dynamic JSON schema. */
     public static StructuredOutputConfig dynamicSchema(String jsonSchema) {
         return new StructuredOutputConfig(true, null, jsonSchema, defaultForcePrompt());
     }
 
+    /** Creates a config with a dynamic JSON schema and a custom force prompt. */
     public static StructuredOutputConfig dynamicSchema(String jsonSchema, String forcePrompt) {
         return new StructuredOutputConfig(true, null, jsonSchema, forcePrompt);
     }
 
+    /** Returns true if this configuration has a valid output class or non-blank JSON schema. */
     public boolean isEnabled() {
         return (!dynamicSchema && outputClass != null)
             || (dynamicSchema && jsonSchema != null && !jsonSchema.isBlank());
     }
 
+    /** Returns the JSON schema, generated from the output class or from the raw schema. */
     public String effectiveSchema() {
         if (!dynamicSchema) {
             if (outputClass == null) return null;

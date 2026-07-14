@@ -10,6 +10,9 @@ import de.augmentia.strandsagents.interceptor.hitl.checkpoint.CheckpointService;
 
 import java.util.List;
 
+/**
+ * Plugin that enforces human-in-the-loop approval before tool execution.
+ */
 public class HITLPlugin implements Plugin {
 
     private final HITLProvider provider;
@@ -18,16 +21,25 @@ public class HITLPlugin implements Plugin {
     private CheckpointService checkpointService;
     private Agent agent;
 
+    /**
+     * Creates a HITL plugin with no review-action filter.
+     */
     public HITLPlugin(HITLProvider provider, HITLAuthority authority) {
         this(provider, authority, List.of());
     }
 
+    /**
+     * Creates a HITL plugin scoped to specific tool actions that require review.
+     */
     public HITLPlugin(HITLProvider provider, HITLAuthority authority, List<String> reviewActions) {
         this.provider = provider;
         this.authority = authority;
         this.reviewActions = reviewActions;
     }
 
+    /**
+     * Creates a checkpoint-based HITL plugin without a provider.
+     */
     public HITLPlugin(CheckpointService checkpointService) {
         this.provider = null;
         this.authority = HITLAuthority.CONFIRM;
@@ -46,6 +58,9 @@ public class HITLPlugin implements Plugin {
     }
 
     @Override
+    /**
+     * Intercepts tool calls to request human approval via provider or checkpoint service.
+     */
     public HookResult beforeToolCall(HookContexts.BeforeToolCallContext ctx) {
         if (checkpointService != null) {
             return handleCheckpoint(ctx);
@@ -116,6 +131,9 @@ public class HITLPlugin implements Plugin {
         return agent;
     }
 
+    /**
+     * Returns a simple console-based HITL provider for interactive approval.
+     */
     public static HITLProvider consoleProvider() {
         return (action, context) -> {
             System.out.print("Tool '" + action + "' with args: " + context + " \u2014 execute? [y/N] ");

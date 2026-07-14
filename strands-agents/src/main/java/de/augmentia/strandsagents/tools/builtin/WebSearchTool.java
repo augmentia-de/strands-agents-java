@@ -15,6 +15,9 @@ import de.augmentia.strandsagents.prompt.PromptRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Searches the web using the Tavily Search API or falls back to a mock result.
+ */
 public class WebSearchTool implements AgentTool<WebSearchTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(WebSearchTool.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -62,6 +65,15 @@ public class WebSearchTool implements AgentTool<WebSearchTool.Params> {
         return schema;
     }
 
+    /**
+     * Performs a web search via Tavily API or returns a mock result if no API key is configured.
+     *
+     * @param toolCallId unique identifier for this tool invocation
+     * @param params     the search parameters (query)
+     * @param abortFlag  flag to signal premature cancellation
+     * @param onUpdate   callback for streaming intermediate results
+     * @return the tool result containing search results or an error
+     */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         log.debug("Tool: web_search START query={}", params.query());
@@ -162,5 +174,8 @@ public class WebSearchTool implements AgentTool<WebSearchTool.Params> {
         }
     }
 
+    /**
+     * Parameters for a web search: the search query string.
+     */
     public record Params(String query) {}
 }

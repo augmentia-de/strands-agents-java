@@ -493,10 +493,16 @@ public class Agent implements AutoCloseable {
 
 
 
+    /**
+     * Delegates a chat request to the underlying model. Override to intercept or stream.
+     */
     protected ChatResponse doChat(ChatRequest request) {
         return model.chat(request);
     }
 
+    /**
+     * Dispatches an event to all registered listeners and the event publisher.
+     */
     protected void fire(AgentEvent event) {
         for (var listener : eventListeners) {
             try {
@@ -574,10 +580,16 @@ public class Agent implements AutoCloseable {
         this.checkpointService = checkpointService;
     }
 
+    /**
+     * Pauses execution and transitions to WAITING_FOR_HUMAN phase for HITL approval.
+     */
     public void pauseExecution() {
         phase = AgentPhase.WAITING_FOR_HUMAN;
     }
 
+    /**
+     * Resumes a paused execution by signaling the pause condition.
+     */
     public void resumeExecution() {
         pauseLock.lock();
         try {
@@ -588,10 +600,16 @@ public class Agent implements AutoCloseable {
         }
     }
 
+    /**
+     * Convenience method — resumes execution (alias for {@link #resumeExecution()}).
+     */
     public void approve() {
         resumeExecution();
     }
 
+    /**
+     * Rejects execution, transitioning to FAILED phase and signaling the pause condition.
+     */
     public void reject(String reason) {
         pauseLock.lock();
         try {
@@ -602,6 +620,9 @@ public class Agent implements AutoCloseable {
         }
     }
 
+    /**
+     * Cancels the current execution, interrupts the execution thread, and sets the abort flag.
+     */
     public void cancel() {
         cancelled = true;
         abortFlag.set(true);
@@ -626,6 +647,9 @@ public class Agent implements AutoCloseable {
         }
     }
 
+    /**
+     * Shuts down the agent: cancels execution and closes all registered resources.
+     */
     public void shutdown() {
         if (shutdown) return;
         shutdown = true;
@@ -648,6 +672,9 @@ public class Agent implements AutoCloseable {
         return shutdown;
     }
 
+    /**
+     * Returns the model corresponding to the current tier (ADVANCED or default).
+     */
     public ChatModel getCurrentModel() {
         if (currentTier == ModelTier.ADVANCED && advancedModel != null) {
             return advancedModel;
@@ -671,6 +698,9 @@ public class Agent implements AutoCloseable {
         return currentTier;
     }
 
+    /**
+     * Switches the active model tier and logs the change.
+     */
     public void switchTier(ModelTier tier) {
         this.currentTier = tier;
         if (tier == ModelTier.ADVANCED && advancedModel != null) {
@@ -684,6 +714,9 @@ public class Agent implements AutoCloseable {
         return new Builder();
     }
 
+    /**
+     * Fluent builder for constructing an {@link Agent} with optional components.
+     */
     public static class Builder {
         private ChatModel model;
         private ToolRegistry toolRegistry = new ToolRegistry();
@@ -766,6 +799,9 @@ public class Agent implements AutoCloseable {
             return this;
         }
 
+        /**
+         * Builds the agent, throwing if no model has been set.
+         */
         public Agent build() {
             if (model == null) {
                 throw new IllegalStateException("Agent model is required");

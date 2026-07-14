@@ -179,6 +179,9 @@ public class StreamingAgent extends Agent {
         return bridge.chat(request);
     }
 
+    /**
+     * Cancels streaming and the underlying model bridge.
+     */
     public void cancelStreaming() {
         cancel();
         var b = currentBridge;

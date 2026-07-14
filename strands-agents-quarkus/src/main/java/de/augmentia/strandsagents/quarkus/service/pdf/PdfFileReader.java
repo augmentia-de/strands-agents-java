@@ -11,6 +11,9 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Reads text content from PDF files using Apache PDFBox.
+ */
 public class PdfFileReader implements FileReader {
     private static final Logger log = LoggerFactory.getLogger(PdfFileReader.class);
     private static final int MAX_CHARS = 20_000;

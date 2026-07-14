@@ -1,5 +1,6 @@
 package de.augmentia.strandsagents.interceptor.security;
 
+/** Tokens representing system capabilities for permission control. */
 public enum CapabilityToken {
     FILE_READ,
     FILE_WRITE,

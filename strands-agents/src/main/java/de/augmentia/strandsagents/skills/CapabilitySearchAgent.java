@@ -7,13 +7,22 @@ import dev.langchain4j.model.chat.ChatModel;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Sub-agent that analyses a task against available skills and tools and returns structured capability recommendations.
+ */
 public class CapabilitySearchAgent extends Agent {
 
+    /**
+     * Describes a skill and the tools that were enriched/recommended for it.
+     */
     public record ToolEnrichment(
         String skillName,
         List<String> enrichedTools
     ) {}
 
+    /**
+     * Structured output from capability analysis.
+     */
     public record Analysis(
         String analysis,
         List<String> recommendedSkills,
@@ -22,6 +31,13 @@ public class CapabilitySearchAgent extends Agent {
         List<ToolEnrichment> toolEnrichments
     ) {}
 
+    /**
+     * @param model               LLM for analysis
+     * @param skills              available skills keyed by name
+     * @param mcpServers          configured MCP servers
+     * @param defaultCapabilities built-in default capabilities
+     * @param toolExecutor        executor for tool resolution
+     */
     public CapabilitySearchAgent(ChatModel model, Map<String, Skill> skills,
                                   List<CapabilityRegistry.McpServerConfig> mcpServers,
                                   List<CapabilityRegistry.Capability> defaultCapabilities,

@@ -1,5 +1,8 @@
 package de.augmentia.strandsagents.interceptor.pipeline;
 
+/**
+ * Sealed result type returned by hooks to continue, cancel, modify, or retry.
+ */
 public sealed interface HookResult
     permits HookResult.Continue, HookResult.Cancel, HookResult.Modify, HookResult.Retry {
 

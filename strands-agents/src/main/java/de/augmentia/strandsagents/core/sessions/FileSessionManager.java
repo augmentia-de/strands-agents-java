@@ -20,11 +20,17 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * File-based session persistence using JSON files with file locking.
+ */
 public class FileSessionManager implements SessionManager {
 
     private final Path baseDir;
     private final ObjectMapper mapper;
 
+    /**
+     * @param baseDir directory to store session JSON files
+     */
     public FileSessionManager(Path baseDir) {
         this.baseDir = baseDir;
         this.mapper = createMapper();
@@ -62,6 +68,9 @@ public class FileSessionManager implements SessionManager {
         }
     }
 
+    /**
+     * Creates a new session persisted as a JSON file.
+     */
     @Override
     public Session createSession(String agentName, Map<String, Object> metadata) {
         ensureDir();
@@ -73,6 +82,9 @@ public class FileSessionManager implements SessionManager {
         return session;
     }
 
+    /**
+     * Loads a session from its JSON file, returning empty if not found.
+     */
     @Override
     public Optional<Session> loadSession(String sessionId) {
         var file = resolve(sessionId);
@@ -87,6 +99,9 @@ public class FileSessionManager implements SessionManager {
         }
     }
 
+    /**
+     * Persists a session to its JSON file with file locking.
+     */
     @Override
     public void saveSession(Session session) {
         var file = resolve(session.sessionId());
@@ -97,6 +112,9 @@ public class FileSessionManager implements SessionManager {
         }
     }
 
+    /**
+     * Deletes the session JSON file for the given ID.
+     */
     @Override
     public void deleteSession(String sessionId) {
         var file = resolve(sessionId);
@@ -107,6 +125,9 @@ public class FileSessionManager implements SessionManager {
         }
     }
 
+    /**
+     * Lists all sessions in the base directory, optionally filtered by agent name.
+     */
     @Override
     public List<Session> listSessions(String agentName) {
         ensureDir();
@@ -127,6 +148,9 @@ public class FileSessionManager implements SessionManager {
         return results;
     }
 
+    /**
+     * Finds sessions whose metadata contains the given key-value pair.
+     */
     @Override
     public List<Session> searchByMetadata(String key, String value) {
         ensureDir();

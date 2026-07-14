@@ -17,6 +17,13 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
+/**
+ * An agent that routes requests between a simple and an advanced model tier.
+ * <p>
+ * Uses an {@link LlmRouter} or LLM-based classification to decide which model
+ * tier should handle a given request, enabling cost-optimised execution.
+ * </p>
+ */
 public class RoutingAgent extends Agent {
 
     private static final Logger log = LoggerFactory.getLogger(RoutingAgent.class);
@@ -26,6 +33,9 @@ public class RoutingAgent extends Agent {
     private final LlmRouter router;
     private volatile ModelTier resolvedTier;
 
+    /**
+     * Constructs a RoutingAgent without an explicit router (uses LLM-based classification).
+     */
     public RoutingAgent(ChatModel simpleModel, ChatModel advancedModel,
                         ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                         ConversationManager conversationManager, SessionManager sessionManager,
@@ -35,6 +45,9 @@ public class RoutingAgent extends Agent {
             sessionManager, chatMemoryStore, resilienceConfig, plugins);
     }
 
+    /**
+     * Constructs a RoutingAgent with an explicit {@link LlmRouter}.
+     */
     public RoutingAgent(ChatModel simpleModel, ChatModel advancedModel, LlmRouter router,
                         ToolRegistry toolRegistry, ToolExecutor toolExecutor,
                         ConversationManager conversationManager, SessionManager sessionManager,
@@ -50,6 +63,11 @@ public class RoutingAgent extends Agent {
         setModelTier(ModelTier.ROUTING);
     }
 
+    /**
+     * Determines whether a user goal should use the SIMPLE or ADVANCED model tier.
+     *
+     * @return the resolved model tier
+     */
     public ModelTier resolveRoutingTier(String userGoal) {
         if (router != null) {
             var result = router.classify(userGoal, List.of("SIMPLE", "ADVANCED"));
@@ -92,6 +110,9 @@ public class RoutingAgent extends Agent {
         return resolvedTier;
     }
 
+    /**
+     * Activates the resolved tier by switching to the appropriate model.
+     */
     public void applyRouting() {
         if (resolvedTier == ModelTier.ADVANCED && advancedModel != null) {
             switchTier(ModelTier.ADVANCED);

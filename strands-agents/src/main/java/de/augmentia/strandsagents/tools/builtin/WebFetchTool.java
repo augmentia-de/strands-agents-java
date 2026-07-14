@@ -16,6 +16,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Fetches a web page by URL and extracts its visible text content.
+ */
 public class WebFetchTool implements AgentTool<WebFetchTool.Params> {
     private static final Logger log = LoggerFactory.getLogger(WebFetchTool.class);
     private static final Pattern URL_PATTERN = Pattern.compile("^https?://[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(/.*)?$");
@@ -51,6 +54,15 @@ public class WebFetchTool implements AgentTool<WebFetchTool.Params> {
         return schema;
     }
 
+    /**
+     * Sends an HTTP GET request, extracts the title and text content from the HTML response.
+     *
+     * @param toolCallId unique identifier for this tool invocation
+     * @param params     the fetch parameters (url)
+     * @param abortFlag  flag to signal premature cancellation
+     * @param onUpdate   callback for streaming intermediate results
+     * @return the tool result containing page text or an error
+     */
     @Override
     public ToolResult execute(String toolCallId, Params params, AtomicBoolean abortFlag, Consumer<ToolResult> onUpdate) {
         log.debug("Tool: web_fetch url={}", params.url());
@@ -148,5 +160,8 @@ public class WebFetchTool implements AgentTool<WebFetchTool.Params> {
         };
     }
 
+    /**
+     * Parameters for fetching a web page: the URL to fetch.
+     */
     public record Params(String url) {}
 }

@@ -48,6 +48,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Core agent execution loop that orchestrates LLM calls, tool execution, guardrails, and hooks.
+ */
 final class AgentLoop {
 
     private static final Logger log = LoggerFactory.getLogger(AgentLoop.class);
@@ -72,6 +75,9 @@ final class AgentLoop {
     private String structuredOutputResult;
     private final StuckDetector stuckDetector = new StuckDetector();
 
+    /**
+     * Constructs an AgentLoop with the given agent, session ID, prompt, and context variables.
+     */
     AgentLoop(Agent agent, String sid, String prompt, Map<String, Object> contextVariables) {
         this.agent = agent;
         this.run = agent.runConfig.snapshot();
@@ -81,6 +87,9 @@ final class AgentLoop {
         agent.abortFlag.set(false);
     }
 
+    /**
+     * Executes the agent loop, iterating through LLM calls and tool executions until completion.
+     */
     AgentResult execute() {
         agent.cancelled = false;
         agent.executionThread = Thread.currentThread();
@@ -165,6 +174,9 @@ final class AgentLoop {
 
     // ── Hooks ────────────────────────────────────────────────────────
 
+    /**
+     * Invokes the before-agent hook and handles modification or cancellation.
+     */
     private boolean handleBeforeAgent() {
         var beforeAgentResult = run.hookRegistry().triggerBeforeAgent(
             new HookContexts.BeforeAgentContext(sid, prompt, contextVariables));
@@ -181,6 +193,9 @@ final class AgentLoop {
         return false;
     }
 
+    /**
+     * Invokes the before-model-call hook, allowing prompt/tool modification or cancellation.
+     */
     private String handleBeforeModelCall(String effectivePrompt, List<Message> domainMessages,
                                           List<ToolSpecification> toolSpecs) {
         var promptBuilder = new StringBuilder(effectivePrompt);
@@ -242,6 +257,9 @@ final class AgentLoop {
 
     // ── Conversation ─────────────────────────────────────────────────
 
+    /**
+     * Prunes the conversation history using the configured conversation manager, if any.
+     */
     private List<Message> pruneConversation() {
         var currentMessages = agent.chatMemory.messages();
         var domainMessages = currentMessages.stream().map(Message::from).toList();
@@ -261,6 +279,9 @@ final class AgentLoop {
 
     // ── Guardrails ───────────────────────────────────────────────────
 
+    /**
+     * Runs input guardrails from all plugins and handles any violations.
+     */
     private boolean runInputGuardrails(List<Message> domainMessages) {
         for (var plugin : agent.getOrderedPlugins()) {
             for (var g : plugin.getInputGuardrails()) {
@@ -277,6 +298,9 @@ final class AgentLoop {
         return false;
     }
 
+    /**
+     * Runs output guardrails on the AI response and handles any violations.
+     */
     private boolean runOutputGuardrails(List<Message> domainMessages, AiMessage aiMessage) {
         var responseText = aiMessage.text() != null ? aiMessage.text() : "";
         agent.fire(new AfterInvocationEvent(sid, Instant.now(), responseText, domainMessages));
@@ -295,6 +319,9 @@ final class AgentLoop {
         return false;
     }
 
+    /**
+     * Handles a guardrail violation according to the plugin's configured block action.
+     */
     private AgentResult handlePluginGuardrail(Plugin plugin, GuardrailResult guardResult) {
         log.debug("Guardrail blocked by '{}' — action={}, reason='{}'",
             plugin.name(), plugin.getBlockAction(), guardResult.reason());
@@ -336,6 +363,9 @@ final class AgentLoop {
 
     // ── System Prompt ────────────────────────────────────────────────
 
+    /**
+     * Builds the effective system prompt, firing the before-invocation event.
+     */
     private String buildSystemPrompt(List<Message> domainMessages) {
         var sb = new StringBuilder(run.systemPrompt() != null ? run.systemPrompt() : "");
         var bie = new BeforeInvocationEvent(sid, Instant.now(), sb, domainMessages);
@@ -343,6 +373,9 @@ final class AgentLoop {
         return sb.toString().trim();
     }
 
+    /**
+     * Builds the list of tool specifications available to the model.
+     */
     private List<ToolSpecification> buildToolSpecs() {
         var specs = structuredForceActive
             ? java.util.Collections.<ToolSpecification>emptyList()
@@ -353,6 +386,9 @@ final class AgentLoop {
 
     // ── Structured Output ────────────────────────────────────────────
 
+    /**
+     * Attempts to parse structured output from the AI response, retrying with a force prompt if needed.
+     */
     private boolean handleStructuredOutput(AiMessage aiMessage) {
         var soConfig = run.structuredOutputConfig();
         if (soConfig != null && soConfig.isEnabled() && !aiMessage.hasToolExecutionRequests()) {
@@ -377,6 +413,9 @@ final class AgentLoop {
 
     // ── LLM Call ─────────────────────────────────────────────────────
 
+    /**
+     * Invokes the LLM with resilience and post-call hook processing, retrying on hook retry requests.
+     */
     private AiMessage invokeModel(List<ChatMessage> currentMessages, List<ToolSpecification> toolSpecs) {
         var responseText = "";
         AiMessage aiMessage = null;
@@ -437,6 +476,9 @@ final class AgentLoop {
             : null;
     }
 
+    /**
+     * Calls the LLM with retry logic, token recovery, circuit breaker, and timeout support.
+     */
     private ChatResponse callWithResilience(List<ChatMessage> currentMessages, List<ToolSpecification> toolSpecs) {
         var recovery = new TokenRecovery();
         var msgs = currentMessages;
@@ -478,6 +520,9 @@ final class AgentLoop {
         }
     }
 
+    /**
+     * Builds a ChatRequest from the current messages, tool specs, and structured output config.
+     */
     private ChatRequest buildRequest(List<ChatMessage> messages, List<ToolSpecification> toolSpecs) {
         var builder = ChatRequest.builder();
         builder.messages(messages);
@@ -502,12 +547,18 @@ final class AgentLoop {
         return builder.build();
     }
 
+    /**
+     * Returns the effective retry configuration, falling back to defaults.
+     */
     private RetryConfig effectiveRetryConfig() {
         return agent.retryConfig != null ? agent.retryConfig : RetryConfig.DEFAULT;
     }
 
     // ── Tool Execution ───────────────────────────────────────────────
 
+    /**
+     * Executes all tool execution requests from the AI message, handling hooks and errors.
+     */
     private void executeTools(AiMessage aiMessage) {
         for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
             if (agent.cancelled || agent.abortFlag.get()) {
@@ -608,6 +659,9 @@ final class AgentLoop {
         }
     }
 
+    /**
+     * Wraps a callable with retry logic if a retry configuration is set.
+     */
     private <T> T wrapWithRetry(Callable<T> callable) throws Exception {
         if (agent.retryConfig != null) {
             return Retry.run(callable, agent.retryConfig);
@@ -615,6 +669,9 @@ final class AgentLoop {
         return callable.call();
     }
 
+    /**
+     * Finds a ToolExecutionRequest by tool name from the given list.
+     */
     private ToolExecutionRequest findRequest(List<ToolExecutionRequest> requests, String toolName) {
         return requests.stream()
             .filter(r -> r.name().equals(toolName))
@@ -622,6 +679,9 @@ final class AgentLoop {
             .orElse(null);
     }
 
+    /**
+     * Parses JSON tool arguments into a map, returning an empty map on failure.
+     */
     private Map<String, Object> parseArgs(String arguments) {
         if (arguments == null || arguments.isBlank()) {
             return Map.of();
@@ -636,6 +696,9 @@ final class AgentLoop {
 
     // ── Completion ───────────────────────────────────────────────────
 
+    /**
+     * Handles normal agent completion when no tool execution requests remain.
+     */
     private AgentResult handleCompletion(AiMessage aiMessage) {
         var responseText = aiMessage.text() != null ? aiMessage.text() : "";
         var doneResult = new AgentResult(
@@ -662,6 +725,9 @@ final class AgentLoop {
         return result;
     }
 
+    /**
+     * Handles termination when the maximum number of tool iterations is reached.
+     */
     private AgentResult handleMaxIterations() {
         log.debug("Max iterations ({}) reached — returning result", run.maxToolIterations());
         agent.phase = AgentPhase.FAILED;
@@ -682,6 +748,9 @@ final class AgentLoop {
         return modifiedResult;
     }
 
+    /**
+     * Handles termination when the agent is detected to be in a stuck state.
+     */
     private AgentResult handleStuck() {
         log.debug("Stuck-state detected — returning result");
         agent.phase = AgentPhase.FAILED;
@@ -704,6 +773,9 @@ final class AgentLoop {
 
     // ── HITL / Pause ─────────────────────────────────────────────────
 
+    /**
+     * Blocks execution while the agent is in the WAITING_FOR_HUMAN phase.
+     */
     private void checkPaused() {
         if (agent.phase == AgentPhase.WAITING_FOR_HUMAN) {
             agent.pauseLock.lock();
@@ -727,6 +799,9 @@ final class AgentLoop {
 
     private AgentResult lastResult;
 
+    /**
+     * Constructs an AgentResult with the current execution state.
+     */
     private AgentResult result(String answer, StopReason reason) {
         return new AgentResult(
             sid,
@@ -737,12 +812,18 @@ final class AgentLoop {
         );
     }
 
+    /**
+     * Returns the elapsed execution duration in milliseconds.
+     */
     private long durationMs() {
         return (System.nanoTime() - startNanos) / 1_000_000;
     }
 
     // ── Utility ──────────────────────────────────────────────────────
 
+    /**
+     * Truncates a string to the maximum log length for safe logging.
+     */
     private static String truncate(String s) {
         if (s == null) return "null";
         return s.length() <= LOG_MAX ? s : s.substring(0, LOG_MAX) + "...";
