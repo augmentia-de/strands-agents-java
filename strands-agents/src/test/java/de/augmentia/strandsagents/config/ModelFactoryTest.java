@@ -57,25 +57,6 @@ class ModelFactoryTest {
             var model = ModelFactory.createChatModel(ModelTier.ADVANCED, tc);
             assertThat(model.toString()).contains("advanced-model");
         }
-
-        @Test
-        void createStreamingChatModel_fallsBackToBridge() {
-            ModelFactory.register(ModelProviderType.OPENAI, new ModelProvider() {
-                @Override
-                public ChatModel createChatModel(ChatModelConfig config) {
-                    return new MockSyncModel();
-                }
-
-                @Override
-                public StreamingChatModel createStreamingChatModel(ChatModelConfig config) {
-                    return null;
-                }
-            });
-            var cfg = new ChatModelConfig(ModelProviderType.OPENAI, null, null, "test", null, null, Map.of(), null, null);
-            var tc = new TieredModelConfig(cfg, cfg, ModelTier.SIMPLE);
-            var streaming = ModelFactory.createStreamingChatModel(ModelTier.SIMPLE, tc);
-            assertThat(streaming).isInstanceOf(SyncToStreamingBridge.class);
-        }
     }
 
     static class MockSyncModel implements ChatModel {

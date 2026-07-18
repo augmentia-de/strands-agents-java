@@ -41,10 +41,7 @@ public class ModelFactory {
         var config = tieredConfig.forTier(tier);
         var streamingProvider = provider(config.provider());
         var result = streamingProvider.createStreamingChatModel(config);
-        if (result != null) return result;
-        // Fallback: wrap sync model in bridge
-        var syncModel = streamingProvider.createChatModel(config);
-        return new SyncToStreamingBridge(syncModel);
+        return result;
     }
 
     /** Creates a ChatModel from a full ChatModelConfig. */
@@ -107,10 +104,7 @@ public class ModelFactory {
             config.logRequests(),
             config.logResponses()
         );
-        var streaming = provider(ModelProviderType.OPENAI).createStreamingChatModel(c);
-        if (streaming != null) return streaming;
-        var syncModel = provider(ModelProviderType.OPENAI).createChatModel(c);
-        return new SyncToStreamingBridge(syncModel);
+        return provider(ModelProviderType.OPENAI).createStreamingChatModel(c);
     }
 
     /** Looks up the registered ModelProvider for the given type. */
